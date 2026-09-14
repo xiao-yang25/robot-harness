@@ -41,10 +41,10 @@ headers. Comments explain constraints and reasons, rather than restating code.
 ## Checking changes
 
 Run the formatter on changed C++ files and check the resulting diff. For the
-current M0 sources, from the repository root:
+Core header and source, for example, from the repository root:
 
 ```sh
-clang-format --dry-run --Werror src/core.cpp tests/core_smoke.cpp
+clang-format --dry-run --Werror include/robot_harness/authority_gate.hpp src/core.cpp
 ```
 
 Use `clang-format -i` with explicit file paths to apply formatting; include new

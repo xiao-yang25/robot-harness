@@ -9,11 +9,12 @@ truthful operation feedback.
 
 ## Status
 
-**M1: normal sample execution implemented; Ubuntu validation pending.** This
+**M1: normal sample execution implemented and validated on macOS and Ubuntu.** This
 increment connects a passive Core, deterministic native worker, managed result
 sink, and host-driven example. Local macOS behavior tests and independent code
-review have passed. The earlier M0 CI result does not validate M1; see
-[Testing](docs/TESTING.md) for coverage and remaining evidence.
+review have passed, along with the
+[M1 Ubuntu build and three tests](https://github.com/xiao-yang25/robot-harness/actions/runs/34844507974).
+See [Testing](docs/TESTING.md) for the tested revision and coverage limits.
 
 The declared effect is acceptance of a sample result in a cooperative in-process
 fixture. Cancellation, deadlines, provider replacement, restart recovery, ROS

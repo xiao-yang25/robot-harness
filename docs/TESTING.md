@@ -110,8 +110,12 @@ This validates M0 only. Later changes require results for their own tested commi
 The M1 local implementation has passed all three registered tests on macOS with
 AppleClang, both normally and with AddressSanitizer/UndefinedBehaviorSanitizer.
 Independent code review also passed for that working tree. The host task record
-retains the base revision, uncommitted scope, commands, and output locations.
-M1 has not yet run in Ubuntu CI; full cross-platform acceptance remains pending.
+retains the reviewed scope, commands, and output locations. Commit `7eb0e76`
+subsequently passed the
+[M1 Ubuntu CI run](https://github.com/xiao-yang25/robot-harness/actions/runs/34844507974)
+on September 14, 2026: Ubuntu 22.04.5, GCC 11.4.0, configure/build succeeded, and
+all three registered tests passed. This establishes the implemented M1 behavior
+on both development platforms, within the coverage below.
 
 The fixture tests check independent expected numerical results, sequential
 requests, startup prerequisites, invalid arguments, explicitly staged deferred
@@ -127,8 +131,8 @@ not full fault injection through the host event stream or M2/M3 coverage.
 |---|---|---|
 | Core, sample fixture, example and CMake | README configure/build commands; CTest runs `robot_harness.authority_gate`, `robot_harness.sample_execution`, and `robot_harness.normal_execution_example` | Registered in `tests/CMakeLists.txt`; local CTest output and `build/Testing/Temporary/LastTest.log`, or corresponding custom build directory |
 | C++ formatting and naming | Follow [Coding style](CODING_STYLE.md); run clang-format on changed C++ files and review names | Local formatter check; not currently a CI job or behavior test |
-| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | First M0 Linux run passed at `0be526a`; see the linked Actions result above |
-| M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; local results passed within the coverage above; M1 Ubuntu result pending |
+| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; see the linked Actions results above |
+| M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Native rejection/failure, cancel ACK before settlement, expired deadline, missing/partial-effect evidence; no unearned success or conflicting redispatch | Planned; extend the M1 Core/native CTest suite |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |

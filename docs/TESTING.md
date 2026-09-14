@@ -66,7 +66,9 @@ compatibility issues, but cannot replace target-host timing measurements.
 Record the tested commit, environment, command, outcome, and material limitation
 in ordinary test or CI output. Do not infer Linux PASS from a macOS result or
 infer remote execution from the existence of a workflow file. The first Linux
-result requires pushing the workflow and inspecting the completed Actions run.
+result was verified on September 14, 2026: commit `0be526a` passed the
+[Ubuntu build and 1/1 smoke test](https://github.com/xiao-yang25/robot-harness/actions/runs/34826759485).
+This validates M0 only. Later changes require results for their own tested commit.
 
 ## Change-to-check mapping
 
@@ -74,7 +76,7 @@ result requires pushing the workflow and inspecting the completed Actions run.
 |---|---|---|
 | Current Core build, smoke test, CMake | README configure/build commands; CTest must run `robot_harness.core_smoke` and pass | Implemented: `tests/CMakeLists.txt`; local CTest output and `build/Testing/Temporary/LastTest.log`, or corresponding custom build directory |
 | C++ formatting and naming | Follow [Coding style](CODING_STYLE.md); run clang-format on changed C++ files and review names | Local formatter check; not currently a CI job or behavior test |
-| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | Workflow configured; no successful Linux run has been established in this task record |
+| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | First M0 Linux run passed at `0be526a`; see the linked Actions result above |
 | M1 normal action/events | Register fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Planned; only the M0 smoke test currently exists |
 | M2 failure/cancel | Native rejection/failure, cancel ACK before settlement, expired deadline, missing/partial-effect evidence; no unearned success or conflicting redispatch | Planned; extend the M1 Core/native CTest suite |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |

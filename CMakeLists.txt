@@ -47,8 +47,14 @@ add_executable(robot_harness_normal_execution
   examples/normal_execution.cpp
 )
 
+add_executable(robot_harness_failure_execution
+  examples/failure_execution.cpp
+)
+
 target_compile_features(robot_harness_normal_execution PRIVATE cxx_std_17)
 target_link_libraries(robot_harness_normal_execution PRIVATE robot_harness_sample_fixture)
+target_compile_features(robot_harness_failure_execution PRIVATE cxx_std_17)
+target_link_libraries(robot_harness_failure_execution PRIVATE robot_harness_sample_fixture)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)

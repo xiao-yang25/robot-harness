@@ -3,9 +3,9 @@
 This is the implementation-facing summary of the research workspace's accepted
 D-073 architecture and September 10 product split. The September 14 replanning
 changes the implementation order to runnable behavior slices, preserving those
-ownership boundaries. M0 established the build skeleton; M1 is now the active
-implementation slice. M2–M4 remain planned. See README and Testing for implemented
-status and the limits of actual validation.
+ownership boundaries. M0 established the build skeleton; M1 has been implemented
+and merged. M2a implements failure closure; cancellation, expiry and M3–M4 remain
+planned. See README and Testing for tested status and validation limits.
 
 ## Source roles
 
@@ -160,9 +160,11 @@ and conflicting admission blocked. No event bus, database, default worker thread
 or persistent replay is introduced.
 
 Request payloads and callback targets remain alive under host/adapter ownership
-until native use has ended. On shutdown the host closes admission, requests any
-supported stop, drains the required callbacks and releases native resources before
-destroying their adapter targets. A provider that cannot establish cleanup must
+until native use has ended. On shutdown the host closes admission and follows the
+adapter's declared drain-or-stop policy, requesting native stop when that policy
+requires it. It drains the required callbacks and releases native resources before
+destroying their adapter targets. The finite M1/M2 sample defaults to draining;
+explicitly revoked output stays revoked during shutdown. A provider that cannot establish cleanup must
 report that limit rather than emit settlement. M1 proves this only for its finite,
 deterministic in-process fixture; other shutdown paths are added with their adapter.
 
@@ -234,10 +236,10 @@ events. The caller then uses `process_next_staged_event()` or
 Native completion alone therefore does not imply that Core has received its
 evidence or that the sink has accepted its result.
 
-The sample's `started` observation is emitted after its deterministic computation;
-it records that execution occurred, not a precise execution-start timestamp. The
-example clock advances an integer on each observation, so neither the event times
-nor their differences establish execution latency. `shutdown()` closes admission
+The sample's `started` observation is emitted when its native execution routine
+begins, before calculation or a controlled execution failure. The example clock
+advances an integer on each observation, so neither the event times nor their
+differences establish execution latency. `shutdown()` closes admission
 and drains finite pending work and callbacks while the sink is available, then
 closes the adapter. This is normal draining, not cancellation.
 
@@ -247,6 +249,184 @@ admitted. After that next admission, evidence for the old operation is stale and
 cannot modify the current operation. This does not implement durable receipt
 history or recovery across restart; callers retain any historical receipt copies
 they need.
+
+## M2a caller and integration surface
+
+M2a extends the same provisional Core and sample host. Implementation and tested
+platform status are reported separately in README and Testing.
+
+`observe_non_submission()` records a definitive adapter refusal before native
+submission. The receipt reports `DispatchStatus::kNotSubmitted` and
+`NativeOutcome::kNotExecuted`; it does not invent native acceptance or a terminal
+success. Its source is the configured `settlement_evidence_source`, which already
+identifies the adapter responsible for the fixture's cleanup observations.
+
+`NativeEventKind::kRejected` records a native submission attempt that was not
+accepted, using the native source and attempted native identity. Acceptance and
+rejection are mutually exclusive in this fixture protocol: an incompatible later
+acceptance/rejection observation is rejected without replacing the earlier fact.
+Conflicting native success/failure facts still produce an unknown blocked outcome.
+This assumes truthful, definitive native rejection; a missing response is not one.
+
+`observe_output_not_delivered()` records `OutputDisposition::kNotDelivered` and a
+reason. `kNoOutputProduced` comes from the adapter after non-submission, rejection
+or native failure. `kSinkRejected` comes from the managed sink after native success
+and an actual failed acceptance attempt, with the remaining result discarded.
+Identity and current permission are checked before classifying sink availability;
+an invalid result cannot manufacture delivery-failure evidence for another action.
+In either path, settlement remains a separate observation with matching identity,
+source, scope and a time no earlier than the prerequisite facts.
+
+For one operation, new output non-delivery and settlement observations must have
+strictly greater sequence numbers than previously recorded facts from the same
+source. Equal observation times are valid; a later time does not excuse a reused
+or regressing sequence. Different sources have independent sequences, and exact
+replays of a recorded fact remain idempotent even after later closure facts.
+The host preserves the adapter's settlement callback sequence instead of assigning
+a new constant. An operation whose output is definitively not delivered cannot
+subsequently deliver that output.
+
+The sample host offers `reject_next_native_submission()` and
+`fail_next_native_execution()` for deterministic failure scenarios. The first
+applies to the next native submission attempt; the second applies when native
+execution next begins. A pre-dispatch refusal does not consume either control,
+and a native rejection does not consume the pending execution-failure control.
+These controls do not retry work or represent production failure-detection policy.
+`worker_submission_count()` counts attempts after the actual dispatch permission
+check, including native rejection; `worker_execution_count()` counts executions
+that began, including controlled failure. Inspect these alongside actual sink
+results and the layered receipt.
+
+In synchronous mode `submit()` drains the observations for its request before
+returning, including definitive dispatch refusal. In deferred mode it applies
+the initial non-submission/acceptance/rejection observation and leaves subsequent
+output disposition and settlement staged for explicit host processing. Thus a
+rejected native attempt can still occupy the domain while cleanup evidence is
+pending. The normal success flow is retained, and shutdown defaults to finite
+draining of retained native work and its callbacks.
+
+## M2 planned behavior: failure, cancellation and expiry
+
+This section defines the M2 behavior and slice boundaries. M2a uses the surface
+above; M2b/M2c remain future work. See Testing for actual evidence. Keep the M1
+sample calculation, static binding, single
+effect domain and single active operation. Add failure controls to the fixture,
+not a generic fault engine or another Core scheduler. M3 still owns provider
+replacement, restart and recovery from contradictory evidence.
+
+The caller must be able to distinguish a failed request from an operation whose
+effects may still continue. Stopping future result acceptance and releasing the
+domain are separate decisions: revoked permission stays revoked even while the
+old operation occupies the domain.
+
+### Increment order
+
+| Slice | Behavior to implement together with its example and tests |
+|---|---|
+| M2a: rejection and failure | Close an admitted operation that never reached native execution; report explicit native rejection or failure after acceptance; resolve undelivered output and require actual cleanup before another request |
+| M2b: cancellation | Request cancellation by operation identity, revoke future dispatch/output permission, observe native ACK separately from terminal outcome, and keep the domain occupied until settlement |
+| M2c: deadline | Add an optional absolute deadline in the host clock domain; expiry uses the same revocation and native-stop path as cancellation, with a distinct recorded reason |
+
+Each slice preserves M1 behavior and gets its own focused review and macOS/Ubuntu
+validation when implemented. Failure closure comes first because cancel and
+expiry also need a truthful way to finish without a successful delivered result.
+This avoids adding one generic `done` flag or a separate release rule per command.
+
+### Facts required for closure
+
+Extend the receipt only with facts these paths need: definitive non-submission or
+native rejection; a cancellation request and its ACK disposition; deadline and
+observed expiry; native cancellation when actually reported; resolved output
+without acceptance; and revocation distinct from domain release. Exact C++ names
+remain provisional. Preserve known native outcomes and already accepted results.
+
+Invalid arguments remain a pre-admission rejection with no allocated operation.
+A local dispatch refusal after admission needs correlated adapter evidence that
+no work was submitted and no retained request can be dispatched later. Explicit
+native rejection must identify the attempted submission and establish that the
+native owner did not accept work; a lost response does not establish rejection.
+Neither case may invent a native success or cancellation event to release a slot.
+
+For an accepted operation, release requires a consistent native terminal fact,
+resolved result disposition, and matching settlement evidence. A result may be
+accepted, or definitively not delivered after the adapter has discarded/fenced
+all remaining delivery paths. Failed sink acceptance must be recorded truthfully;
+it does not turn native success into native failure. A flag saying permission was
+revoked is not evidence that cleanup or output disposal occurred.
+
+For a proven non-submission or rejection, equivalent evidence must establish no
+remaining native work, deferred dispatch or output obligation. In both paths,
+settlement covers the existing `worker-callbacks-and-managed-result` scope:
+native payload use has ended and remaining callbacks/results have been handled
+so no old managed result can subsequently commit. Check source, operation,
+binding, sequence and causal observation times against the relevant prerequisites.
+The adapter supplies observations; Core makes the release decision. New work
+still requires an open host and available worker/sink at actual dispatch.
+
+Missing terminal or cleanup evidence leaves the relevant facts pending/unknown
+and conflicting admission blocked. Later valid evidence for the same operation
+can finish delayed closure; it cannot re-enable revoked output. Contradictory
+valid terminal facts retain the M1 unknown/block behavior and require later M3
+recovery, not an M2 reset or a synthetic settlement. Task verdict remains
+unassessed on every path.
+
+### Cancellation and ordering
+
+The host serializes a valid cancellation transition before asking the adapter to
+stop native work. That transition prevents any later dispatch or managed result
+acceptance for the operation. The adapter attempts native cancellation at most
+once for repeated requests; ACK, refusal and unavailable acknowledgement remain
+separate observations and none releases the domain. A native terminal fact plus
+actual cleanup may establish settlement even if no ACK was received.
+
+Cancellation before actual dispatch prevents submission and uses proven
+non-submission closure. Cancellation after acceptance may complete cooperatively
+or the worker may ignore it and finish naturally. In the latter case record the
+real native success/failure, reject its later result at the sink, and wait for
+cleanup. Native success after a cancel request is not a contradictory terminal
+fact: the request never claimed the native work had stopped.
+
+If a result is staged but not accepted, cancellation wins when its transition
+occurs first in the host sequence; check current permission at actual sink
+acceptance. If the sink accepted the result first, retain that fact and payload:
+cancellation cannot roll it back. If cleanup is still pending, the domain stays
+occupied. Unknown/stale operation commands do not affect the current operation;
+commands after release report that no active cancellation is needed. Repeated
+commands do not dispatch work or issue duplicate native stops.
+
+`shutdown()` retains normal finite draining as its default, without implicitly
+requesting cancellation. An explicitly revoked operation remains revoked during
+draining: discard its pending result, retain targets until native use and callbacks
+end, then close. Destruction alone cannot manufacture missing settlement evidence.
+
+### Deadline meaning
+
+A deadline bounds authorization through operation closure, including result
+acceptance and settlement; it is not a real-time stopping guarantee. With no
+deadline, existing M1 behavior is unchanged. A request already expired at admission
+is rejected without native submission. At `now >= deadline`, an active operation
+expires; an already released operation is not retroactively expired.
+
+Core stays passive. The host explicitly supplies current time and evaluates expiry
+before actual dispatch, result acceptance, event processing and new admission;
+an explicit time-advance/poll entry lets an idle host observe expiry. Reading an
+old receipt alone does not run a timer. Tests use a manually controlled monotonic
+clock, not sleeping or wall-clock timing assumptions.
+
+Once expiry is observed, the host uses the same one-time native-stop path as
+cancellation. Preserve both reasons if cancellation and expiry occur, without
+repeated stop requests. A completion staged before the deadline but delivered
+after it cannot restore output permission. Output accepted before expiry remains
+accepted, while expiry during pending cleanup does not erase native success or
+release the domain. If synchronous computation occupies the host across the
+deadline, it cannot be preempted by this design; the subsequent boundary check
+must reject late delivery and drain cleanup truthfully.
+
+The implementation and verification entry points are the existing Core and
+fixture headers/sources, normal example and tests. The
+[M2 planned checks](TESTING.md#m2-planned-checks) define observable acceptance;
+no thread pool, retry policy, transport, ROS dependency or new evidence archive is
+needed for these slices.
 
 ## Product feedback and later expansion
 

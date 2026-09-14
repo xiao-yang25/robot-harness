@@ -33,7 +33,19 @@ bool is_valid_request(const SampleRequest& request) {
   return true;
 }
 
-enum class CallbackKind { kAccepted, kStarted, kTerminalSucceeded, kResult, kSettled };
+enum class CallbackKind {
+  kNotSubmitted,
+  kAccepted,
+  kRejected,
+  kStarted,
+  kTerminalSucceeded,
+  kTerminalFailed,
+  kNoOutputProduced,
+  kResult,
+  kSettled
+};
+
+enum class ResultAcceptance { kAccepted, kSinkUnavailable, kInvalid, kPermissionDenied };
 
 struct NativeCallback {
   CallbackKind kind = CallbackKind::kAccepted;
@@ -79,18 +91,37 @@ public:
     result_sink_ready_ = is_ready;
   }
 
+  void reject_next_native_submission() noexcept {
+    reject_next_native_submission_ = true;
+  }
+  void fail_next_native_execution() noexcept {
+    fail_next_native_execution_ = true;
+  }
+
   bool dispatch(const OperationAuthority& authority, const SampleRequest& request,
                 DispatchPermission permission) {
-    if (!is_worker_ready() || !is_result_sink_ready() || pending_work_.has_value() ||
-        !permission()) {
-      return false;
-    }
-
     WorkItem work;
     work.authority = authority;
     work.request = request;
     work.native_identity = "native-sample-" + std::to_string(authority.operation_id);
+
+    if (!is_worker_ready() || !is_result_sink_ready() || pending_work_.has_value() ||
+        !permission()) {
+      emit(work, CallbackKind::kNotSubmitted, 1);
+      emit(work, CallbackKind::kNoOutputProduced, 2);
+      emit(work, CallbackKind::kSettled, 3);
+      return false;
+    }
+
     ++submission_count_;
+    if (reject_next_native_submission_) {
+      reject_next_native_submission_ = false;
+      emit(work, CallbackKind::kRejected, 1);
+      emit(work, CallbackKind::kNoOutputProduced, 1);
+      emit(work, CallbackKind::kSettled, 2);
+      return true;
+    }
+
     emit(work, CallbackKind::kAccepted, 1);
     if (completion_mode_ == CompletionMode::kSynchronous) {
       finish(work);
@@ -110,13 +141,19 @@ public:
     return true;
   }
 
-  bool accept_result(const OperationAuthority& authority, SampleResult result,
-                     ResultPermission permission) {
-    if (!is_result_sink_ready() || result.operation_id != authority.operation_id || !permission()) {
-      return false;
+  ResultAcceptance accept_result(const OperationAuthority& authority, SampleResult result,
+                                 ResultPermission permission) {
+    if (result.operation_id != authority.operation_id) {
+      return ResultAcceptance::kInvalid;
+    }
+    if (!permission()) {
+      return ResultAcceptance::kPermissionDenied;
+    }
+    if (!is_result_sink_ready()) {
+      return ResultAcceptance::kSinkUnavailable;
     }
     results_.push_back(std::move(result));
-    return true;
+    return ResultAcceptance::kAccepted;
   }
 
   void drain_pending() {
@@ -145,8 +182,14 @@ public:
   std::size_t submission_count() const noexcept {
     return submission_count_;
   }
+  std::size_t execution_count() const noexcept {
+    return execution_count_;
+  }
   bool has_pending_work() const noexcept {
     return pending_work_.has_value();
+  }
+  bool is_deferred() const noexcept {
+    return completion_mode_ == CompletionMode::kDeferred;
   }
 
 private:
@@ -164,6 +207,16 @@ private:
   }
 
   void finish(const WorkItem& work) {
+    ++execution_count_;
+    emit(work, CallbackKind::kStarted, 2);
+    if (fail_next_native_execution_) {
+      fail_next_native_execution_ = false;
+      emit(work, CallbackKind::kTerminalFailed, 3);
+      emit(work, CallbackKind::kNoOutputProduced, 1);
+      emit(work, CallbackKind::kSettled, 2);
+      return;
+    }
+
     SampleResult result;
     result.operation_id = work.authority.operation_id;
     result.request_reference = work.request.request_reference;
@@ -174,7 +227,6 @@ private:
       result.squared_values.push_back(square);
       result.sum_of_squares += square;
     }
-    emit(work, CallbackKind::kStarted, 2);
     emit(work, CallbackKind::kTerminalSucceeded, 3);
     emit(work, CallbackKind::kResult, 4, std::move(result));
     emit(work, CallbackKind::kSettled, 5);
@@ -185,9 +237,12 @@ private:
   bool worker_ready_ = true;
   bool result_sink_ready_ = true;
   bool is_closed_ = false;
+  bool reject_next_native_submission_ = false;
+  bool fail_next_native_execution_ = false;
   std::optional<WorkItem> pending_work_;
   std::vector<SampleResult> results_;
   std::size_t submission_count_ = 0;
+  std::size_t execution_count_ = 0;
 };
 
 }  // namespace
@@ -245,12 +300,22 @@ struct SampleExecutionHost::Implementation {
     }
     StagedEvent event = std::move(staged_events.front());
     staged_events.pop_front();
-    const auto& callback = event.callback;
+    auto& callback = event.callback;
     switch (callback.kind) {
+    case CallbackKind::kNotSubmitted:
+      gate->observe_non_submission(
+          {callback.authority, {kSettlementEvidenceSource, event.observed_at, callback.sequence}});
+      break;
     case CallbackKind::kAccepted:
       gate->observe_native({callback.authority,
                             callback.native_identity,
                             NativeEventKind::kAccepted,
+                            {kNativeEvidenceSource, event.observed_at, callback.sequence}});
+      break;
+    case CallbackKind::kRejected:
+      gate->observe_native({callback.authority,
+                            callback.native_identity,
+                            NativeEventKind::kRejected,
                             {kNativeEvidenceSource, event.observed_at, callback.sequence}});
       break;
     case CallbackKind::kStarted:
@@ -265,17 +330,38 @@ struct SampleExecutionHost::Implementation {
                             NativeEventKind::kTerminalSucceeded,
                             {kNativeEvidenceSource, event.observed_at, callback.sequence}});
       break;
+    case CallbackKind::kTerminalFailed:
+      gate->observe_native({callback.authority,
+                            callback.native_identity,
+                            NativeEventKind::kTerminalFailed,
+                            {kNativeEvidenceSource, event.observed_at, callback.sequence}});
+      break;
+    case CallbackKind::kNoOutputProduced:
+      gate->observe_output_not_delivered(
+          {callback.authority,
+           OutputNonDeliveryReason::kNoOutputProduced,
+           {},
+           {kSettlementEvidenceSource, event.observed_at, callback.sequence}});
+      break;
     case CallbackKind::kResult: {
       if (!callback.result.has_value()) {
         break;
       }
       const std::string result_reference =
           "managed-result-" + std::to_string(callback.authority.operation_id);
-      if (adapter.accept_result(callback.authority, *callback.result, [this, &callback] {
+      const auto acceptance =
+          adapter.accept_result(callback.authority, std::move(*callback.result), [this, &callback] {
             return gate->can_deliver_result(callback.authority);
-          })) {
+          });
+      callback.result.reset();
+      if (acceptance == ResultAcceptance::kAccepted) {
         gate->observe_output_accepted(
             {callback.authority, result_reference, {kResultSinkObserver, read_time(), 1}});
+      } else if (acceptance == ResultAcceptance::kSinkUnavailable) {
+        gate->observe_output_not_delivered({callback.authority,
+                                            OutputNonDeliveryReason::kSinkRejected,
+                                            result_reference,
+                                            {kResultSinkObserver, read_time(), 1}});
       }
       break;
     }
@@ -283,7 +369,7 @@ struct SampleExecutionHost::Implementation {
       gate->observe_settlement({callback.authority,
                                 kSettlementScope,
                                 true,
-                                {kSettlementEvidenceSource, read_time(), 1}});
+                                {kSettlementEvidenceSource, read_time(), callback.sequence}});
       break;
     }
     return true;
@@ -347,6 +433,14 @@ void SampleExecutionHost::set_result_sink_ready(bool is_ready) {
   implementation_->adapter.set_result_sink_ready(is_ready);
 }
 
+void SampleExecutionHost::reject_next_native_submission() noexcept {
+  implementation_->adapter.reject_next_native_submission();
+}
+
+void SampleExecutionHost::fail_next_native_execution() noexcept {
+  implementation_->adapter.fail_next_native_execution();
+}
+
 SampleSubmission SampleExecutionHost::submit(const SampleRequest& request) {
   auto& state = *implementation_;
   SampleSubmission submission;
@@ -369,14 +463,19 @@ SampleSubmission SampleExecutionHost::submit(const SampleRequest& request) {
   }
 
   const auto authority = *admission.authority;
-  if (!state.adapter.dispatch(authority, request, [&state, &authority] {
-        return state.gate->claim_dispatch(authority, state.read_time());
-      })) {
+  const bool dispatched = state.adapter.dispatch(authority, request, [&state, &authority] {
+    return state.gate->claim_dispatch(authority, state.read_time());
+  });
+  if (state.adapter.is_deferred()) {
+    state.process_next();
+  } else {
+    state.process_all();
+  }
+  if (!dispatched) {
     submission.status = SampleSubmissionStatus::kDispatchBlocked;
     return submission;
   }
   submission.status = SampleSubmissionStatus::kSubmitted;
-  state.process_all();
   return submission;
 }
 
@@ -407,6 +506,10 @@ const std::vector<SampleResult>& SampleExecutionHost::results() const noexcept {
 
 std::size_t SampleExecutionHost::worker_submission_count() const noexcept {
   return implementation_->adapter.submission_count();
+}
+
+std::size_t SampleExecutionHost::worker_execution_count() const noexcept {
+  return implementation_->adapter.execution_count();
 }
 
 bool SampleExecutionHost::has_pending_native_work() const noexcept {

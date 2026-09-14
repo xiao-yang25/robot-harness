@@ -10,6 +10,8 @@ const char* outcome_name(robot_harness::NativeOutcome outcome) {
   switch (outcome) {
   case robot_harness::NativeOutcome::kPending:
     return "pending";
+  case robot_harness::NativeOutcome::kNotExecuted:
+    return "not-executed";
   case robot_harness::NativeOutcome::kSucceeded:
     return "succeeded";
   case robot_harness::NativeOutcome::kFailed:

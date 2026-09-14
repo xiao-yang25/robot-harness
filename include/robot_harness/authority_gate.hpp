@@ -78,7 +78,7 @@ struct AdmissionDecision {
 };
 
 enum class EvidenceDisposition { kAccepted, kDuplicate, kRejected };
-enum class NativeEventKind { kAccepted, kStarted, kTerminalSucceeded, kTerminalFailed };
+enum class NativeEventKind { kAccepted, kRejected, kStarted, kTerminalSucceeded, kTerminalFailed };
 
 struct NativeEvidence {
   OperationAuthority authority;
@@ -93,6 +93,20 @@ struct OutputEvidence {
   EvidenceRecord record;
 };
 
+struct NonSubmissionEvidence {
+  OperationAuthority authority;
+  EvidenceRecord record;
+};
+
+enum class OutputNonDeliveryReason { kNoOutputProduced, kSinkRejected };
+
+struct OutputNonDeliveryEvidence {
+  OperationAuthority authority;
+  OutputNonDeliveryReason reason = OutputNonDeliveryReason::kNoOutputProduced;
+  std::string result_reference;
+  EvidenceRecord record;
+};
+
 struct SettlementEvidence {
   OperationAuthority authority;
   std::string scope;
@@ -100,10 +114,10 @@ struct SettlementEvidence {
   EvidenceRecord record;
 };
 
-enum class DispatchStatus { kPending, kSubmitted };
-enum class NativeAcceptance { kPending, kAccepted };
-enum class NativeOutcome { kPending, kSucceeded, kFailed, kUnknown };
-enum class OutputDisposition { kPending, kAccepted };
+enum class DispatchStatus { kPending, kSubmitted, kNotSubmitted };
+enum class NativeAcceptance { kPending, kAccepted, kRejected };
+enum class NativeOutcome { kPending, kNotExecuted, kSucceeded, kFailed, kUnknown };
+enum class OutputDisposition { kPending, kAccepted, kNotDelivered };
 enum class SettlementStatus { kPending, kSettled };
 enum class DomainVerdict { kUnassessed };
 enum class AuthorityDisposition { kCurrent, kReleased, kBlockedUnknown };
@@ -124,11 +138,15 @@ struct OperationReceipt {
   std::string native_identity;
   std::string result_reference;
   std::string settlement_scope;
+  std::optional<OutputNonDeliveryReason> output_non_delivery_reason;
+  std::optional<EvidenceRecord> non_submission_evidence;
   std::optional<EvidenceRecord> native_acceptance_evidence;
+  std::optional<EvidenceRecord> native_rejection_evidence;
   std::optional<EvidenceRecord> native_started_evidence;
   std::optional<EvidenceRecord> native_success_evidence;
   std::optional<EvidenceRecord> native_failure_evidence;
   std::optional<EvidenceRecord> output_evidence;
+  std::optional<EvidenceRecord> output_non_delivery_evidence;
   std::optional<EvidenceRecord> settlement_evidence;
 };
 
@@ -159,9 +177,11 @@ public:
 
   AdmissionDecision admit(const OperationRequest& request);
   bool claim_dispatch(const OperationAuthority& authority, MonotonicTime observed_at);
+  EvidenceDisposition observe_non_submission(const NonSubmissionEvidence& evidence);
   EvidenceDisposition observe_native(const NativeEvidence& evidence);
   bool can_deliver_result(const OperationAuthority& authority) const;
   EvidenceDisposition observe_output_accepted(const OutputEvidence& evidence);
+  EvidenceDisposition observe_output_not_delivered(const OutputNonDeliveryEvidence& evidence);
   EvidenceDisposition observe_settlement(const SettlementEvidence& evidence);
   std::optional<OperationReceipt> receipt(const OperationAuthority& authority) const;
 

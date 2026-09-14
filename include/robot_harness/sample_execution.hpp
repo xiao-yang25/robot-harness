@@ -55,6 +55,8 @@ public:
   StartupStatus initialize();
   void set_worker_ready(bool is_ready);
   void set_result_sink_ready(bool is_ready);
+  void reject_next_native_submission() noexcept;
+  void fail_next_native_execution() noexcept;
 
   SampleSubmission submit(const SampleRequest& request);
   bool complete_deferred();
@@ -65,6 +67,7 @@ public:
   std::optional<OperationReceipt> receipt(const OperationAuthority& authority) const;
   const std::vector<SampleResult>& results() const noexcept;
   std::size_t worker_submission_count() const noexcept;
+  std::size_t worker_execution_count() const noexcept;
   bool has_pending_native_work() const noexcept;
 
   void shutdown();

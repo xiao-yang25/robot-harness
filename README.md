@@ -26,8 +26,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The smoke test checks the initial build/link setup only. It does not test robot
-execution semantics.
+The smoke test links and calls the placeholder Core library. It does not test
+robot execution semantics.
+
+The [Ubuntu CI workflow](.github/workflows/core.yml) runs the same CMake/CTest
+suite on GitHub-hosted Ubuntu 22.04. macOS remains a local development environment;
+ROS integration and timing measurements use their relevant Ubuntu/Linux targets.
+See [testing environments and evidence boundaries](docs/TESTING.md). A workflow
+file alone is not evidence of a successful Linux run.
 
 ## Development host build note
 

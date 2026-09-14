@@ -70,6 +70,11 @@ require their own relevant evidence. The initial prototype does not claim them.
 
 ## Verification discipline
 
+Use the [testing environment split](TESTING.md): local macOS plus Ubuntu CI for
+Core correctness, Ubuntu for ROS integration, and target deployment hardware for
+timing and physical effects. CI coverage grows with M1/M2 tests; M0 only checks
+the build and placeholder library call.
+
 Use focused checks for meaningful state branches and adapter boundaries. Do not
 copy the historical experiment artifact system into product tests. No new
 project-computed digest is needed for ordinary local development. The applicable

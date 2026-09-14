@@ -1,6 +1,7 @@
-#include <string_view>
+namespace robot_harness {
+int core_build_anchor() noexcept;
+}
 
 int main() {
-  constexpr std::string_view profile{"TRUSTED_EMBEDDED"};
-  return profile.empty() ? 1 : 0;
+  return robot_harness::core_build_anchor();
 }

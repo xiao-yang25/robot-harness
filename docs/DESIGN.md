@@ -22,6 +22,19 @@ identifiers, not files shipped in this product repository. The host/task handoff
 supplies their actual location when a change needs those sources. Do not invent
 paths or treat an inaccessible historical result as current runtime evidence.
 
+## Design principles
+
+- Favor high cohesion: keep closely related responsibilities and invariants together.
+- Keep coupling low through clear dependency directions and limited interfaces.
+- Use modular boundaries that hide implementation details and allow local change.
+- Make contracts, ownership, state transitions and error handling explicit.
+- Prefer simple, testable designs; introduce abstractions for demonstrated needs.
+- Evaluate these principles together with correctness, performance and maintenance
+  costs. They guide tradeoffs rather than prescribe a fixed class or directory layout.
+
+The shared engineering guides provide the design and review methods. The sections
+below record this project's concrete boundaries and decisions.
+
 ## Product boundary
 
 Robot Harness is independently usable by agents, behavior trees, and deterministic

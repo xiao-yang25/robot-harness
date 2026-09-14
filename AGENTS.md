@@ -18,6 +18,7 @@ to this repository.
 |---|---|
 | Product purpose, implemented status, next increment | [README](README.md) |
 | Accepted execution boundary and M1–M4 scope | [Design](docs/DESIGN.md) |
+| General software design principles | [Design principles](docs/DESIGN.md#design-principles) |
 | Commands, environments, acceptance mapping, result locations | [Testing](docs/TESTING.md) |
 | PR review workflow and revision-linked evidence | [PR review and evidence](docs/TESTING.md#pr-review-and-evidence) |
 | C++ naming, headers, formatting and generated-file boundaries | [Coding style](docs/CODING_STYLE.md) |

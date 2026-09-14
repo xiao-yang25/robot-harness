@@ -23,7 +23,7 @@ Requires CMake 3.16 or newer and a C++17 compiler. ROS is not required for the c
 ```sh
 cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build
-ctest --test-dir build --output-on-failure
+(cd build && ctest --output-on-failure)
 ```
 
 The smoke test links and calls the placeholder Core library. It does not test
@@ -35,19 +35,20 @@ ROS integration and timing measurements use their relevant Ubuntu/Linux targets.
 See [testing environments and evidence boundaries](docs/TESTING.md). A workflow
 file alone is not evidence of a successful Linux run.
 
-## Development host build note
+## macOS SDK selection
 
-On the development host, the default macOS 27 SDK failed to link because the
-installed linker did not recognize its `arm64e.x1` entries. M0 built and passed
-its smoke test with the installed macOS 26.5 SDK:
+If the compiler and default SDK are incompatible, explicitly select a compatible
+installed SDK for the local build. Replace the example path below with an actual
+SDK path on your machine:
 
 ```sh
-cmake -S . -B build-macos-sdk26 -DBUILD_TESTING=ON -DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
-cmake --build build-macos-sdk26
-ctest --test-dir build-macos-sdk26 --output-on-failure
+cmake -S . -B build-local -DBUILD_TESTING=ON -DCMAKE_OSX_SYSROOT="/path/to/compatible/MacOSX.sdk"
+cmake --build build-local
+(cd build-local && ctest --output-on-failure)
 ```
 
-This is a host-specific workaround, not a project SDK requirement.
+Machine-specific versions, paths, and diagnostic logs stay in the host's task
+record. A local SDK selection is not a project requirement for other platforms.
 
 ## Responsibilities
 
@@ -64,10 +65,15 @@ general scheduler, model-serving engine, robot controller, or agent framework.
 
 ## Next implementation
 
-M1 implements the passive authority state machine. A deterministic native adapter
-then exercises interruption, late output, settlement, and recovery. A ROS 2
-Humble adapter follows, while a separate Robot Agent project can begin consuming
-the minimal interfaces as soon as they are usable.
+M1 delivers one normal sample operation through a native worker to a managed
+result sink, with correlated events and a layered receipt. The minimal Core and
+deterministic adapter are delivered together. M2 adds
+failure and cancellation, M3 adds replacement and recovery, and M4 maps the same
+behavior to ROS 2 Humble. Each increment includes its regression tests. A separate
+Robot Agent can start using the available interfaces before all milestones finish.
+These are planned milestones; the current implementation remains M0.
 
-See [design and implementation scope](docs/DESIGN.md) and
-[repository instructions](AGENTS.md).
+For project constraints and the engineering workflow entry, start with
+[repository instructions](AGENTS.md). The accepted boundary and M1–M4 sequence
+are in [Design](docs/DESIGN.md); runnable checks and remaining environment gaps
+are in [Testing](docs/TESTING.md).

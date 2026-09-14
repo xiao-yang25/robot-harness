@@ -1,185 +1,99 @@
 # Minimal Integrity and Proportional Assurance Standard
 
-> Status: **ACCEPTED — D-068，2026-08-31**
-> Scope: all future documents、designs、tooling and experiment executions
-> Principle: every check must protect a distinct failure mode；digest proves byte integrity，direct
-> observation and focused tests prove correctness
+This is the product application of accepted research decision **D-068
+(2026-08-31)**. It preserves the applicable constraints without importing a
+particular host, boot, qualification run, or historical authorization state into
+product setup. The original research standard and sealed evidence remain in the
+research workspace. This document does not supersede their numeric values,
+runtime predicates, state semantics, or authorization boundaries.
 
-## 1. Decision
+## Integrity boundaries
 
-Robot Harness adopts a minimal integrity model。New work must not add a digest merely because an
-artifact has a field that could be hashed。A digest is justified only when bytes cross a trust
-boundary、must be compared with an already accepted immutable object，or must be checked after
-transfer/storage。
+Default to **no project-computed digest** for local development. Do not introduce
+MD5. A digest establishes byte integrity, not semantic correctness.
 
-This standard supersedes the checksum、per-file digest、repeated independent rehash and large
-assertion-registry mechanics in D-060–D-067 for **new work and new executions**。It does not rewrite
-or invalidate already sealed evidence；historical bundles remain verifiable under the contract that
-created them。Numeric values、state semantics、runtime predicates、sentinel thresholds、barrier
-rules and authorization boundaries are unchanged。
+| Object or boundary | Required treatment |
+|---|---|
+| Container image identity | Read the digest supplied by the container runtime; do not rehash image bytes |
+| Accepted profile or runtime policy | Compare stable IDs, versions, and consumed numeric values or predicates directly |
+| Local source and execution | Use reviewed source and relevant runtime observations; no routine source snapshots, byte counts, or aggregate source hashes |
+| Final evidence archive crossing a transfer boundary | One SHA-256 computed by the packager and verified once by the receiver |
 
-## 2. Integrity Budget：exception boundaries，not a checklist
+These boundaries are a ceiling, not a checklist. Do not add a digest where no
+byte-identity trust boundary requires it. Do not add per-sample/per-raw-file digest
+chains, an internal checksum manifest duplicating the final archive check, or
+repeated hashes of the same immutable input in several stages.
 
-The following are the only places where a new SHA-256 may be justified。They are a ceiling，not a
-required set。The default is **no project-computed digest** unless bytes actually cross an external
-storage/transfer boundary and corruption would otherwise be undetectable：
+Any proposed additional digest must have an explicit **Integrity Budget**:
+the concrete trust boundary, object, producer, verifier, reason existing direct
+checks or the final archive digest are insufficient, and how repeated computation
+is prevented. An exception requires an explicit decision grounded in a new
+failure mode; "more rigorous" is not sufficient. Merely having a digest field
+does not make it required.
 
-| Boundary | Default treatment | When a digest is justified |
-|---|---|---|
-| Container image identity | Read the immutable digest already supplied by the container runtime；do not recompute image bytes | Only when importing an image through an untrusted transport without a verified runtime identity |
-| Accepted numeric profile | Compare the accepted profile ID、version and consumed numeric fields directly | Only when the profile bytes are transferred independently of their authority store |
-| Runtime policy | Compare policy ID、version and predicates directly | Only when policy bytes cross an independent trust boundary |
-| Source | Use reviewed read-only source plus actual executable/cmdline/process observations | Only for a release artifact crossing a trust boundary；never as a routine per-attempt snapshot |
-| Final evidence archive | One SHA-256 produced by the packager and checked once by the receiver | Default and sufficient transfer-integrity check |
+## Semantic correctness
 
-For the current applicability qualification，the selected budget is **one digest total：the final
-evidence archive**。Docker's existing `sha256:...` image identity is compared as a supplied runtime
-value and is not recomputed by project tooling。Profile and policy use stable IDs plus direct field
-validation。No source snapshot、source byte count or source aggregate digest is produced。
+Validate schemas, consumed values, runtime facts, state transitions, and safety
+predicates directly. Relevant lifecycle, clock continuity, placement, ordering,
+and admission facts retain their checks when an experiment actually depends on
+them. A matching digest cannot substitute for those facts.
 
-If a boundary is not crossed，or byte identity is not needed，do not hash it。Within one workflow the same immutable object must not be rehashed by each
-producer、auditor、sealer and verifier merely to restate the same fact。
+At external boundaries, validate required semantic fields, types, enums, and
+invariants. Unknown optional metadata is not an error unless it collides with a
+reserved semantic namespace. Do not give internal intermediates separate closed
+schemas merely because they are files. Require exact cardinality or ordering only
+when it changes the decision.
 
-MD5 is prohibited：it adds another mechanism without providing a useful boundary in this project。
-Short IDs may be derived for display，but never grant authority and need not be independently
-verified。
+Missing, conflicting, or unparseable evidence remains unresolved. A direct
+runtime-policy violation rejects the affected attempt. A whole qualification is
+invalidated only by an observed change to its boot-level stable facts; cosmetic
+names, writable staging files, and unrelated optional metadata are not such facts.
 
-## 3. Requirements that remain strict without hashes
+## Proportional checks and evidence
 
-The following continue to be validated directly from raw facts and schemas：
+For an experiment that produces a safety-critical decision and transfers evidence,
+use one collector, one evaluator, one focused independent safety-decision check,
+one packager, and one transfer-boundary check. Each has a distinct responsibility:
 
-- boot ID、clocksource、clock continuity and suspend detection；
-- actual image、pull policy、mounts、tmpfs run root and process lifecycle；
-- observer/control/treatment CPU affinity and role placement；
-- PRE/POST ordering、cardinality and run/attempt identity；
-- the per-boot sentinel、lateness threshold and registered derivation；
-- `APPLICABLE / MISMATCH / UNRESOLVED` state and reason mapping；
-- closed barrier、empty pre-release treatment ledger and release ordering；
-- archive path safety、required-file presence、parseability and the fields needed for adjudication。
+- The collector records raw facts; the evaluator validates and derives the result.
+- The independent decision check covers the safety-critical disposition through
+  independent parsing, predicate recomputation, or observation, not rehashing.
+- The packager does not re-adjudicate the result. The receiver checks transfer
+  integrity and path safety, loads the decision, and performs only the focused
+  safety-critical admission checks needed by its boundary.
 
-A digest match must never substitute for these checks。Conversely，a missing redundant per-file
-digest must not make otherwise complete raw evidence inconclusive。
+This experiment chain does not require every local build/test to produce an
+archive. It also does not replace code review required by the applicable shared
+engineering guide: decision checking and code review cover different objects.
 
-## 4. Disallowed patterns for new work
+Test semantic branches and representative boundaries. Avoid large fixed assertion
+registries, exhaustive per-leaf mutation suites, and repeated full evaluators.
+Counts summarize diagnostics; they are not an acceptance target. Keep one current
+authority reference per concern rather than chains of acceptance/contract locks.
 
-New documents、designs and tooling must not require：
+Only a final archive needs immutable/read-only treatment. Staging may remain
+writable until packaging succeeds. Retain failed attempts under distinct attempt
+identities instead of repairing sealed evidence in place. Reference reusable
+authority inputs rather than copying them into every evidence bundle.
 
-- per-sample、per-row or per-raw-evidence-file hashes；
-- routine source snapshots、source byte counts or executable/entrypoint digest chains for each
-  attempt；
-- the same immutable input to be hashed repeatedly in builder/auditor/sealer/transfer stages；
-- both internal checksum manifests and an external archive checksum for the same transfer purpose；
-- bundle IDs、directory names or acceptance status derived solely from additional digest layers；
-- large fixed assertion registries whose only behavior is to repeat one aggregate PASS；
-- a new acceptance manifest or lock solely to bind another acceptance manifest or lock。
+Where the research admission protocol applies, local release depends on the
+evaluator, focused independent decision check, closed barrier, and empty treatment
+ledger; it does not wait for remote archive transfer. A packaging failure excludes
+the run as invalid evidence but does not retroactively turn a correctly fenced
+admission into a safety violation. Product effect-domain release continues to use
+the settlement requirements in [Design](../DESIGN.md), not archive delivery.
 
-Independent review remains required where it catches a different class of error，but independence
-must come from separate parsing、predicate recomputation、negative tests or observation—not from
-rehashing identical bytes。
+## Historical evidence and applicability
 
-## 5. Proportional verification model
+Do not rewrite sealed D-060–D-067 evidence or reinterpret it as new product
+validation. Historical compatibility fields may remain readable, but redundant
+digest repetitions, fixed assertion counts, and lock chains must not become
+requirements for new work.
 
-The same rule applies to non-hash checks：repeating a check is justified only when the second
-consumer observes a different trust boundary or can catch a different implementation failure。
-
-### 5.1 One owner per responsibility
-
-The default execution chain is：
-
-```text
-collector records raw facts
-  → evaluator validates schemas/predicates and derives state/reasons
-  → one independent decision check covers safety-critical disposition
-  → packager creates the final archive
-  → receiver verifies archive integrity and path safety
-```
-
-The packager does not re-adjudicate semantics。The receiver does not rerun the complete evaluator。
-It verifies transfer integrity，loads the recorded decision and performs only the small set of
-safety-critical admission checks needed by the consumer。
-
-### 5.2 Schema strictness
-
-- External/untrusted inputs require parseability、required fields、types、enums and safety
-  invariants。
-- Unknown metadata fields are ignored unless they collide with a reserved semantic namespace。
-- Internal intermediate files do not need distinct closed schemas when they are never consumed
-  outside the same tool boundary。
-- Exact cardinality/order is required only where it changes semantics，such as the configured
-  sentinel samples、clock triplet selection and PRE-before-POST lifecycle。JSON key order and harmless
-  metadata order are not adjudication conditions。
-
-### 5.3 Reviews、assertions and tests
-
-- Use a concise result with state、reason codes and the failed predicate。Do not require a large
-  fixed assertion registry that merely mirrors one aggregate result。
-- One independent implementation is required only for the final safety-critical disposition，not
-  for collectors、packagers and transfer code independently reimplementing the whole pipeline。
-- Test semantic branches and representative boundary classes。Do not require mutation of every
-  leaf、every field permutation or every equivalent malformed encoding after the parser behavior is
-  already covered。
-- Counts such as `19/19` or `22/22` are diagnostic summaries，not authority and not an acceptance
-  goal。
-
-### 5.4 Authority and packaging
-
-- Maintain one current authority reference per concern。Do not create chains of review lock →
-  contract lock → implementation lock → acceptance lock when a decision ID、versioned artifact and
-  one retained digest already identify the authority。
-- Only the final archive needs immutable/read-only treatment。Staging directories and intermediate
-  files may remain writable until successful packaging；failed attempts are retained under a new
-  attempt identity rather than repaired in place。
-- A per-run admission barrier release does not wait for remote archive transfer。It requires the local evaluator PASS、
-  the one independent safety decision PASS、current barrier CLOSED and treatment ledger empty。
-  Packaging/transfer then records the run。If final evidence packaging fails，the run is
-  `INVALID_EVIDENCE` and cannot contribute to Gate A，but the failure does not retroactively turn a
-  correctly fenced local admission into a safety violation。
-- Reusable authority inputs are referenced，not copied into every attempt bundle。
-
-### 5.5 Failure severity
-
-- A direct runtime-policy violation rejects the current attempt。
-- Missing、conflicting or unparsable evidence yields `UNRESOLVED`。
-- A whole qualification is invalidated only when a boot-level stable fact is directly observed to
-  have changed，not because one attempt has a bad path、PID、optional metadata field or incomplete
-  file。
-- Cosmetic naming、directory-ID mismatch、file mode on non-final staging data and unknown optional
-  metadata are not standalone reasons to reject otherwise valid evidence。
-
-## 6. Required design discipline
-
-Any future document or design that introduces a hash must include a short **Integrity Budget** that
-states：
-
-1. the exact trust boundary；
-2. the single object being protected；
-3. who computes it and who verifies it；
-4. why schema validation、an existing aggregate digest or the final archive digest is insufficient；
-5. how repeated computation is prevented。
-
-If this justification is absent，the hash requirement is non-normative and must be removed during
-review。An exception outside the listed boundary categories requires an explicit new decision with a measured
-failure mode；“more rigorous” by itself is not sufficient justification。
-
-## 7. Applicability migration
-
-- Preserve D-060–D-067 documents、locks、vectors and sealed evidence as historical records。
-- Existing tooling may retain legacy digest fields for backward-readable evidence，but future
-  execution acceptance must not depend on redundant legacy digest repetitions、fixed assertion
-  counts、multi-lock chains or repeated full-pipeline revalidation。
-- Per-boot qualification is a regression preflight，not a second calibration。Replace the historical
-  10-minute / 60,000-sample sentinel with exactly 3,000 consecutive 10 ms samples（30 seconds）。
-  The accepted 50 ms maximum-lateness threshold is unchanged；any exceedance still fails closed。
-- Qualification clock evidence uses three PRE and three POST triplets；admission uses three current
-  triplets。The minimum-width selection and suspend/discontinuity comparison are unchanged。Separate
-  four-point continuity wrappers are unnecessary when host PRE/POST、clock PRE/POST and sentinel
-  first/last timestamps provide the same ordering facts。
-- The D-068 qualification path now uses only the final archive digest，3,000-sample sentinel、3+3
-  clock evidence and the direct runtime predicates in section 3。Its focused local suite passes；a
-  real attempt remains a separate execution action。
-- The prepared remote directory
-  `qualification-d067-20260831a` (located through the research workspace record)
-  is classified `PREPARATION_SUPERSEDED`。It contains no formal container、sentinel or
-  qualification result and must not be promoted into evidence。
-- No calibration rerun is required。D-061 numeric values remain accepted；Gate A、schedules and
-  B0/B1/H remain separately unauthorized。
+The original D-068 qualification's selected budget remains one final-archive
+digest. Its accepted 3,000-sample sentinel, 50 ms threshold, clock evidence,
+runtime predicates, and attempt-specific authority remain in the research
+standard; they are not universal product defaults. A new qualification must use
+that applicable source rather than reconstructing an execution procedure from
+this product summary. Its absence is a gap for that experiment, not for an
+ordinary Core build.

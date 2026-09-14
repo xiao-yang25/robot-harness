@@ -9,8 +9,8 @@ their relevant target environments.
 | Check | Environment | Evidence boundary |
 |---|---|---|
 | Core build and state transitions | Local macOS and Ubuntu CI | Results apply to implemented tests; injected time is not a measurement of OS timing |
-| Deterministic native adapter scenarios | macOS and Ubuntu as M2 is implemented | Simulated late output and settlement do not establish physical stopping |
-| ROS 2 Humble / Nav2 integration | Ubuntu target environment | Test native cancellation, provider loss, late completion, and actual adapter submission boundaries |
+| Deterministic native adapter scenarios | macOS and Ubuntu from M1 onward | Simulated late output and settlement do not establish physical stopping |
+| ROS 2 Humble lifecycle/action integration | Ubuntu target environment | Test native cancellation, provider loss, late completion, and actual adapter submission boundaries |
 | Scheduling, latency, jitter, resource contention | Target Linux deployment host | Generic hosted CI and a Linux VM on a Mac do not establish deployment performance |
 | Task outcome and physical effects | Relevant simulator, then robot hardware | Simulation and hardware results are reported separately |
 
@@ -31,7 +31,12 @@ The checkout step follows the official
 digest, evidence archive, dependency matrix, or custom runner is needed for this
 initial job.
 
-To reproduce the job on Ubuntu with a C++ compiler and CMake installed:
+The CI command below requires CMake/CTest 3.20 or newer (`--test-dir` was added
+in 3.20). The project can still configure with CMake 3.16; the portable README
+recipe runs CTest inside the build directory. The CI runner must have GCC, CMake,
+and a build tool installed; the workflow does not install ROS or custom tooling.
+
+To reproduce the CI job on Ubuntu with those tools installed:
 
 ```sh
 cmake -S . -B build -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++
@@ -47,13 +52,41 @@ compatibility issues, but cannot replace target-host timing measurements.
 
 - **M0:** build, link, and call the placeholder Core library symbol. This does not
   validate any execution-governance behavior.
-- **M1:** add focused Core transition tests using host-supplied deterministic
-  time; run the same cases locally and in Ubuntu CI.
-- **M2:** register deterministic adapter scenarios in the same CTest suite.
-- **M3/M4:** add the relevant Ubuntu ROS integration and cross-path regression;
-  keep these separate from the ROS-independent Core job.
+- **M1:** build and run the normal-action example through the real library and
+  deterministic adapter; register focused initialization, dispatch, event and
+  receipt tests using host-supplied time. Run locally and in Ubuntu CI.
+- **M2:** extend that suite with failure, cancellation, expiry and delayed/unknown
+  settlement. Inspect actual fixture effects as well as returned receipts.
+- **M3:** add stale-output, replacement, conflict and restart/recovery cases at the
+  actual fixture submission boundary; keep earlier normal-path tests running.
+- **M4:** run relevant Ubuntu ROS integration and cross-path regression separately
+  from the ROS-independent Core/native job. Unsupported native guarantees must
+  produce explicit limits, not a substituted synthetic ROS PASS.
 
 Record the tested commit, environment, command, outcome, and material limitation
 in ordinary test or CI output. Do not infer Linux PASS from a macOS result or
 infer remote execution from the existence of a workflow file. The first Linux
 result requires pushing the workflow and inspecting the completed Actions run.
+
+## Change-to-check mapping
+
+| Changed scope | Check entry and expected result | Status / evidence location |
+|---|---|---|
+| Current Core build, smoke test, CMake | README configure/build commands; CTest must run `robot_harness.core_smoke` and pass | Implemented: `tests/CMakeLists.txt`; local CTest output and `build/Testing/Temporary/LastTest.log`, or corresponding custom build directory |
+| C++ formatting and naming | Follow [Coding style](CODING_STYLE.md); run clang-format on changed C++ files and review names | Local formatter check; not currently a CI job or behavior test |
+| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | Workflow configured; no successful Linux run has been established in this task record |
+| M1 normal action/events | Register fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Planned; only the M0 smoke test currently exists |
+| M2 failure/cancel | Native rejection/failure, cancel ACK before settlement, expired deadline, missing/partial-effect evidence; no unearned success or conflicting redispatch | Planned; extend the M1 Core/native CTest suite |
+| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |
+| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
+| Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
+
+For Core admission, cancellation, settlement, recovery, and adapter ownership
+changes, use the shared engineering guide's applicable independent-review rule;
+the registered tests alone do not complete that review. Do not create another
+project-specific copy of the review policy.
+
+No robot target or credential is configured by these instructions. Missing Linux
+or hardware evidence remains explicit; writing a test plan does not satisfy it.
+Build output is local and ignored by Git. Do not add log archives, private host
+details, or a second status registry merely to record a check.

@@ -9,12 +9,14 @@ truthful operation feedback.
 
 ## Status
 
-**M1: normal sample execution implemented and validated on macOS and Ubuntu.** This
-increment connects a passive Core, deterministic native worker, managed result
-sink, and host-driven example. Local macOS behavior tests and independent code
-review have passed, along with the
-[M1 Ubuntu build and three tests](https://github.com/xiao-yang25/robot-harness/actions/runs/34844507974).
-See [Testing](docs/TESTING.md) for the tested revision and coverage limits.
+**M2a: failure closure implemented, reviewed, and validated on macOS and Ubuntu.**
+The sample now distinguishes non-submission, native rejection, native failure,
+and result delivery failure. New work is allowed only after the relevant outcome,
+output disposition and cleanup evidence are complete. Local macOS tests, sanitizer
+checks and independent code review have passed.
+The [M2a Ubuntu run](https://github.com/xiao-yang25/robot-harness/actions/runs/34864391097)
+for `16b2888` passed all five tests in both normal and ASan/UBSan builds.
+See [Testing](docs/TESTING.md) for evidence and limits.
 
 The declared effect is acceptance of a sample result in a cooperative in-process
 fixture. Cancellation, deadlines, provider replacement, restart recovery, ROS
@@ -61,6 +63,19 @@ sample B (`5, 6`, sum of squares `61`). Results and receipt layers are printed
 from the actual execution. Link `robot_harness_core` for the Core alone, or
 `robot_harness_sample_fixture` to use this deterministic host and worker.
 
+## Failure execution example
+
+```sh
+./build/robot_harness_failure_execution
+```
+
+This example drives an accepted operation through a controlled native failure,
+attempts another request while cleanup is pending and checks that it is blocked.
+After processing output disposition and settlement, the caller submits a fresh
+operation whose actual result is `16`. There is no automatic retry. See
+[failure_execution.cpp](examples/failure_execution.cpp) and the
+[M2a interface](docs/DESIGN.md#m2a-caller-and-integration-surface).
+
 ## Code map
 
 | Entry | Role |
@@ -68,7 +83,7 @@ from the actual execution. Link `robot_harness_core` for the Core alone, or
 | [Core interface](include/robot_harness/authority_gate.hpp) and [implementation](src/core.cpp) | Operation identity, admission, evidence validation, and current receipt; no sample payload |
 | [Sample host interface](include/robot_harness/sample_execution.hpp) and [implementation](src/sample_execution.cpp) | Host, deterministic adapter/worker, callback staging, and managed result storage |
 | [Application example](examples/normal_execution.cpp) | Initializes the host and runs A then B in both completion modes |
-| [Core tests](tests/authority_gate_tests.cpp) and [fixture tests](tests/sample_execution_tests.cpp) | Core evidence boundaries and actual normal execution, delivery, and shutdown |
+| [Core tests](tests/authority_gate_tests.cpp), [normal fixture tests](tests/sample_execution_tests.cpp) and [M2a tests](tests/m2a_failure_tests.cpp) | Evidence boundaries, actual normal/failure execution, delivery, cleanup and shutdown |
 
 For the request-to-result sequence, see [M1 caller and integration surface](docs/DESIGN.md#m1-caller-and-integration-surface).
 For commands and what to observe, see [manual verification](docs/TESTING.md#manual-verification).
@@ -117,8 +132,9 @@ deterministic adapter are delivered together. M2 adds
 failure and cancellation, M3 adds replacement and recovery, and M4 maps the same
 behavior to ROS 2 Humble. Each increment includes its regression tests. A separate
 Robot Agent can start using the available interfaces before all milestones finish.
-M1 is the current development slice; M2–M4 remain planned. The normal fixture
-does not establish the cancellation/recovery benefits that later slices must test.
+M1 is complete and M2a is the current failure-closure slice. M2b cancellation,
+M2c expiry and M3–M4 remain planned. Current results do not establish those later
+capabilities.
 
 For project constraints and the engineering workflow entry, start with
 [repository instructions](AGENTS.md). The accepted boundary and M1–M4 sequence

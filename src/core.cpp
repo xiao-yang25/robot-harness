@@ -1,5 +1,6 @@
 #include "robot_harness/authority_gate.hpp"
 
+#include <array>
 #include <stdexcept>
 #include <utility>
 
@@ -22,18 +23,31 @@ bool is_record_well_formed(const EvidenceRecord& record, const std::string& expe
          record.observed_at >= earliest_time;
 }
 
+std::array<const std::optional<EvidenceRecord>*, 9>
+receipt_records(const OperationReceipt& receipt) {
+  return {&receipt.native_acceptance_evidence, &receipt.native_rejection_evidence,
+          &receipt.native_started_evidence,    &receipt.native_success_evidence,
+          &receipt.native_failure_evidence,    &receipt.output_evidence,
+          &receipt.non_submission_evidence,    &receipt.output_non_delivery_evidence,
+          &receipt.settlement_evidence};
+}
+
+bool follows_same_source_records(const EvidenceRecord& evidence, const OperationReceipt& receipt) {
+  for (const auto* record : receipt_records(receipt)) {
+    if (record->has_value() && (*record)->source == evidence.source &&
+        evidence.sequence <= (*record)->sequence) {
+      return false;
+    }
+  }
+  return true;
+}
+
 MonotonicTime latest_time(const OperationReceipt& receipt) {
   MonotonicTime time = receipt.authority.admitted_at;
   if (receipt.dispatched_at.has_value() && *receipt.dispatched_at > time) {
     time = *receipt.dispatched_at;
   }
-  const std::optional<EvidenceRecord>* records[] = {&receipt.native_acceptance_evidence,
-                                                    &receipt.native_started_evidence,
-                                                    &receipt.native_success_evidence,
-                                                    &receipt.native_failure_evidence,
-                                                    &receipt.output_evidence,
-                                                    &receipt.settlement_evidence};
-  for (const auto* record : records) {
+  for (const auto* record : receipt_records(receipt)) {
     if (record->has_value() && (*record)->observed_at > time) {
       time = (*record)->observed_at;
     }
@@ -80,11 +94,41 @@ struct AuthorityGate::Implementation {
   }
 
   bool current_is_releasable() const {
-    return current_receipt.has_value() &&
-           current_receipt->native_outcome == NativeOutcome::kSucceeded &&
-           current_receipt->output == OutputDisposition::kAccepted &&
-           current_receipt->settlement == SettlementStatus::kSettled &&
+    return current_receipt.has_value() && has_resolved_closure(*current_receipt) &&
            current_receipt->authority_disposition == AuthorityDisposition::kReleased;
+  }
+
+  bool has_resolved_effects(const OperationReceipt& receipt) const {
+    if (receipt.dispatch == DispatchStatus::kNotSubmitted) {
+      return receipt.native_outcome == NativeOutcome::kNotExecuted &&
+             receipt.output == OutputDisposition::kNotDelivered &&
+             receipt.output_non_delivery_reason == OutputNonDeliveryReason::kNoOutputProduced;
+    }
+    if (receipt.dispatch != DispatchStatus::kSubmitted) {
+      return false;
+    }
+    if (receipt.native_acceptance == NativeAcceptance::kRejected) {
+      return receipt.native_outcome == NativeOutcome::kNotExecuted &&
+             receipt.output == OutputDisposition::kNotDelivered &&
+             receipt.output_non_delivery_reason == OutputNonDeliveryReason::kNoOutputProduced;
+    }
+    if (receipt.native_acceptance != NativeAcceptance::kAccepted) {
+      return false;
+    }
+    if (receipt.native_outcome == NativeOutcome::kFailed) {
+      return receipt.output == OutputDisposition::kNotDelivered &&
+             receipt.output_non_delivery_reason == OutputNonDeliveryReason::kNoOutputProduced;
+    }
+    if (receipt.native_outcome != NativeOutcome::kSucceeded) {
+      return false;
+    }
+    return receipt.output == OutputDisposition::kAccepted ||
+           (receipt.output == OutputDisposition::kNotDelivered &&
+            receipt.output_non_delivery_reason == OutputNonDeliveryReason::kSinkRejected);
+  }
+
+  bool has_resolved_closure(const OperationReceipt& receipt) const {
+    return receipt.settlement == SettlementStatus::kSettled && has_resolved_effects(receipt);
   }
 
   void refresh_authority_disposition() {
@@ -95,9 +139,7 @@ struct AuthorityGate::Implementation {
       current_receipt->authority_disposition = AuthorityDisposition::kBlockedUnknown;
       return;
     }
-    if (current_receipt->native_outcome == NativeOutcome::kSucceeded &&
-        current_receipt->output == OutputDisposition::kAccepted &&
-        current_receipt->settlement == SettlementStatus::kSettled) {
+    if (has_resolved_closure(*current_receipt)) {
       current_receipt->authority_disposition = AuthorityDisposition::kReleased;
       return;
     }
@@ -259,6 +301,34 @@ bool AuthorityGate::claim_dispatch(const OperationAuthority& authority, Monotoni
   return true;
 }
 
+EvidenceDisposition AuthorityGate::observe_non_submission(const NonSubmissionEvidence& evidence) {
+  auto& state = *implementation_;
+  if (!state.current_authority_matches(evidence.authority) ||
+      !is_record_well_formed(evidence.record, state.config.settlement_evidence_source,
+                             evidence.authority.admitted_at)) {
+    return EvidenceDisposition::kRejected;
+  }
+  auto& receipt = *state.current_receipt;
+  if (receipt.dispatch == DispatchStatus::kNotSubmitted) {
+    return receipt.non_submission_evidence.has_value() &&
+                   records_match(*receipt.non_submission_evidence, evidence.record)
+               ? EvidenceDisposition::kDuplicate
+               : EvidenceDisposition::kRejected;
+  }
+  if (receipt.dispatch != DispatchStatus::kPending ||
+      receipt.native_acceptance_evidence.has_value() ||
+      receipt.native_rejection_evidence.has_value() ||
+      receipt.native_started_evidence.has_value() || receipt.native_success_evidence.has_value() ||
+      receipt.native_failure_evidence.has_value()) {
+    return EvidenceDisposition::kRejected;
+  }
+  receipt.dispatch = DispatchStatus::kNotSubmitted;
+  receipt.native_outcome = NativeOutcome::kNotExecuted;
+  receipt.non_submission_evidence = evidence.record;
+  state.refresh_authority_disposition();
+  return EvidenceDisposition::kAccepted;
+}
+
 EvidenceDisposition AuthorityGate::observe_native(const NativeEvidence& evidence) {
   auto& state = *implementation_;
   if (!state.current_authority_matches(evidence.authority) || evidence.native_identity.empty() ||
@@ -270,6 +340,7 @@ EvidenceDisposition AuthorityGate::observe_native(const NativeEvidence& evidence
 
   switch (evidence.kind) {
   case NativeEventKind::kAccepted:
+  case NativeEventKind::kRejected:
   case NativeEventKind::kStarted:
   case NativeEventKind::kTerminalSucceeded:
   case NativeEventKind::kTerminalFailed:
@@ -296,7 +367,15 @@ EvidenceDisposition AuthorityGate::observe_native(const NativeEvidence& evidence
   if (!receipt.native_identity.empty() && receipt.native_identity != evidence.native_identity) {
     return EvidenceDisposition::kRejected;
   }
-  if (receipt.native_identity.empty() && evidence.kind != NativeEventKind::kAccepted) {
+  if (receipt.native_identity.empty() && evidence.kind != NativeEventKind::kAccepted &&
+      evidence.kind != NativeEventKind::kRejected) {
+    return EvidenceDisposition::kRejected;
+  }
+
+  if ((receipt.native_acceptance == NativeAcceptance::kRejected &&
+       evidence.kind != NativeEventKind::kRejected) ||
+      (receipt.native_acceptance == NativeAcceptance::kAccepted &&
+       evidence.kind == NativeEventKind::kRejected)) {
     return EvidenceDisposition::kRejected;
   }
 
@@ -309,6 +388,16 @@ EvidenceDisposition AuthorityGate::observe_native(const NativeEvidence& evidence
       receipt.native_identity = evidence.native_identity;
       receipt.native_acceptance = NativeAcceptance::kAccepted;
       receipt.native_acceptance_evidence = evidence.record;
+    }
+    break;
+  case NativeEventKind::kRejected:
+    if (receipt.native_acceptance == NativeAcceptance::kRejected) {
+      disposition = EvidenceDisposition::kDuplicate;
+    } else {
+      receipt.native_identity = evidence.native_identity;
+      receipt.native_acceptance = NativeAcceptance::kRejected;
+      receipt.native_outcome = NativeOutcome::kNotExecuted;
+      receipt.native_rejection_evidence = evidence.record;
     }
     break;
   case NativeEventKind::kStarted:
@@ -395,6 +484,76 @@ EvidenceDisposition AuthorityGate::observe_output_accepted(const OutputEvidence&
   return EvidenceDisposition::kAccepted;
 }
 
+EvidenceDisposition
+AuthorityGate::observe_output_not_delivered(const OutputNonDeliveryEvidence& evidence) {
+  auto& state = *implementation_;
+  if (!state.current_authority_matches(evidence.authority)) {
+    return EvidenceDisposition::kRejected;
+  }
+
+  const std::string* expected_source = nullptr;
+  const EvidenceRecord* prerequisite = nullptr;
+  switch (evidence.reason) {
+  case OutputNonDeliveryReason::kNoOutputProduced:
+    expected_source = &state.config.settlement_evidence_source;
+    if (!evidence.result_reference.empty()) {
+      return EvidenceDisposition::kRejected;
+    }
+    if (state.current_receipt->dispatch == DispatchStatus::kNotSubmitted) {
+      prerequisite = state.current_receipt->non_submission_evidence
+                         ? &*state.current_receipt->non_submission_evidence
+                         : nullptr;
+    } else if (state.current_receipt->native_acceptance == NativeAcceptance::kRejected) {
+      prerequisite = state.current_receipt->native_rejection_evidence
+                         ? &*state.current_receipt->native_rejection_evidence
+                         : nullptr;
+    } else if (state.current_receipt->native_acceptance == NativeAcceptance::kAccepted &&
+               state.current_receipt->native_outcome == NativeOutcome::kFailed) {
+      prerequisite = state.current_receipt->native_failure_evidence
+                         ? &*state.current_receipt->native_failure_evidence
+                         : nullptr;
+    }
+    break;
+  case OutputNonDeliveryReason::kSinkRejected:
+    expected_source = &state.config.result_sink_observer;
+    if (evidence.result_reference.empty() ||
+        state.current_receipt->native_acceptance != NativeAcceptance::kAccepted ||
+        state.current_receipt->native_outcome != NativeOutcome::kSucceeded) {
+      return EvidenceDisposition::kRejected;
+    }
+    prerequisite = state.current_receipt->native_success_evidence
+                       ? &*state.current_receipt->native_success_evidence
+                       : nullptr;
+    break;
+  default:
+    return EvidenceDisposition::kRejected;
+  }
+  if (prerequisite == nullptr ||
+      !is_record_well_formed(evidence.record, *expected_source, prerequisite->observed_at)) {
+    return EvidenceDisposition::kRejected;
+  }
+
+  auto& receipt = *state.current_receipt;
+  if (receipt.output == OutputDisposition::kNotDelivered) {
+    return receipt.output_non_delivery_reason == evidence.reason &&
+                   receipt.result_reference == evidence.result_reference &&
+                   receipt.output_non_delivery_evidence.has_value() &&
+                   records_match(*receipt.output_non_delivery_evidence, evidence.record)
+               ? EvidenceDisposition::kDuplicate
+               : EvidenceDisposition::kRejected;
+  }
+  if (receipt.output != OutputDisposition::kPending ||
+      !follows_same_source_records(evidence.record, receipt)) {
+    return EvidenceDisposition::kRejected;
+  }
+  receipt.output = OutputDisposition::kNotDelivered;
+  receipt.output_non_delivery_reason = evidence.reason;
+  receipt.result_reference = evidence.result_reference;
+  receipt.output_non_delivery_evidence = evidence.record;
+  state.refresh_authority_disposition();
+  return EvidenceDisposition::kAccepted;
+}
+
 EvidenceDisposition AuthorityGate::observe_settlement(const SettlementEvidence& evidence) {
   auto& state = *implementation_;
   if (!state.current_authority_matches(evidence.authority) ||
@@ -411,15 +570,15 @@ EvidenceDisposition AuthorityGate::observe_settlement(const SettlementEvidence& 
                ? EvidenceDisposition::kDuplicate
                : EvidenceDisposition::kRejected;
   }
-  if (!evidence.permits_same_domain_admission ||
-      receipt.native_outcome == NativeOutcome::kPending ||
-      (receipt.native_outcome == NativeOutcome::kSucceeded &&
-       receipt.output != OutputDisposition::kAccepted)) {
+  if (!evidence.permits_same_domain_admission || receipt.output == OutputDisposition::kPending) {
     return EvidenceDisposition::kRejected;
   }
-  if (receipt.native_outcome == NativeOutcome::kSucceeded &&
-      (!receipt.output_evidence.has_value() ||
-       evidence.record.observed_at < receipt.output_evidence->observed_at)) {
+  const auto previous_time = latest_time(receipt);
+  if (evidence.record.observed_at < previous_time ||
+      !follows_same_source_records(evidence.record, receipt)) {
+    return EvidenceDisposition::kRejected;
+  }
+  if (!state.has_resolved_effects(receipt)) {
     return EvidenceDisposition::kRejected;
   }
   receipt.settlement = SettlementStatus::kSettled;

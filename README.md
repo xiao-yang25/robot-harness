@@ -9,15 +9,14 @@ truthful operation feedback.
 
 ## Status
 
-**M2a: failure closure implemented and reviewed locally; Ubuntu validation pending.**
+**M2a: failure closure implemented, reviewed, and validated on macOS and Ubuntu.**
 The sample now distinguishes non-submission, native rejection, native failure,
 and result delivery failure. New work is allowed only after the relevant outcome,
 output disposition and cleanup evidence are complete. Local macOS tests, sanitizer
 checks and independent code review have passed.
-The earlier [M1 Ubuntu result](https://github.com/xiao-yang25/robot-harness/actions/runs/34844507974)
-validates M1 only. See [Testing](docs/TESTING.md) for current evidence and limits.
-The Ubuntu workflow now configures both normal and ASan/UBSan test builds;
-results for the current M2a revision are still pending.
+The [M2a Ubuntu run](https://github.com/xiao-yang25/robot-harness/actions/runs/34864391097)
+for `16b2888` passed all five tests in both normal and ASan/UBSan builds.
+See [Testing](docs/TESTING.md) for evidence and limits.
 
 The declared effect is acceptance of a sample result in a cooperative in-process
 fixture. Cancellation, deadlines, provider replacement, restart recovery, ROS

@@ -31,7 +31,7 @@ AddressSanitizer/UndefinedBehaviorSanitizer build in `build-sanitizers`. Both ru
 all registered tests. Undefined-behavior recovery is disabled so a diagnostic
 fails the test instead of merely printing a warning. A failure in either build
 or test phase fails the same job; its check name remains unchanged for branch
-protection. This configuration still needs a successful Ubuntu run for M2a.
+protection. The verified M2a Ubuntu result is recorded below.
 
 The checkout step follows the official
 [checkout v6 interface](https://github.com/actions/checkout/tree/v6). No additional
@@ -165,8 +165,11 @@ UndefinedBehaviorSanitizer. The original pre-dispatch refusal reproducer failed
 on M1 and passed on M2a, executing only the new request with actual result `9`.
 Independent code review passed for that implementation. A separate probe checked
 actual sink classification, deferred non-submission, retained failure controls,
-and shutdown with an unavailable sink. Ubuntu validation remains pending; the
-earlier M1 Linux run does not validate M2a. The host task record retains the
+and shutdown with an unavailable sink. On September 14, 2026, commit `16b2888`
+passed the [M2a Ubuntu CI run](https://github.com/xiao-yang25/robot-harness/actions/runs/34864391097):
+GCC 11.4.0 configured and built both Debug variants, with all five CTests passing
+normally and under ASan/UBSan. Undefined-behavior recovery was disabled.
+The host task record retains the
 reviewed revision/diff and actual logs. Extend the same tests as later slices are built.
 The same-source closure-sequence regression tests failed before the ordering fix
 in both Core and host checks. After the fix, all five tests passed normally and
@@ -252,7 +255,7 @@ are introduced here.
 |---|---|---|
 | Core, sample fixture, example and CMake | README configure/build commands; CTest runs `robot_harness.authority_gate`, `robot_harness.sample_execution`, `robot_harness.m2a_failure`, `robot_harness.normal_execution_example`, and `robot_harness.failure_execution_example` | Registered in `tests/CMakeLists.txt`; local CTest output and `build/Testing/Temporary/LastTest.log`, or corresponding custom build directory |
 | C++ formatting and naming | Follow [Coding style](CODING_STYLE.md); run clang-format on changed C++ files and review names | Local formatter check; not currently a CI job or behavior test |
-| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; see the linked Actions results above |
+| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; M2a normal and ASan/UBSan passed at `16b2888`; see the linked Actions results above |
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a implemented in Core tests and `tests/m2a_failure_tests.cpp`, plus the failure example; M2b/M2c remain planned |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |

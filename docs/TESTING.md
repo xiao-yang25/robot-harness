@@ -48,10 +48,47 @@ Local macOS commands and the current SDK workaround are in the
 [README](../README.md). A Linux container or VM on a Mac may also catch build
 compatibility issues, but cannot replace target-host timing measurements.
 
+## Manual verification
+
+Build with the README recipe, then run from the repository root:
+
+```sh
+./build/robot_harness_normal_execution
+(cd build && ctest --output-on-failure -V)
+```
+
+Substitute your chosen build directory when using a local SDK override. The
+example runs fixed inputs; it does not accept motion commands or arbitrary sample
+arguments. It prints four final receipts: A then B in synchronous mode, and A then
+B in deferred mode. In each mode, A has squared values `[4, 9, 16]` and sum `29`;
+B has `[25, 36]` and sum `61`. Each final line must report native success, output
+acceptance, settlement, and an unassessed domain verdict. The array values are
+checked in the fixture tests; the example prints the sums.
+
+For intermediate states, follow
+`deferred_events_expose_pending_delivery_and_settlement()` in
+[the fixture tests](../tests/sample_execution_tests.cpp). It uses the public host
+interface, so the same sequence can be stepped through in a debugger or a caller:
+
+| Host action | Observable state |
+|---|---|
+| Initialize and submit A in deferred mode | One real worker submission, native accepted, no output yet |
+| Complete deferred work | Four callbacks staged; Core has not processed the terminal evidence |
+| Process started and terminal | Native succeeded, no sink result; B is blocked |
+| Process result | Actual A result in the sink, settlement pending; B is still blocked |
+| Process settlement | Current operation released; B can now be submitted |
+| Close with B still pending | B is drained and delivered, callbacks are empty, new admission is closed |
+
+The three CTest entries contain multiple behavior checks, not just three
+assertions. A successful test executable may print nothing; use CTest's exit
+status and failed-check messages. Hand-inspecting the normal example does not
+replace Core negative-evidence tests or establish robot motion safety.
+
 ## Coverage grows with implementation
 
-- **M0:** build, link, and call the placeholder Core library symbol. This does not
-  validate any execution-governance behavior.
+- **M0 (historical):** build, link, and call the placeholder Core library symbol.
+  M1 replaces that smoke test with behavior tests; the old result does not validate
+  execution-governance behavior.
 - **M1:** build and run the normal-action example through the real library and
   deterministic adapter; register focused initialization, dispatch, event and
   receipt tests using host-supplied time. Run locally and in Ubuntu CI.
@@ -70,14 +107,32 @@ result was verified on September 14, 2026: commit `0be526a` passed the
 [Ubuntu build and 1/1 smoke test](https://github.com/xiao-yang25/robot-harness/actions/runs/34826759485).
 This validates M0 only. Later changes require results for their own tested commit.
 
+The M1 local implementation has passed all three registered tests on macOS with
+AppleClang, both normally and with AddressSanitizer/UndefinedBehaviorSanitizer.
+Independent code review also passed for that working tree. The host task record
+retains the reviewed scope, commands, and output locations. Commit `7eb0e76`
+subsequently passed the
+[M1 Ubuntu CI run](https://github.com/xiao-yang25/robot-harness/actions/runs/34844507974)
+on September 14, 2026: Ubuntu 22.04.5, GCC 11.4.0, configure/build succeeded, and
+all three registered tests passed. This establishes the implemented M1 behavior
+on both development platforms, within the coverage below.
+
+The fixture tests check independent expected numerical results, sequential
+requests, startup prerequisites, invalid arguments, explicitly staged deferred
+delivery/settlement, and shutdown with pending work. Wrong/duplicate/stale and
+conflicting native evidence is currently exercised directly against Core. A
+separate independent review probe checked actual adapter dispatch and sink denial
+for false permission, wrong result operation, and sink unavailability. This is
+not full fault injection through the host event stream or M2/M3 coverage.
+
 ## Change-to-check mapping
 
 | Changed scope | Check entry and expected result | Status / evidence location |
 |---|---|---|
-| Current Core build, smoke test, CMake | README configure/build commands; CTest must run `robot_harness.core_smoke` and pass | Implemented: `tests/CMakeLists.txt`; local CTest output and `build/Testing/Temporary/LastTest.log`, or corresponding custom build directory |
+| Core, sample fixture, example and CMake | README configure/build commands; CTest runs `robot_harness.authority_gate`, `robot_harness.sample_execution`, and `robot_harness.normal_execution_example` | Registered in `tests/CMakeLists.txt`; local CTest output and `build/Testing/Temporary/LastTest.log`, or corresponding custom build directory |
 | C++ formatting and naming | Follow [Coding style](CODING_STYLE.md); run clang-format on changed C++ files and review names | Local formatter check; not currently a CI job or behavior test |
-| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | First M0 Linux run passed at `0be526a`; see the linked Actions result above |
-| M1 normal action/events | Register fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Planned; only the M0 smoke test currently exists |
+| Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; see the linked Actions results above |
+| M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Native rejection/failure, cancel ACK before settlement, expired deadline, missing/partial-effect evidence; no unearned success or conflicting redispatch | Planned; extend the M1 Core/native CTest suite |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |

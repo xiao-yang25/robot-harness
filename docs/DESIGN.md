@@ -3,14 +3,16 @@
 This is the implementation-facing summary of the research workspace's accepted
 D-073 architecture and September 10 product split. The September 14 replanning
 changes the implementation order to runnable behavior slices, preserving those
-ownership boundaries. M0 is a build skeleton; M1–M4 below are planned, not implemented.
+ownership boundaries. M0 established the build skeleton; M1 is now the active
+implementation slice. M2–M4 remain planned. See README and Testing for implemented
+status and the limits of actual validation.
 
 ## Source roles
 
 This document records the accepted product ownership and recovery boundary for
 implementation. README describes current product status; source describes what
 exists; test and runtime output establish only the behavior actually observed.
-The M0 placeholder cannot relax the boundary defined here.
+Implementation status cannot relax the boundary defined here.
 
 Original decision records and experiments remain in the research workspace:
 `docs/DECISIONS.md` (D-068/D-073),
@@ -180,7 +182,7 @@ its own focused regression immediately.
 
 | Milestone | Runnable behavior and deliverable | Exit evidence |
 |---|---|---|
-| **M0 — build skeleton** | Existing library and smoke executable | Build/link only; currently implemented |
+| **M0 — build skeleton** | Original placeholder library and smoke executable | Historical build/link baseline; M1 replaces the placeholder and smoke test |
 | **M1 — normal action and events** | Minimal Core, deterministic native adapter, host and example together; observe fresh initialization, admission, native execution, terminal and settlement; then run a second action | Actual fixture submissions/state plus caller-visible receipts agree; no submission before all declared prerequisites are ready or on invalid/rejected input; synchronous and deferred completion; duplicate/wrong-operation evidence cannot corrupt the result; actual sink delivery and clean shutdown; macOS and Ubuntu tests |
 | **M2 — failure and cancellation** | Extend the same action with native rejection/failure, cancel request/ACK, delayed settlement and deadline expiry | No implicit retry; cancel ACK and timeout do not imply stopped/settled; conflicting action stays blocked until required evidence; missing or partial-effect evidence stays unknown |
 | **M3 — replacement and recovery** | Caller changes A to B; hold old output, restart provider or Core, re-observe and commit fresh authority; support declared conflict sets/composite availability as required by these cases | Stale output cannot commit at the actual simulated sink; unsettled conflicts remain blocked; invalid/expired/conflicting recovery evidence cannot reopen; fresh binding/revision/generation replaces old authority |
@@ -205,6 +207,46 @@ Concrete C++ types stay repository-local while the examples settle. Add only the
 source/header/example/test directories used by the current slice; no empty module
 scaffold or new production dependency is needed. The example is an actual caller
 of the library and adapter, not a script that prints expected events.
+
+## M1 caller and integration surface
+
+The provisional [AuthorityGate](../include/robot_harness/authority_gate.hpp) is the
+passive Core. The [SampleExecutionHost](../include/robot_harness/sample_execution.hpp)
+is a concrete fixture host that integrates a deterministic adapter, worker, and
+result sink. A different integration supplies its own host and adapter around the
+Core; it does not inherit the sample payload or transform as a product protocol.
+
+The sample request contains an application reference and integer values. The
+worker computes squared values and their sum; these remain outside the Core. The
+fixture accepts 1–16 values in the range -10000 through 10000, keeping its arithmetic
+bounded. The host accepts a nonthrowing monotonic clock whose target outlives the
+host. Its native callbacks are staged so completion during submission cannot
+re-enter a Core transition. The caller can
+explicitly complete a deferred operation, inspect the actual result and current
+receipt, and then submit another request. Both Core and fixture host are
+noncopyable to preserve their operation identity and callback ownership.
+
+In synchronous mode, `submit()` computes the sample and drains the staged events
+before returning. In deferred mode, `submit()` reports native acceptance and
+retains the request; `complete_deferred()` computes it and stages the remaining
+events. The caller then uses `process_next_staged_event()` or
+`process_all_staged_events()` to update the receipt and deliver the result.
+Native completion alone therefore does not imply that Core has received its
+evidence or that the sink has accepted its result.
+
+The sample's `started` observation is emitted after its deterministic computation;
+it records that execution occurred, not a precise execution-start timestamp. The
+example clock advances an integer on each observation, so neither the event times
+nor their differences establish execution latency. `shutdown()` closes admission
+and drains finite pending work and callbacks while the sink is available, then
+closes the adapter. This is normal draining, not cancellation.
+
+For the current receipt, a newly correlated, source-valid conflicting terminal
+observation remains a conflict even after settlement, until another operation is
+admitted. After that next admission, evidence for the old operation is stale and
+cannot modify the current operation. This does not implement durable receipt
+history or recovery across restart; callers retain any historical receipt copies
+they need.
 
 ## Product feedback and later expansion
 
@@ -238,8 +280,8 @@ the SDK scope if native integration already gives the same behavior just as simp
 
 Use the [testing environment split](TESTING.md): local macOS plus Ubuntu CI for
 Core correctness, Ubuntu for ROS integration, and target deployment hardware for
-timing and physical effects. CI coverage grows with M1–M3 tests; M0 only checks
-the build and placeholder library call.
+timing and physical effects. CI coverage grows with M1–M3 tests; the historical M0
+result only checks the build and placeholder library call.
 
 Use focused checks for meaningful state branches and adapter boundaries. Do not
 copy the historical experiment artifact system into product tests. No new

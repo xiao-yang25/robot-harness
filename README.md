@@ -14,7 +14,7 @@ macOS and Ubuntu.** Cancellation and expiry revoke future dispatch/result permis
 while native acknowledgement, termination and cleanup remain separate facts.
 An ignored stop may still end in native success; its late result is discarded.
 The same operation blocks new admission until actual closure evidence is complete.
-All nine registered CTests pass on macOS normally and with ASan/UBSan. Independent
+The nine M2 CTests pass on macOS normally and with ASan/UBSan. Independent
 reviews found no remaining blocking code issues in M2b/M2c. See [Testing](docs/TESTING.md)
 for verification and limits. Commit `8db3c38` passed all nine tests in both normal
 and ASan/UBSan builds in the [M2 Ubuntu run](https://github.com/xiao-yang25/robot-harness/actions/runs/34936844890).
@@ -26,6 +26,16 @@ real-time stopping. Before enabling long-running, resource-intensive or physical
 tasks, implement and validate the [stop and resource requirements](docs/DESIGN.md#stop-and-resource-requirements-before-expanded-execution).
 The current sample does not implement that capability-based admission or prove
 interruption of already running work.
+
+
+A local compute process adapter now integrates capability-based admission, actual
+running cancellation, process exit collection and channel cleanup with Core. Its
+bounded CPU workload is the first backend; it is not a general GPU or robot-stop
+guarantee. The current implementation passes 26 CTests on macOS and Ubuntu ARM64
+in normal and ASan/UBSan builds; independent review found no remaining blocking
+findings within this scope. See the
+[compute usage and verification](docs/TESTING.md#local-compute-usage-and-verification)
+and [public host interface](include/robot_harness/compute_execution.hpp).
 
 Earlier research experiments support the shared-core architecture; they do not
 establish production performance, physical safety, or end-to-end task success.
@@ -39,6 +49,9 @@ cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build
 (cd build && ctest --output-on-failure)
 ```
+
+For a local Ubuntu development container, see the
+[Docker setup and validation commands](docs/TESTING.md#ubuntu-development-container).
 
 ## Normal execution example
 

@@ -62,6 +62,24 @@ target_link_libraries(robot_harness_cancellation_execution PRIVATE robot_harness
 add_executable(robot_harness_deadline_execution examples/deadline_execution.cpp)
 target_link_libraries(robot_harness_deadline_execution PRIVATE robot_harness_sample_fixture)
 
+if(UNIX)
+  add_library(robot_harness_compute STATIC
+    src/compute_execution.cpp
+    src/compute_process.cpp
+  )
+  target_compile_features(robot_harness_compute PUBLIC cxx_std_17)
+  target_link_libraries(robot_harness_compute PUBLIC robot_harness_core)
+  target_include_directories(robot_harness_compute PRIVATE src)
+  add_executable(robot_harness_compute_worker src/compute_worker.cpp)
+  target_compile_features(robot_harness_compute_worker PRIVATE cxx_std_17)
+  add_executable(robot_harness_compute_execution examples/compute_execution.cpp)
+  target_link_libraries(robot_harness_compute_execution PRIVATE robot_harness_compute)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(robot_harness_compute PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(robot_harness_compute_worker PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+endif()
+
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()

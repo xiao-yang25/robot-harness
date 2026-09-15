@@ -56,6 +56,12 @@ target_link_libraries(robot_harness_normal_execution PRIVATE robot_harness_sampl
 target_compile_features(robot_harness_failure_execution PRIVATE cxx_std_17)
 target_link_libraries(robot_harness_failure_execution PRIVATE robot_harness_sample_fixture)
 
+add_executable(robot_harness_cancellation_execution examples/cancellation_execution.cpp)
+target_link_libraries(robot_harness_cancellation_execution PRIVATE robot_harness_sample_fixture)
+
+add_executable(robot_harness_deadline_execution examples/deadline_execution.cpp)
+target_link_libraries(robot_harness_deadline_execution PRIVATE robot_harness_sample_fixture)
+
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()

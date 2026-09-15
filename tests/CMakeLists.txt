@@ -52,3 +52,17 @@ set_tests_properties(
   robot_harness.failure_execution_example
   PROPERTIES TIMEOUT 10
 )
+
+add_executable(robot_harness_m2b_cancellation_tests m2b_cancellation_tests.cpp)
+target_link_libraries(robot_harness_m2b_cancellation_tests PRIVATE robot_harness_sample_fixture)
+add_test(NAME robot_harness.m2b_cancellation COMMAND robot_harness_m2b_cancellation_tests)
+set_tests_properties(robot_harness.m2b_cancellation PROPERTIES TIMEOUT 10)
+
+add_test(NAME robot_harness.cancellation_execution_example COMMAND robot_harness_cancellation_execution)
+set_tests_properties(robot_harness.cancellation_execution_example PROPERTIES TIMEOUT 10)
+
+add_executable(robot_harness_m2c_deadline_tests m2c_deadline_tests.cpp)
+target_link_libraries(robot_harness_m2c_deadline_tests PRIVATE robot_harness_sample_fixture)
+add_test(NAME robot_harness.m2c_deadline COMMAND robot_harness_m2c_deadline_tests)
+add_test(NAME robot_harness.deadline_execution_example COMMAND robot_harness_deadline_execution)
+set_tests_properties(robot_harness.m2c_deadline robot_harness.deadline_execution_example PROPERTIES TIMEOUT 10)

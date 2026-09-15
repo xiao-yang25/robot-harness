@@ -16,6 +16,8 @@ const char* outcome_name(robot_harness::NativeOutcome outcome) {
     return "succeeded";
   case robot_harness::NativeOutcome::kFailed:
     return "failed";
+  case robot_harness::NativeOutcome::kCancelled:
+    return "cancelled";
   case robot_harness::NativeOutcome::kUnknown:
     return "unknown";
   }

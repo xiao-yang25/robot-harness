@@ -40,6 +40,7 @@ enum class CallbackKind {
   kStarted,
   kTerminalSucceeded,
   kTerminalFailed,
+  kTerminalCancelled,
   kNoOutputProduced,
   kResult,
   kSettled
@@ -131,6 +132,47 @@ public:
     return true;
   }
 
+  void set_cancellation_mode(CancellationMode mode) noexcept {
+    cancellation_mode_ = mode;
+  }
+  void set_settlement_reporting_enabled(bool enabled) noexcept {
+    settlement_reporting_enabled_ = enabled;
+  }
+  std::size_t stop_request_count() const noexcept {
+    return stop_request_count_;
+  }
+
+  std::optional<StopAcknowledgement> request_stop(const OperationAuthority& authority) {
+    ++stop_request_count_;
+    if (!pending_work_ || pending_work_->authority.operation_id != authority.operation_id ||
+        !(pending_work_->authority.binding == authority.binding) ||
+        pending_work_->authority.admitted_at != authority.admitted_at) {
+      return StopAcknowledgement::kUnavailable;
+    }
+    switch (cancellation_mode_) {
+    case CancellationMode::kCooperative:
+      pending_work_->is_cancelled = true;
+      return StopAcknowledgement::kAcknowledged;
+    case CancellationMode::kIgnore:
+      return StopAcknowledgement::kAcknowledged;
+    case CancellationMode::kRefuse:
+      return StopAcknowledgement::kRefused;
+    case CancellationMode::kUnavailable:
+      return StopAcknowledgement::kUnavailable;
+    case CancellationMode::kNoAcknowledgement:
+      return std::nullopt;
+    }
+    return std::nullopt;
+  }
+
+  void confirm_non_submission(const OperationAuthority& authority) {
+    WorkItem work;
+    work.authority = authority;
+    emit(work, CallbackKind::kNotSubmitted, 1);
+    emit(work, CallbackKind::kNoOutputProduced, 2);
+    emit(work, CallbackKind::kSettled, 3);
+  }
+
   bool complete_deferred() {
     if (!pending_work_.has_value() || is_closed_) {
       return false;
@@ -197,16 +239,26 @@ private:
     OperationAuthority authority;
     SampleRequest request;
     std::string native_identity;
+    bool is_cancelled = false;
   };
 
   void emit(const WorkItem& work, CallbackKind kind, std::uint64_t sequence,
             std::optional<SampleResult> result = std::nullopt) {
+    if (kind == CallbackKind::kSettled && !settlement_reporting_enabled_) {
+      return;
+    }
     if (callback_) {
       callback_({kind, work.authority, work.native_identity, sequence, std::move(result)});
     }
   }
 
   void finish(const WorkItem& work) {
+    if (work.is_cancelled) {
+      emit(work, CallbackKind::kTerminalCancelled, 2);
+      emit(work, CallbackKind::kNoOutputProduced, 1);
+      emit(work, CallbackKind::kSettled, 2);
+      return;
+    }
     ++execution_count_;
     emit(work, CallbackKind::kStarted, 2);
     if (fail_next_native_execution_) {
@@ -239,6 +291,9 @@ private:
   bool is_closed_ = false;
   bool reject_next_native_submission_ = false;
   bool fail_next_native_execution_ = false;
+  CancellationMode cancellation_mode_ = CancellationMode::kCooperative;
+  bool settlement_reporting_enabled_ = true;
+  std::size_t stop_request_count_ = 0;
   std::optional<WorkItem> pending_work_;
   std::vector<SampleResult> results_;
   std::size_t submission_count_ = 0;
@@ -294,7 +349,53 @@ struct SampleExecutionHost::Implementation {
     return {kind, kSampleBinding, {source, read_time(), sequence}, observed};
   }
 
+  void discard_prepared() {
+    if (!prepared_authority) {
+      return;
+    }
+    const auto authority = *prepared_authority;
+    prepared_request.reset();
+    prepared_authority.reset();
+    adapter.confirm_non_submission(authority);
+  }
+
+  void apply_control(const OperationAuthority& authority, const ControlDecision& decision) {
+    if (decision.status == ControlStatus::kApplied) {
+      if (prepared_authority && prepared_authority->operation_id == authority.operation_id) {
+        discard_prepared();
+      }
+      if (decision.should_request_native_stop) {
+        const auto acknowledgement = adapter.request_stop(authority);
+        if (acknowledgement) {
+          gate->observe_stop_acknowledgement(
+              {authority, *acknowledgement, {"native-stop", read_time(), 1}});
+        }
+      }
+    }
+  }
+
+  ControlDecision observe_time(MonotonicTime now) {
+    if (!current_authority) {
+      return {ControlStatus::kNoActiveOperation, false};
+    }
+    const auto decision = gate->observe_time(*current_authority, now);
+    apply_control(*current_authority, decision);
+    return decision;
+  }
+
+  ControlDecision poll() {
+    return observe_time(read_time());
+  }
+
+  ControlDecision request_cancel(const OperationAuthority& authority) {
+    poll();
+    const auto decision = gate->request_cancel(authority, read_time());
+    apply_control(authority, decision);
+    return decision;
+  }
+
   bool process_next() {
+    poll();
     if (staged_events.empty()) {
       return false;
     }
@@ -336,6 +437,12 @@ struct SampleExecutionHost::Implementation {
                             NativeEventKind::kTerminalFailed,
                             {kNativeEvidenceSource, event.observed_at, callback.sequence}});
       break;
+    case CallbackKind::kTerminalCancelled:
+      gate->observe_native({callback.authority,
+                            callback.native_identity,
+                            NativeEventKind::kTerminalCancelled,
+                            {kNativeEvidenceSource, event.observed_at, callback.sequence}});
+      break;
     case CallbackKind::kNoOutputProduced:
       gate->observe_output_not_delivered(
           {callback.authority,
@@ -349,6 +456,8 @@ struct SampleExecutionHost::Implementation {
       }
       const std::string result_reference =
           "managed-result-" + std::to_string(callback.authority.operation_id);
+      const auto acceptance_time = read_time();
+      observe_time(acceptance_time);
       const auto acceptance =
           adapter.accept_result(callback.authority, std::move(*callback.result), [this, &callback] {
             return gate->can_deliver_result(callback.authority);
@@ -356,21 +465,27 @@ struct SampleExecutionHost::Implementation {
       callback.result.reset();
       if (acceptance == ResultAcceptance::kAccepted) {
         gate->observe_output_accepted(
-            {callback.authority, result_reference, {kResultSinkObserver, read_time(), 1}});
-      } else if (acceptance == ResultAcceptance::kSinkUnavailable) {
+            {callback.authority, result_reference, {kResultSinkObserver, acceptance_time, 1}});
+      } else if (acceptance == ResultAcceptance::kSinkUnavailable ||
+                 acceptance == ResultAcceptance::kPermissionDenied) {
         gate->observe_output_not_delivered({callback.authority,
-                                            OutputNonDeliveryReason::kSinkRejected,
+                                            acceptance == ResultAcceptance::kPermissionDenied
+                                                ? OutputNonDeliveryReason::kAuthorityRevoked
+                                                : OutputNonDeliveryReason::kSinkRejected,
                                             result_reference,
-                                            {kResultSinkObserver, read_time(), 1}});
+                                            {kResultSinkObserver, acceptance_time, 1}});
       }
       break;
     }
-    case CallbackKind::kSettled:
+    case CallbackKind::kSettled: {
+      const auto settlement_time = read_time();
+      observe_time(settlement_time);
       gate->observe_settlement({callback.authority,
                                 kSettlementScope,
                                 true,
-                                {kSettlementEvidenceSource, read_time(), callback.sequence}});
+                                {kSettlementEvidenceSource, settlement_time, callback.sequence}});
       break;
+    }
     }
     return true;
   }
@@ -384,7 +499,9 @@ struct SampleExecutionHost::Implementation {
     if (is_shutdown) {
       return;
     }
+    poll();
     gate->close_admission();
+    discard_prepared();
     adapter.drain_pending();
     process_all();
     adapter.close();
@@ -399,6 +516,9 @@ struct SampleExecutionHost::Implementation {
   std::unique_ptr<AuthorityGate> gate;
   DeterministicSampleAdapter adapter;
   std::deque<StagedEvent> staged_events;
+  std::optional<OperationAuthority> current_authority;
+  std::optional<OperationAuthority> prepared_authority;
+  std::optional<SampleRequest> prepared_request;
   std::uint64_t binding_observation_sequence = 0;
   std::uint64_t worker_observation_sequence = 0;
   std::uint64_t sink_observation_sequence = 0;
@@ -441,8 +561,9 @@ void SampleExecutionHost::fail_next_native_execution() noexcept {
   implementation_->adapter.fail_next_native_execution();
 }
 
-SampleSubmission SampleExecutionHost::submit(const SampleRequest& request) {
+SampleSubmission SampleExecutionHost::prepare(const SampleRequest& request) {
   auto& state = *implementation_;
+  state.poll();
   SampleSubmission submission;
   if (!is_valid_request(request)) {
     return submission;
@@ -454,6 +575,8 @@ SampleSubmission SampleExecutionHost::submit(const SampleRequest& request) {
   operation_request.opaque_request_reference = request.request_reference;
   operation_request.target_reference = kTargetReference;
   operation_request.requested_at = state.read_time();
+  state.observe_time(operation_request.requested_at);
+  operation_request.deadline = request.deadline;
   const auto admission = state.gate->admit(operation_request);
   submission.admission_status = admission.status;
   submission.authority = admission.authority;
@@ -462,24 +585,82 @@ SampleSubmission SampleExecutionHost::submit(const SampleRequest& request) {
     return submission;
   }
 
-  const auto authority = *admission.authority;
+  state.current_authority = admission.authority;
+  state.prepared_authority = admission.authority;
+  state.prepared_request = request;
+  submission.status = SampleSubmissionStatus::kPrepared;
+  return submission;
+}
+
+bool SampleExecutionHost::dispatch_prepared(const OperationAuthority& authority) {
+  auto& state = *implementation_;
+  const bool was_prepared = state.prepared_authority &&
+                            state.prepared_authority->operation_id == authority.operation_id &&
+                            state.prepared_authority->binding == authority.binding &&
+                            state.prepared_authority->admitted_at == authority.admitted_at;
+  state.poll();
+  if (was_prepared && !state.prepared_authority) {
+    if (state.adapter.is_deferred()) {
+      state.process_next();
+    } else {
+      state.process_all();
+    }
+    return false;
+  }
+  if (!state.prepared_authority || !state.prepared_request || state.is_shutdown ||
+      state.prepared_authority->operation_id != authority.operation_id ||
+      !(state.prepared_authority->binding == authority.binding) ||
+      state.prepared_authority->admitted_at != authority.admitted_at) {
+    return false;
+  }
+  auto request = std::move(*state.prepared_request);
+  state.prepared_request.reset();
+  state.prepared_authority.reset();
   const bool dispatched = state.adapter.dispatch(authority, request, [&state, &authority] {
-    return state.gate->claim_dispatch(authority, state.read_time());
+    const auto dispatch_time = state.read_time();
+    state.observe_time(dispatch_time);
+    return state.gate->claim_dispatch(authority, dispatch_time);
   });
   if (state.adapter.is_deferred()) {
     state.process_next();
   } else {
     state.process_all();
   }
-  if (!dispatched) {
-    submission.status = SampleSubmissionStatus::kDispatchBlocked;
-    return submission;
+  return dispatched;
+}
+
+SampleSubmission SampleExecutionHost::submit(const SampleRequest& request) {
+  auto submission = prepare(request);
+  if (submission.status == SampleSubmissionStatus::kPrepared) {
+    submission.status = dispatch_prepared(*submission.authority)
+                            ? SampleSubmissionStatus::kSubmitted
+                            : SampleSubmissionStatus::kDispatchBlocked;
   }
-  submission.status = SampleSubmissionStatus::kSubmitted;
   return submission;
 }
 
+ControlDecision SampleExecutionHost::request_cancel(const OperationAuthority& authority) {
+  return implementation_->request_cancel(authority);
+}
+
+void SampleExecutionHost::set_cancellation_mode(CancellationMode mode) noexcept {
+  implementation_->adapter.set_cancellation_mode(mode);
+}
+
+void SampleExecutionHost::set_settlement_reporting_enabled(bool enabled) noexcept {
+  implementation_->adapter.set_settlement_reporting_enabled(enabled);
+}
+
+std::size_t SampleExecutionHost::native_stop_request_count() const noexcept {
+  return implementation_->adapter.stop_request_count();
+}
+
+ControlDecision SampleExecutionHost::poll() {
+  return implementation_->poll();
+}
+
 bool SampleExecutionHost::complete_deferred() {
+  implementation_->poll();
   return implementation_->adapter.complete_deferred();
 }
 

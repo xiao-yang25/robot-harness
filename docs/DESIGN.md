@@ -4,8 +4,9 @@ This is the implementation-facing summary of the research workspace's accepted
 D-073 architecture and September 10 product split. The September 14 replanning
 changes the implementation order to runnable behavior slices, preserving those
 ownership boundaries. M0 established the build skeleton; M1 has been implemented
-and merged. M2a implements failure closure; cancellation, expiry and M3–M4 remain
-planned. See README and Testing for tested status and validation limits.
+and merged. M2a implements failure closure; M2b/M2c add cancellation and expiry
+with macOS and Ubuntu validation. M3–M4 remain planned. See README and Testing for tested
+status and validation limits.
 
 ## Source roles
 
@@ -66,6 +67,65 @@ that a later queued output remains authorized.
 Native systems retain transport, scheduling, device access, continuous control,
 model execution, and native safety enforcement. The core does not copy payloads
 or replace these owners.
+
+## Stop and resource requirements before expanded execution
+
+The following requirements apply before admitting the first long-running,
+resource-intensive or physical task beyond the bounded sample. They define the
+next integration constraint; runtime capability matching and stop supervision are
+not implemented by M2b/M2c. Current cooperative cancellation ends deferred sample
+work before calculation begins. Synchronous calculation occupies the host and
+cannot be interrupted by a caller cancel or idle poll. An empty result sink does
+not establish that running work stopped, resources were released or motion ceased.
+
+Each adapter must describe its enforced scope and provide observations for the
+execution environment in which it will be used:
+
+| Concern | Required declaration |
+|---|---|
+| Stop behavior | Whether stop is supported before submission, at execution checkpoints or through a native running-task stop; what may continue after a request |
+| Response limits | Conditions and time origin for any claimed stop bound, cancellation-check frequency where applicable, and how an exceeded bound is observed; distinguish a measured result from an enforced guarantee |
+| Remaining effects and resources | Which queued commands, callbacks, device work and resources remain outstanding; how their termination/disposal/release is established |
+| Failure handling | The owner and supported action when stop is refused, unacknowledged, overdue or the host/worker is unavailable; explicit limits when isolation or escalation is unavailable |
+
+Trusted application/deployment policy specifies the task's required stop behavior
+and applicable resource budget. An Agent may request stricter limits but cannot
+relax that policy or declare an adapter capable. Core admission must compare the
+required guarantees with supported, currently valid adapter capabilities; the
+host supplies the policy and observations, and the adapter enforces the declared
+limits at actual native boundaries. Unsupported, unknown or no longer valid
+required capabilities must reject admission before native work starts. If a
+prerequisite changes after admission but before native dispatch, deny dispatch and
+use truthful non-submission closure. If a required capability becomes invalid after
+native work starts, revoke authority, use the declared failure handling and retain
+unresolved effects until valid closure evidence arrives. No silent downgrade or
+fallback is permitted. A bounded noninterruptible task can be admitted only when
+its actual guarantees satisfy the task policy.
+
+For compute work, enforce applicable size/concurrency/memory/usage limits before
+and during execution at the owner capable of enforcing them. Keep cancellation
+handling responsive while native work is running, using checkpoints or an
+appropriate worker boundary. A separate process may enable termination of local
+work, but does not by itself stop remote requests or establish shared GPU resource
+release. Required resource-release evidence must match the actual execution scope.
+
+For hazardous physical work, required controller/device protection must operate
+under the declared host-stall or communication-loss conditions. Ordinary Action
+cancellation, suppressed result delivery and killing a host process are not proof
+of a safe physical state. Select and validate the native stop behavior and its
+observations for the device; no universal abrupt-stop action is assumed.
+
+A stop-response budget is distinct from the operation deadline. Exceeding it must
+invoke the adapter's declared failure handling and retain unresolved settlement;
+it must not fabricate a terminal state or reopen conflicting admission. Any
+escalation is a separate supported action with its own observations, not an
+unbounded retry of the same cancel request. A bound required during host blockage
+cannot be enforced solely by the blocked host's poll loop. Keep the passive Core
+and native safety ownership; choose the concrete supervision mechanism with the
+first adapter. Exact API fields, units, bounds and isolation choices follow that
+adapter's requirements, rather than a new universal scheduler or safety framework.
+
+Verification is specified in [expanded execution checks](TESTING.md#expanded-execution-checks).
 
 ## Results and recovery
 
@@ -318,12 +378,92 @@ rejected native attempt can still occupy the domain while cleanup evidence is
 pending. The normal success flow is retained, and shutdown defaults to finite
 draining of retained native work and its callbacks.
 
+## M2b caller and integration surface
+
+`request_cancel(authority, observed_at)` on Core revokes future dispatch and output
+before returning a `ControlDecision`. The host consumes `should_request_native_stop`
+once. Repeated cancellation returns `kAlreadyRequested`; a stale/unknown identity
+or released operation returns `kNoActiveOperation`. A backdated control is rejected.
+`kRevoked` means the operation still occupies its domain; `kReleased` requires the
+same terminal/output/settlement closure as the other paths. Neither disposition
+erases the recorded cancellation reason.
+
+`observe_stop_acknowledgement()` accepts one definitive acknowledged/refused/
+unavailable response, correlated by the full authority. A missing response leaves
+`kPending`. The configured `stop_evidence_source` (default `native-stop`) has its
+own response sequence, separate from native execution, sink and settlement sources.
+It must differ from those three source identities. This permits a synchronous
+stop response while older native callbacks are staged: a response never orders or
+relabels those callbacks as termination. The request decision is the host's
+instruction to attempt a stop; only the acknowledgement evidence records a
+response. Settlement is ordered after its actual native/output prerequisites;
+a later independently observed control/ACK does not invalidate earlier completed
+cleanup delivered afterwards. New admission and control timestamps still respect
+all recorded observations. `kTerminalCancelled` is a native terminal observation; conflicting
+success, failure or cancellation terminal facts produce `kUnknown`.
+
+The host's `prepare()` retains a request without submission and returns `kPrepared`;
+`dispatch_prepared()` checks the full identity and performs the real boundary
+check. `submit()` composes them. Cancellation of a prepared request discards that
+payload before staging non-submission, no-output and settlement observations.
+Shutdown also disposes an undispatched request without claiming cancellation.
+A failed/stale dispatch call does not consume another operation's prepared payload.
+
+`set_cancellation_mode()` controls the deterministic fixture: cooperative work
+acknowledges but retains its payload until explicit completion/draining, then
+reports native cancellation without computing the sample. Ignore mode acknowledges
+and later completes naturally; refuse/unavailable/no-acknowledgement modes also
+continue naturally. `native_stop_request_count()` observes actual adapter stop
+attempts. These controls are fixture behaviors, not guarantees of a robot API.
+
+At the actual result sink, revoked permission causes disposal and
+`kAuthorityRevoked` output non-delivery evidence. Native success remains success.
+Already accepted results remain in the sink. The fixture's
+`set_settlement_reporting_enabled(false)` suppresses the cleanup report even when
+resources are drained, allowing tests to verify that shutdown cannot manufacture
+settlement. It does not implement M3 recovery or replay a suppressed report.
+
+## M2c caller and integration surface
+
+`OperationRequest::deadline` and `SampleRequest::deadline` are optional absolute
+times in the supplied monotonic clock domain. Admission at or after the deadline
+returns `AdmissionStatus::kExpired` without allocating an operation. An admitted
+receipt retains that deadline and, when observed, `expiry_observed_at`. Expiry and
+`cancellation_requested_at` are independent reasons for the same revoked permission;
+both can remain present without issuing a second native stop.
+
+Core's `observe_time(authority, now)` is passive: it returns `kNotDue` before the
+deadline, `kApplied` on first observed expiry, `kAlreadyRequested` for repeated
+expiry, and `kNoActiveOperation` for stale/released authority. Invalid causal times
+are rejected. It uses the same `ControlDecision` stop instruction as cancellation.
+A host must serialize time checks with effects and consume that instruction; a
+stored receipt or `can_deliver_result()` query never reads a clock. Dispatch and
+output evidence also reject timestamps at/after the deadline as boundary backstops;
+a rejected attempt does not replace the host's explicit expiry observation.
+
+The sample host calls `observe_time()` before new admission, actual dispatch, event
+processing, actual sink acceptance, settlement, native completion and shutdown.
+`poll()` supplies an explicit idle entry point. Boundary checks take fresh clock
+samples even if the function-entry check has not expired. Sink acceptance and its
+evidence use the same boundary observation, avoiding a second clock read that
+could misdate an already accepted result. Callback observation times remain the
+original native facts. Synchronous native work is finite but cannot be preempted:
+the following boundary denies any late output, then drains the actual callbacks.
+
+Deadline covers closure, including pending output/cleanup. An operation released
+before expiry stays released. If settlement evidence is still pending at expiry,
+the receipt records expiry and can later close from valid native/output/cleanup
+facts. Already accepted output remains accepted. ACK and control delivery order
+do not impose new causal requirements on previously observed cleanup, as described
+in M2b. This is cooperative host-driven authorization, not a physical stopping or
+real-time scheduling guarantee.
+
 ## M2 planned behavior: failure, cancellation and expiry
 
-This section defines the M2 behavior and slice boundaries. M2a uses the surface
-above; M2b/M2c remain future work. See Testing for actual evidence. Keep the M1
-sample calculation, static binding, single
-effect domain and single active operation. Add failure controls to the fixture,
+This section defines the accepted M2 behavior and slice boundaries. The caller
+surfaces above now implement M2a/M2b/M2c; see Testing for actual evidence and its
+scope limitations. Keep the M1 sample calculation, static binding,
+single effect domain and single active operation. Add failure controls to the fixture,
 not a generic fault engine or another Core scheduler. M3 still owns provider
 replacement, restart and recovery from contradictory evidence.
 

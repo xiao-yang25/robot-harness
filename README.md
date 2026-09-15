@@ -9,18 +9,23 @@ truthful operation feedback.
 
 ## Status
 
-**M2a: failure closure implemented, reviewed, and validated on macOS and Ubuntu.**
-The sample now distinguishes non-submission, native rejection, native failure,
-and result delivery failure. New work is allowed only after the relevant outcome,
-output disposition and cleanup evidence are complete. Local macOS tests, sanitizer
-checks and independent code review have passed.
-The [M2a Ubuntu run](https://github.com/xiao-yang25/robot-harness/actions/runs/34864391097)
-for `16b2888` passed all five tests in both normal and ASan/UBSan builds.
-See [Testing](docs/TESTING.md) for evidence and limits.
+**M2b cancellation and M2c deadlines are implemented, reviewed and validated on
+macOS and Ubuntu.** Cancellation and expiry revoke future dispatch/result permission,
+while native acknowledgement, termination and cleanup remain separate facts.
+An ignored stop may still end in native success; its late result is discarded.
+The same operation blocks new admission until actual closure evidence is complete.
+All nine registered CTests pass on macOS normally and with ASan/UBSan. Independent
+reviews found no remaining blocking code issues in M2b/M2c. See [Testing](docs/TESTING.md)
+for verification and limits. Commit `8db3c38` passed all nine tests in both normal
+and ASan/UBSan builds in the [M2 Ubuntu run](https://github.com/xiao-yang25/robot-harness/actions/runs/34936844890).
 
 The declared effect is acceptance of a sample result in a cooperative in-process
-fixture. Cancellation, deadlines, provider replacement, restart recovery, ROS
-integration, and physical safety remain later work.
+fixture. Provider replacement, restart recovery, ROS integration and physical
+safety remain later work. Deadlines are checked by the host; they do not promise
+real-time stopping. Before enabling long-running, resource-intensive or physical
+tasks, implement and validate the [stop and resource requirements](docs/DESIGN.md#stop-and-resource-requirements-before-expanded-execution).
+The current sample does not implement that capability-based admission or prove
+interruption of already running work.
 
 Earlier research experiments support the shared-core architecture; they do not
 establish production performance, physical safety, or end-to-end task success.
@@ -76,6 +81,22 @@ operation whose actual result is `16`. There is no automatic retry. See
 [failure_execution.cpp](examples/failure_execution.cpp) and the
 [M2a interface](docs/DESIGN.md#m2a-caller-and-integration-surface).
 
+## Cancellation and deadline examples
+
+```sh
+./build/robot_harness_cancellation_execution
+./build/robot_harness_deadline_execution
+```
+
+The cancellation example requests a stop that the worker acknowledges and ignores.
+It checks blocked admission, later native success with no delivered result, then
+executes a fresh request after cleanup. The deadline example moves a manual clock
+to the deadline, calls `poll()`, adds a caller cancellation and verifies exactly one
+native stop. Both print actual checks and return nonzero if an expected result fails.
+See [manual verification](docs/TESTING.md#manual-verification) and the sources:
+[cancellation](examples/cancellation_execution.cpp),
+[deadline](examples/deadline_execution.cpp).
+
 ## Code map
 
 | Entry | Role |
@@ -83,7 +104,7 @@ operation whose actual result is `16`. There is no automatic retry. See
 | [Core interface](include/robot_harness/authority_gate.hpp) and [implementation](src/core.cpp) | Operation identity, admission, evidence validation, and current receipt; no sample payload |
 | [Sample host interface](include/robot_harness/sample_execution.hpp) and [implementation](src/sample_execution.cpp) | Host, deterministic adapter/worker, callback staging, and managed result storage |
 | [Application example](examples/normal_execution.cpp) | Initializes the host and runs A then B in both completion modes |
-| [Core tests](tests/authority_gate_tests.cpp), [normal fixture tests](tests/sample_execution_tests.cpp) and [M2a tests](tests/m2a_failure_tests.cpp) | Evidence boundaries, actual normal/failure execution, delivery, cleanup and shutdown |
+| [Core tests](tests/authority_gate_tests.cpp), [normal fixture tests](tests/sample_execution_tests.cpp) and [M2a tests](tests/m2a_failure_tests.cpp), [cancellation tests](tests/m2b_cancellation_tests.cpp), [deadline tests](tests/m2c_deadline_tests.cpp) | Evidence boundaries, actual normal/failure/cancel/expiry execution, delivery, cleanup and shutdown |
 
 For the request-to-result sequence, see [M1 caller and integration surface](docs/DESIGN.md#m1-caller-and-integration-surface).
 For commands and what to observe, see [manual verification](docs/TESTING.md#manual-verification).
@@ -132,9 +153,9 @@ deterministic adapter are delivered together. M2 adds
 failure and cancellation, M3 adds replacement and recovery, and M4 maps the same
 behavior to ROS 2 Humble. Each increment includes its regression tests. A separate
 Robot Agent can start using the available interfaces before all milestones finish.
-M1 is complete and M2a is the current failure-closure slice. M2b cancellation,
-M2c expiry and M3–M4 remain planned. Current results do not establish those later
-capabilities.
+M1 and M2a have passed macOS and Ubuntu validation. M2b cancellation and M2c
+expiry now also have macOS and Ubuntu evidence for their implemented scope.
+M3–M4 remain planned.
 
 For project constraints and the engineering workflow entry, start with
 [repository instructions](AGENTS.md). The accepted boundary and M1–M4 sequence

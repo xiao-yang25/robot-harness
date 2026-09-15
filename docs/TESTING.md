@@ -31,7 +31,7 @@ AddressSanitizer/UndefinedBehaviorSanitizer build in `build-sanitizers`. Both ru
 all registered tests. Undefined-behavior recovery is disabled so a diagnostic
 fails the test instead of merely printing a warning. A failure in either build
 or test phase fails the same job; its check name remains unchanged for branch
-protection. The verified M2a Ubuntu result is recorded below.
+protection. The verified M2a and M2b/M2c Ubuntu results are recorded below.
 
 The checkout step follows the official
 [checkout v6 interface](https://github.com/actions/checkout/tree/v6). No additional
@@ -93,8 +93,7 @@ interface, so the same sequence can be stepped through in a debugger or a caller
 | Process settlement | Current operation released; B can now be submitted |
 | Close with B still pending | B is drained and delivered, callbacks are empty, new admission is closed |
 
-The five CTest entries contain multiple behavior checks, not just five
-assertions. A successful test executable may print nothing; use CTest's exit
+The CTest entries contain multiple behavior checks, not just one assertion each. A successful test executable may print nothing; use CTest's exit
 status and failed-check messages. Hand-inspecting the normal example does not
 replace Core negative-evidence tests or establish robot motion safety.
 
@@ -112,6 +111,41 @@ boundary. Submission count includes rejected native attempts; execution count
 includes started work that fails. Read those counts alongside receipts and actual
 sink contents. No-submission, rejection and native failure produce no result;
 sink rejection preserves native success while reporting failed delivery.
+
+For M2b, run the cancellation example and focused checks:
+
+```sh
+./build/robot_harness_cancellation_execution
+(cd build && ctest --output-on-failure -R 'm2b_cancellation|cancellation_execution_example')
+```
+
+The example prints four `true` observations: an acknowledged cancel with native
+work still pending, blocked new admission, natural native success with the revoked
+result discarded and cleanup observed, then a fresh request producing `16`.
+[cancellation_execution.cpp](../examples/cancellation_execution.cpp) is the caller;
+[m2b_cancellation_tests.cpp](../tests/m2b_cancellation_tests.cpp) additionally
+exercises pre-dispatch cancellation, repeated/stale commands, cooperative/ignored/
+refused/unavailable/absent responses, late natural failure, both output orderings,
+missing cleanup during shutdown and conflicting terminal evidence. Tests inspect
+actual submission/stop counts, retained native work and sink results.
+
+For M2c, run the deadline example and focused checks:
+
+```sh
+./build/robot_harness_deadline_execution
+(cd build && ctest --output-on-failure -R 'm2c_deadline|deadline_execution_example')
+```
+
+The example prints four `true` observations: receipt reads are passive, `poll()`
+observes deadline `20` while the worker is still pending, expiry plus cancellation
+attempts one native stop, and natural success at `25` yields no late sink result
+but does produce cleanup evidence. [m2c_deadline_tests.cpp](../tests/m2c_deadline_tests.cpp)
+checks absent/expired/equal deadlines, pre-dispatch expiry, idle polling, admission
+with an expired occupied domain, both cancellation/expiry orderings, staged output
+and pending-settlement orderings, synchronous work across expiry and clock changes
+between entry and actual dispatch/sink/settlement boundaries. Core checks also
+exercise wrong identity, backdated observations and deadline boundary backstops.
+These use controlled clock values, without sleeping or timing measurements.
 
 ## Coverage grows with implementation
 
@@ -158,7 +192,16 @@ not full fault injection through the host event stream or M2/M3 coverage.
 
 These are acceptance scenarios for
 [M2](DESIGN.md#m2-planned-behavior-failure-cancellation-and-expiry). M2a now has
-Core and host tests; the M2b/M2c rows remain planned, not executed checks.
+Core and host tests; M2b/M2c each have focused tests and a caller example.
+The current M2b/M2c implementation passes all nine registered CTests on macOS
+normally and with ASan/UBSan. M2b independent review passed after the delayed-ACK
+fix below; M2c independent code review found no blocking code issues. On September
+15, 2026, implementation commit `8db3c38802950d025ec710dd6f71f43176108d18` passed the
+[M2b/M2c Ubuntu CI run](https://github.com/xiao-yang25/robot-harness/actions/runs/34936844890):
+Ubuntu 22.04, GCC 11.4.0, normal Debug and ASan/UBSan builds each passed all nine
+CTest entries, with undefined-behavior recovery disabled. This closes the Linux
+validation gap for the implemented sample cancellation/deadline behavior. It does
+not validate the future expanded-execution requirements below.
 The M2a implementation based on `fc283ec` passed all five CTests on
 macOS with AppleClang, both normally and with AddressSanitizer and
 UndefinedBehaviorSanitizer. The original pre-dispatch refusal reproducer failed
@@ -180,6 +223,14 @@ actual adapter sequences through non-submission, rejection and execution failure
 then verifies a fresh request's result. Different sources and operations retain
 independent sequence spaces. Focused independent re-review of the sequence fix
 passed, including an additional probe with shared native/adapter source identity.
+
+M2b independent review found that a later ACK incorrectly raised the cleanup time
+lower bound. The regression failed before the fix and passed afterwards. Settlement
+now checks native/output prerequisites separately from control observation times;
+new admission still respects those control times. Tests cover late ACK and late
+cancellation arriving before earlier completed cleanup, while a premature cleanup
+remains rejected. Focused independent re-review passed. This ordering fix preserves
+the source/identity/sequence checks and does not introduce synthetic cleanup.
 
 The host scenarios must exercise real fixture submissions, staged callbacks and
 the actual managed sink; setting receipt fields directly is not sufficient.
@@ -210,6 +261,31 @@ do not relabel it as no effect or claim rollback. This is a fixture-scoped check
 not a partial-motion or physical-stop test. No complete fault matrix is required.
 Keep M1 regression running, check changed lifetime paths with relevant sanitizers,
 and run each implemented slice on macOS and Ubuntu with independent review.
+
+## Expanded execution checks
+
+These checks are required before enabling long-running, resource-intensive or
+physical tasks under [stop and resource requirements](DESIGN.md#stop-and-resource-requirements-before-expanded-execution).
+They are planned acceptance work, not tests implemented or passed by the current
+nine CTest entries. The first implementation should use one small compute adapter
+with observable running progress and resource ownership; physical guarantees need
+separate controller/device validation.
+
+| Scenario | Required observation |
+|---|---|
+| Requested stop/resource guarantee unsupported, unknown or stale | No native submission or expensive work allocation; admission reports the unmet requirement. A compatible request can run; changed prerequisites before dispatch also prevent submission |
+| Cancellation while work is demonstrably running | Observe actual progress before cancel and cessation under the declared conditions/bound, plus resource release and output disposal; ACK or an empty sink alone cannot pass |
+| Stop ignored/refused, no response or stop-response budget exceeded | Observe any declared bounded failure action at its real boundary; no synthetic terminal/settlement, repeated cancel loop or new conflicting admission while closure is unresolved |
+| Resource limit reached or worker/host stalls | Observe the claimed resource limit at its enforcing owner and verify that required supervision still operates under the declared failure condition |
+| Physical adapter loses command/host responsiveness | Verify the required native protection and resulting physical state in the target setup; process exit and ROS terminal status alone are insufficient |
+
+Manual-clock unit checks establish policy ordering. Real worker tests must observe
+running execution, cessation and owned resources; any timing claim needs its
+specified clock, observation points, load and environment. Linux process/resource
+behavior requires Linux execution, and hosted CI does not establish device stopping
+latency. Reuse relevant CI checks as tests are implemented; retain existing M2
+regressions. No fixed universal stop threshold or exhaustive fault registry is
+introduced by this requirement.
 
 ## PR review and evidence
 

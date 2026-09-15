@@ -16,6 +16,7 @@ namespace robot_harness {
 struct SampleRequest {
   std::string request_reference;
   std::vector<std::int32_t> values;
+  std::optional<MonotonicTime> deadline;
 };
 
 struct SampleResult {
@@ -26,7 +27,10 @@ struct SampleResult {
 };
 
 enum class CompletionMode { kSynchronous, kDeferred };
+// Fixture behavior after a stop request; acknowledgement never completes the work.
+enum class CancellationMode { kCooperative, kIgnore, kRefuse, kUnavailable, kNoAcknowledgement };
 enum class SampleSubmissionStatus {
+  kPrepared,
   kSubmitted,
   kInvalidArgument,
   kAdmissionBlocked,
@@ -58,7 +62,16 @@ public:
   void reject_next_native_submission() noexcept;
   void fail_next_native_execution() noexcept;
 
+  void set_cancellation_mode(CancellationMode mode) noexcept;
+  // Suppress cleanup evidence to exercise a missing report, even during shutdown.
+  void set_settlement_reporting_enabled(bool enabled) noexcept;
+
+  SampleSubmission prepare(const SampleRequest& request);
+  bool dispatch_prepared(const OperationAuthority& authority);
   SampleSubmission submit(const SampleRequest& request);
+  ControlDecision request_cancel(const OperationAuthority& authority);
+  ControlDecision poll();
+  std::size_t native_stop_request_count() const noexcept;
   bool complete_deferred();
   bool process_next_staged_event();
   void process_all_staged_events();

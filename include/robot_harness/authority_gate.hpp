@@ -54,6 +54,7 @@ struct OperationRequest {
   std::string opaque_request_reference;
   std::string target_reference;
   MonotonicTime requested_at = 0;
+  std::optional<MonotonicTime> deadline;
 };
 
 struct OperationAuthority {
@@ -67,6 +68,7 @@ struct OperationAuthority {
 enum class AdmissionStatus {
   kAdmitted,
   kInvalidRequest,
+  kExpired,
   kRecoveryRequired,
   kDomainOccupied,
   kClosed,
@@ -78,7 +80,14 @@ struct AdmissionDecision {
 };
 
 enum class EvidenceDisposition { kAccepted, kDuplicate, kRejected };
-enum class NativeEventKind { kAccepted, kRejected, kStarted, kTerminalSucceeded, kTerminalFailed };
+enum class NativeEventKind {
+  kAccepted,
+  kRejected,
+  kStarted,
+  kTerminalSucceeded,
+  kTerminalFailed,
+  kTerminalCancelled
+};
 
 struct NativeEvidence {
   OperationAuthority authority;
@@ -98,7 +107,7 @@ struct NonSubmissionEvidence {
   EvidenceRecord record;
 };
 
-enum class OutputNonDeliveryReason { kNoOutputProduced, kSinkRejected };
+enum class OutputNonDeliveryReason { kNoOutputProduced, kSinkRejected, kAuthorityRevoked };
 
 struct OutputNonDeliveryEvidence {
   OperationAuthority authority;
@@ -116,11 +125,24 @@ struct SettlementEvidence {
 
 enum class DispatchStatus { kPending, kSubmitted, kNotSubmitted };
 enum class NativeAcceptance { kPending, kAccepted, kRejected };
-enum class NativeOutcome { kPending, kNotExecuted, kSucceeded, kFailed, kUnknown };
+enum class NativeOutcome { kPending, kNotExecuted, kSucceeded, kFailed, kCancelled, kUnknown };
 enum class OutputDisposition { kPending, kAccepted, kNotDelivered };
 enum class SettlementStatus { kPending, kSettled };
 enum class DomainVerdict { kUnassessed };
-enum class AuthorityDisposition { kCurrent, kReleased, kBlockedUnknown };
+enum class AuthorityDisposition { kCurrent, kRevoked, kReleased, kBlockedUnknown };
+
+enum class ControlStatus { kApplied, kAlreadyRequested, kNoActiveOperation, kNotDue, kRejected };
+struct ControlDecision {
+  ControlStatus status = ControlStatus::kRejected;
+  bool should_request_native_stop = false;
+};
+
+enum class StopAcknowledgement { kNotRequested, kPending, kAcknowledged, kRefused, kUnavailable };
+struct StopAcknowledgementEvidence {
+  OperationAuthority authority;
+  StopAcknowledgement acknowledgement = StopAcknowledgement::kUnavailable;
+  EvidenceRecord record;
+};
 
 struct OperationReceipt {
   OperationAuthority authority;
@@ -130,11 +152,17 @@ struct OperationReceipt {
   NativeOutcome native_outcome = NativeOutcome::kPending;
   bool observed_native_success = false;
   bool observed_native_failure = false;
+  bool observed_native_cancellation = false;
   OutputDisposition output = OutputDisposition::kPending;
   SettlementStatus settlement = SettlementStatus::kPending;
   DomainVerdict domain_verdict = DomainVerdict::kUnassessed;
   AuthorityDisposition authority_disposition = AuthorityDisposition::kCurrent;
   std::optional<MonotonicTime> dispatched_at;
+  std::optional<MonotonicTime> cancellation_requested_at;
+  std::optional<MonotonicTime> deadline;
+  std::optional<MonotonicTime> expiry_observed_at;
+  std::optional<MonotonicTime> native_stop_requested_at;
+  StopAcknowledgement stop_acknowledgement = StopAcknowledgement::kNotRequested;
   std::string native_identity;
   std::string result_reference;
   std::string settlement_scope;
@@ -145,6 +173,8 @@ struct OperationReceipt {
   std::optional<EvidenceRecord> native_started_evidence;
   std::optional<EvidenceRecord> native_success_evidence;
   std::optional<EvidenceRecord> native_failure_evidence;
+  std::optional<EvidenceRecord> native_cancellation_evidence;
+  std::optional<EvidenceRecord> stop_acknowledgement_evidence;
   std::optional<EvidenceRecord> output_evidence;
   std::optional<EvidenceRecord> output_non_delivery_evidence;
   std::optional<EvidenceRecord> settlement_evidence;
@@ -160,6 +190,8 @@ struct AuthorityGateConfig {
   std::string settlement_evidence_source;
   std::string settlement_scope;
   MonotonicTime started_at = 0;
+  // Stop responses have a separate sequence stream from native execution events.
+  std::string stop_evidence_source = "native-stop";
 };
 
 class AuthorityGate {
@@ -177,6 +209,10 @@ public:
 
   AdmissionDecision admit(const OperationRequest& request);
   bool claim_dispatch(const OperationAuthority& authority, MonotonicTime observed_at);
+  ControlDecision request_cancel(const OperationAuthority& authority, MonotonicTime observed_at);
+  // Host calls this at execution boundaries and while idle; receipt reads are passive.
+  ControlDecision observe_time(const OperationAuthority& authority, MonotonicTime observed_at);
+  EvidenceDisposition observe_stop_acknowledgement(const StopAcknowledgementEvidence& evidence);
   EvidenceDisposition observe_non_submission(const NonSubmissionEvidence& evidence);
   EvidenceDisposition observe_native(const NativeEvidence& evidence);
   bool can_deliver_result(const OperationAuthority& authority) const;

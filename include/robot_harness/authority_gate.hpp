@@ -28,7 +28,12 @@ struct EvidenceRecord {
 
 enum class InitializationState { kRecoveryRequired, kReady, kClosed };
 
-enum class StartupEvidenceKind { kBindingIdleAndSettled, kWorkerReady, kResultSinkReady };
+enum class StartupEvidenceKind {
+  kBindingIdleAndSettled,
+  kWorkerReady,
+  kResultSinkReady,
+  kAdapterReady
+};
 
 struct StartupEvidence {
   StartupEvidenceKind kind = StartupEvidenceKind::kBindingIdleAndSettled;
@@ -46,6 +51,25 @@ struct StartupStatus {
   std::optional<EvidenceRecord> binding_idle_and_settled;
   std::optional<EvidenceRecord> worker_ready;
   std::optional<EvidenceRecord> result_sink_ready;
+  bool is_adapter_ready = false;
+  std::optional<EvidenceRecord> adapter_ready;
+};
+
+// Profile semantics belong to the adapter; Core matches the exact supported profile
+// and checks the consumed workload against the observed limit.
+struct ExecutionRequirements {
+  std::string profile_id;
+  std::uint64_t work_units = 0;
+};
+
+struct ExecutionCapabilities {
+  BindingIdentity binding;
+  std::string capability_id;
+  std::string profile_id;
+  std::uint64_t maximum_work_units = 0;
+  bool available = false;
+  EvidenceRecord record;
+  MonotonicTime valid_until = 0;  // Exclusive; evaluated again at dispatch.
 };
 
 struct OperationRequest {
@@ -55,6 +79,7 @@ struct OperationRequest {
   std::string target_reference;
   MonotonicTime requested_at = 0;
   std::optional<MonotonicTime> deadline;
+  std::optional<ExecutionRequirements> execution_requirements;
 };
 
 struct OperationAuthority {
@@ -72,6 +97,7 @@ enum class AdmissionStatus {
   kRecoveryRequired,
   kDomainOccupied,
   kClosed,
+  kCapabilitiesUnavailable,
 };
 
 struct AdmissionDecision {
@@ -178,6 +204,7 @@ struct OperationReceipt {
   std::optional<EvidenceRecord> output_evidence;
   std::optional<EvidenceRecord> output_non_delivery_evidence;
   std::optional<EvidenceRecord> settlement_evidence;
+  std::optional<ExecutionRequirements> execution_requirements;
 };
 
 struct AuthorityGateConfig {
@@ -192,6 +219,9 @@ struct AuthorityGateConfig {
   MonotonicTime started_at = 0;
   // Stop responses have a separate sequence stream from native execution events.
   std::string stop_evidence_source = "native-stop";
+  StartupEvidenceKind readiness_kind = StartupEvidenceKind::kWorkerReady;
+  // A configured observer makes execution requirements mandatory for admission.
+  std::string execution_capability_observer;
 };
 
 class AuthorityGate {
@@ -206,6 +236,8 @@ public:
 
   EvidenceDisposition observe_startup(const StartupEvidence& evidence);
   StartupStatus startup_status() const;
+  EvidenceDisposition observe_execution_capabilities(const ExecutionCapabilities& capabilities);
+  bool supports_execution(const ExecutionRequirements& requirements, MonotonicTime at) const;
 
   AdmissionDecision admit(const OperationRequest& request);
   bool claim_dispatch(const OperationAuthority& authority, MonotonicTime observed_at);

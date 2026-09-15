@@ -62,6 +62,88 @@ Local macOS commands and the current SDK workaround are in the
 [README](../README.md). A Linux container or VM on a Mac may also catch build
 compatibility issues, but cannot replace target-host timing measurements.
 
+## Ubuntu development container
+
+[docker/Dockerfile](../docker/Dockerfile) provides Ubuntu 22.04, GCC, CMake,
+Ninja and process inspection tools for local development. On September 15, 2026,
+the ECR-source recipe below built successfully with Docker Desktop 4.91.0 / Engine
+29.8.0 on ARM64 with Linux kernel `7.0.12-linuxkit`. The source/test content of commit `4c4465b` passed all nine CTests
+in both Debug and ASan/UBSan configurations, running as UID 1000 with GCC 11.4.0
+and CMake 3.22.1. UBSan recovery was disabled. The working tree added only design,
+documentation and container setup; no compute-process implementation was tested.
+CTest logs remain in `/build/debug/Testing/Temporary/LastTest.log` and
+`/build/sanitizers/Testing/Temporary/LastTest.log` in the named volume.
+Install and start a local Docker runtime first; on macOS the official
+[Docker Desktop installer](https://docs.docker.com/desktop/setup/install/mac-install/)
+has an Apple silicon version. `docker info` must succeed before continuing.
+
+Run from the product repository root, using a Docker engine on this machine:
+
+```sh
+docker info
+docker build --pull -f docker/Dockerfile -t robot-harness-dev:ubuntu22.04 docker
+docker run --rm -it --init --cpus=2 --memory=2g \
+  --mount "type=bind,source=$(pwd),target=/src,readonly" \
+  --mount type=volume,source=robot-harness-ubuntu-build,target=/build \
+  robot-harness-dev:ubuntu22.04
+```
+
+If Docker Hub is unreachable, Canonical also publishes Ubuntu through
+[Amazon ECR Public](https://ubuntu.com/docs/oci-registries/oci-how-to/getting-started/).
+Select that official source explicitly instead of changing global registry settings:
+
+```sh
+docker build --pull -f docker/Dockerfile \
+  --build-arg UBUNTU_IMAGE=public.ecr.aws/ubuntu/ubuntu:22.04 \
+  -t robot-harness-dev:ubuntu22.04 docker
+```
+
+Edit source on the Mac; the container reads it at `/src`. The image contains only
+tools and uses a non-root developer account. Linux build files and test logs live
+in the named `/build` volume, separately from macOS builds. A new volume inherits
+the prepared build directory; reuse it only for this checkout and architecture,
+with one active build at a time. `exit` removes the container but retains the
+named volume. The build context is only `docker/`, not the research workspace.
+
+Inside the container, run the same two build configurations as CI:
+
+```sh
+uname -sm
+g++ --version
+cmake -S /src -B /build/debug -G Ninja \
+  -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++
+cmake --build /build/debug --parallel 2
+ctest --test-dir /build/debug --output-on-failure --no-tests=error
+
+cmake -S /src -B /build/sanitizers -G Ninja \
+  -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+cmake --build /build/sanitizers --parallel 2
+ctest --test-dir /build/sanitizers --output-on-failure --no-tests=error
+```
+
+Expected for the existing M2 implementation: nine tests in each configuration.
+Record actual results, compiler, kernel/architecture and Docker's supplied image
+identity when run; the Ubuntu tag and package repositories can change. There is
+no image archive or additional project-computed digest in this workflow.
+
+On Apple silicon, use native `linux/arm64`; the existing Ubuntu CI continues to
+cover x86_64. Do not force amd64 emulation for cancellation timing observations;
+[Docker documents](https://docs.docker.com/build/building/multi-platform/) the
+architecture and emulation differences. Container process tests provide Linux
+evidence for the recorded VM kernel, architecture and namespace configuration,
+not target-device stopping latency. The 2 CPU / 2 GiB envelope is a development
+container limit, not per-operation enforcement by Harness.
+
+No privileged container, Docker socket mount, device access or writable cgroup
+mount is needed for the first finite CPU-worker probe. `--init` handles container
+PID 1 duties; probe/adapter code must still collect its own child exit and prove
+its own cleanup. Container removal must not be counted as successful adapter
+settlement. ROS/device integration and host-stall supervision require separate
+environment choices. Keep the existing hosted CI until container-specific checks
+have actual implementation and evidence.
+
 ## Manual verification
 
 Build with the README recipe, then run from the repository root:
@@ -287,6 +369,105 @@ latency. Reuse relevant CI checks as tests are implemented; retain existing M2
 regressions. No fixed universal stop threshold or exhaustive fault registry is
 introduced by this requirement.
 
+### First compute slice checks
+
+Acceptance cases for the [compute design baseline](DESIGN.md#first-compute-adapter-slice-design-baseline)
+and [local integration contract](DESIGN.md#local-compute-integration-contract).
+The local process implementation registers capability, process, host and example
+tests in CTest; the existing Ubuntu job automatically runs them in both builds.
+The original nine M2 tests retain their fixture scope.
+
+| Case | Evidence required |
+|---|---|
+| Normal execution | Actual completed batches, independently checked scalar result, collected child exit and disposed channels; a second request can run |
+| Policy and launch refusal | Unsupported hard bounds, excessive work, unknown/stale prelaunch adapter capabilities and changed prerequisites reject before launch; per-child readiness is not reused as prelaunch evidence; invalid requests allocate no worker; launch failure closes only proven non-submission |
+| Cancel during partial startup | After a child exists but before readiness, missing readiness or failed/full control sends do not defer the grace anchor or prevent one supported escalation; collect the child exit and cleanup, without claiming non-submission |
+| Cancel during running computation | Progress strictly between zero and N before cancellation, actual cooperative exit, discarded unauthorized output and resource closure; if the worker already finished, the run does not pass this case |
+| Ignored/refused stop | Worker continues after the request; one supported escalation, collected exit cause, output disposition and cleanup; signal delivery alone cannot pass |
+| Missing exit/cleanup evidence | No settlement or conflicting readmission; late natural success remains truthful and unauthorized output stays rejected |
+| Channels and shutdown | Full/coalesced progress, partial message, early EOF, worker start failure and shutdown during execution cannot deadlock cancellation or fabricate success; supported/probed shutdown paths abandon no owned child; failures outside that scope retain explicit unresolved/blocked status and do not promise bounded destruction or proven cleanup |
+
+Use controlled clock checks for grace/expiry ordering and real process checks for
+execution/termination. Synchronization can make ordering deterministic, but a
+worker parked at a test barrier alone does not prove interruption of computation.
+Record progress/exit observations and monotonic timestamps; avoid claiming a
+universal stop bound from sample measurements. Check the owned child's collected
+status and channel lifetime directly; do not use system-wide process killing,
+whole-system memory fluctuations or hashes as release evidence.
+
+Run the POSIX probe on the available host and on Ubuntu before accepting Linux
+behavior. A VM or remote Ubuntu environment is sufficient for this process scope;
+no physical robot or privileged cgroup setup is required. Add focused CTest/CI
+entries when the implementation exists, retain normal and sanitizer regressions,
+and give process tests finite outer timeouts with explicit owned-child cleanup.
+
+
+### Local compute usage and verification
+
+On macOS or Linux, the default build includes `robot_harness_compute` and the
+same-build `robot_harness_compute_worker`. Core itself retains its portable build.
+From the product checkout after building:
+
+```sh
+./build/robot_harness_compute_execution "$(pwd)/build/robot_harness_compute_worker"
+ctest --test-dir build -R 'compute_' --output-on-failure
+```
+
+The example prints the actual sum `332833505` for 1003 iterations, exit code 0 and
+confirmed cleanup. Its 1000ms grace permits sanitizer exit checks; the host API
+default remains 100ms, and neither setting is a hard stopping guarantee.
+
+`ComputeExecutionHost` takes a trusted absolute worker path. Call `initialize`,
+then `submit` (or `prepare` followed by `dispatch_prepared`), and keep calling
+`poll` until the receipt settles. Inspect the optional result and separate process
+observation. `request_cancel` revokes future result permission; it does not mean
+exit. Call `begin_shutdown` and continue polling until `shutdown_status` is closed;
+unresolved requires investigation, not treating the domain as free. The destructor
+fallback may block and fail fast on irrecoverable ownership/cleanup errors.
+
+`poll` here is the host's progress method, not the OS `poll`/`epoll` API. Keep
+invoking it even without incoming events; elapsed deadlines and stop escalation
+also need host execution. The example's 1ms sleep does not establish a stopping
+bound. See [Design](DESIGN.md#local-compute-integration-contract) for the deployment
+condition checks and the limits on per-call work.
+
+The host integration tests check normal result/reuse, unsupported profiles and
+workload limits, prelaunch loss, actual no-child spawn failure, running cooperative
+cancel, ignored cancel, startup shutdown/deadline, delayed exit, cancel after an
+independently observed exit, event backpressure, malformed/early worker exit, and
+the example. Process tests additionally check raw wait status, control failure,
+queued-but-unhandled stop and idempotent closure. Compile-time fixture workers are
+built only for tests; production worker arguments have no fault-mode switch.
+
+These checks do not establish hard stopping bounds, process RSS/CPU quotas,
+host-crash recovery, remote/descendant/GPU effects or physical stopping. Full-control
+send EAGAIN and irrecoverable OS close/reap failures have no runtime injection
+coverage yet; failure paths must remain explicit, and unsupported required guarantees
+are rejected. The bounded progress-backpressure case is distinct from a full
+control channel. Protocol regression tests cover counter rollback across stop ACKs
+and event EOF while a child remains alive; host-isolation tests reject cross-instance
+authorities. Setup cleanup error propagation is statically reviewed, not fault-injected.
+
+On September 15, 2026, the compute increment based on `4c4465b`
+passed all 26 registered CTests in each of these configurations:
+
+| Configuration | Result |
+|---|---|
+| macOS ARM64, AppleClang 21, SDK 26.5, Debug | 26/26 |
+| Same macOS environment, ASan/UBSan | 26/26 |
+| Ubuntu 22.04 ARM64 Docker, GCC 11.4, 2 CPUs/2GiB, non-root, Debug | 26/26 |
+| Same Ubuntu environment, ASan/UBSan with UB recovery disabled | 26/26 |
+
+CTest logs are retained in the host task record and build directories. The process
+test entry contains ten focused scenarios; it is one CTest, not ten extra registered
+tests. These results include the original M2 regressions. The existing Ubuntu CI
+configuration runs all new entries automatically; the PR records the remote run
+and its tested revision separately from these local results. Scoped independent
+review approved the C++ implementation and independently rebuilt/reran all 26
+tests on macOS. It found
+no remaining blocking findings; no production or physical-stop certification is
+implied.
+
 ## PR review and evidence
 
 The shared guide owns review policy; this section maps it to this repository.
@@ -333,7 +514,7 @@ are introduced here.
 | C++ formatting and naming | Follow [Coding style](CODING_STYLE.md); run clang-format on changed C++ files and review names | Local formatter check; not currently a CI job or behavior test |
 | Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; M2a normal and ASan/UBSan passed at `16b2888`; see the linked Actions results above |
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
-| M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a implemented in Core tests and `tests/m2a_failure_tests.cpp`, plus the failure example; M2b/M2c remain planned |
+| M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |

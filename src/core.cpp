@@ -121,6 +121,7 @@ struct AuthorityGate::Implementation {
   std::optional<OperationReceipt> current_receipt;
   std::optional<EvidenceRecord> last_native_record;
   std::optional<NativeEventKind> last_native_kind;
+  std::optional<ExecutionCapabilities> execution_capabilities;
 
   bool current_authority_matches(const OperationAuthority& authority) const {
     return current_receipt.has_value() && authority_matches(current_receipt->authority, authority);
@@ -208,7 +209,9 @@ AuthorityGate::AuthorityGate(AuthorityGateConfig config)
       value.settlement_scope.empty() || value.stop_evidence_source.empty() ||
       value.stop_evidence_source == value.native_evidence_source ||
       value.stop_evidence_source == value.settlement_evidence_source ||
-      value.stop_evidence_source == value.result_sink_observer) {
+      value.stop_evidence_source == value.result_sink_observer ||
+      (value.readiness_kind != StartupEvidenceKind::kWorkerReady &&
+       value.readiness_kind != StartupEvidenceKind::kAdapterReady)) {
     throw std::invalid_argument(
         "authority gate configuration requires static identities and sources");
   }
@@ -231,6 +234,10 @@ EvidenceDisposition AuthorityGate::observe_startup(const StartupEvidence& eviden
     expected_source = &state.config.binding_observer;
     break;
   case StartupEvidenceKind::kWorkerReady:
+  case StartupEvidenceKind::kAdapterReady:
+    if (evidence.kind != state.config.readiness_kind) {
+      return EvidenceDisposition::kRejected;
+    }
     fact = &state.worker_ready;
     expected_source = &state.config.worker_observer;
     break;
@@ -276,18 +283,72 @@ StartupStatus AuthorityGate::startup_status() const {
   status.state = state.initialization_state;
   status.binding = state.config.binding;
   status.is_binding_idle_and_settled = state.binding_idle.observed && state.binding_idle.value;
-  status.is_worker_ready = state.worker_ready.observed && state.worker_ready.value;
+  const bool is_ready = state.worker_ready.observed && state.worker_ready.value;
+  status.is_worker_ready =
+      state.config.readiness_kind == StartupEvidenceKind::kWorkerReady && is_ready;
+  status.is_adapter_ready =
+      state.config.readiness_kind == StartupEvidenceKind::kAdapterReady && is_ready;
   status.is_result_sink_ready = state.result_sink_ready.observed && state.result_sink_ready.value;
   if (state.binding_idle.observed) {
     status.binding_idle_and_settled = state.binding_idle.record;
   }
   if (state.worker_ready.observed) {
-    status.worker_ready = state.worker_ready.record;
+    if (state.config.readiness_kind == StartupEvidenceKind::kWorkerReady) {
+      status.worker_ready = state.worker_ready.record;
+    } else {
+      status.adapter_ready = state.worker_ready.record;
+    }
   }
   if (state.result_sink_ready.observed) {
     status.result_sink_ready = state.result_sink_ready.record;
   }
   return status;
+}
+
+EvidenceDisposition
+AuthorityGate::observe_execution_capabilities(const ExecutionCapabilities& capabilities) {
+  auto& state = *implementation_;
+  if (state.initialization_state == InitializationState::kClosed ||
+      state.config.execution_capability_observer.empty() ||
+      !(capabilities.binding == state.config.binding) ||
+      capabilities.capability_id != state.config.capability_id || capabilities.profile_id.empty() ||
+      capabilities.maximum_work_units == 0 ||
+      capabilities.valid_until <= capabilities.record.observed_at ||
+      !is_record_well_formed(capabilities.record, state.config.execution_capability_observer,
+                             state.config.started_at)) {
+    return EvidenceDisposition::kRejected;
+  }
+  if (state.execution_capabilities) {
+    const auto& previous = *state.execution_capabilities;
+    if (capabilities.record.observed_at < previous.record.observed_at ||
+        capabilities.record.sequence < previous.record.sequence) {
+      return EvidenceDisposition::kRejected;
+    }
+    if (capabilities.record.sequence == previous.record.sequence) {
+      return records_match(capabilities.record, previous.record) &&
+                     capabilities.profile_id == previous.profile_id &&
+                     capabilities.maximum_work_units == previous.maximum_work_units &&
+                     capabilities.available == previous.available &&
+                     capabilities.valid_until == previous.valid_until
+                 ? EvidenceDisposition::kDuplicate
+                 : EvidenceDisposition::kRejected;
+    }
+  }
+  state.execution_capabilities = capabilities;
+  return EvidenceDisposition::kAccepted;
+}
+
+bool AuthorityGate::supports_execution(const ExecutionRequirements& requirements,
+                                       MonotonicTime at) const {
+  const auto& state = *implementation_;
+  if (!state.execution_capabilities || requirements.profile_id.empty() ||
+      requirements.work_units == 0) {
+    return false;
+  }
+  const auto& capabilities = *state.execution_capabilities;
+  return capabilities.available && capabilities.profile_id == requirements.profile_id &&
+         requirements.work_units <= capabilities.maximum_work_units &&
+         at >= capabilities.record.observed_at && at < capabilities.valid_until;
 }
 
 AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
@@ -330,6 +391,13 @@ AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
     }
   }
 
+  if ((!state.config.execution_capability_observer.empty() && !request.execution_requirements) ||
+      (request.execution_requirements &&
+       !supports_execution(*request.execution_requirements, request.requested_at))) {
+    decision.status = AdmissionStatus::kCapabilitiesUnavailable;
+    return decision;
+  }
+
   OperationAuthority authority;
   authority.operation_id = state.next_operation_id++;
   authority.binding = state.config.binding;
@@ -338,6 +406,7 @@ AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
   OperationReceipt receipt;
   receipt.authority = authority;
   receipt.deadline = request.deadline;
+  receipt.execution_requirements = request.execution_requirements;
   state.current_receipt = receipt;
   state.last_native_record.reset();
   state.last_native_kind.reset();
@@ -353,7 +422,9 @@ bool AuthorityGate::claim_dispatch(const OperationAuthority& authority, Monotoni
       !state.current_authority_matches(authority) || observed_at < authority.admitted_at ||
       state.current_receipt->dispatch != DispatchStatus::kPending ||
       is_revoked(*state.current_receipt) ||
-      has_reached_deadline(*state.current_receipt, observed_at)) {
+      has_reached_deadline(*state.current_receipt, observed_at) ||
+      (state.current_receipt->execution_requirements &&
+       !supports_execution(*state.current_receipt->execution_requirements, observed_at))) {
     return false;
   }
   state.current_receipt->dispatch = DispatchStatus::kSubmitted;
@@ -444,13 +515,20 @@ EvidenceDisposition AuthorityGate::observe_non_submission(const NonSubmissionEvi
     return EvidenceDisposition::kRejected;
   }
   auto& receipt = *state.current_receipt;
+  if (receipt.dispatch == DispatchStatus::kSubmitted &&
+      (!receipt.dispatched_at || evidence.record.observed_at < *receipt.dispatched_at)) {
+    return EvidenceDisposition::kRejected;
+  }
   if (receipt.dispatch == DispatchStatus::kNotSubmitted) {
     return receipt.non_submission_evidence.has_value() &&
                    records_match(*receipt.non_submission_evidence, evidence.record)
                ? EvidenceDisposition::kDuplicate
                : EvidenceDisposition::kRejected;
   }
-  if (receipt.dispatch != DispatchStatus::kPending ||
+  // The adapter can prove that a claimed dispatch failed before any child/native
+  // work was created. Once any native observation exists this path is forbidden.
+  if ((receipt.dispatch != DispatchStatus::kPending &&
+       receipt.dispatch != DispatchStatus::kSubmitted) ||
       receipt.native_acceptance_evidence.has_value() ||
       receipt.native_rejection_evidence.has_value() ||
       receipt.native_started_evidence.has_value() || receipt.native_success_evidence.has_value() ||

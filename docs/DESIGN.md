@@ -127,6 +127,218 @@ adapter's requirements, rather than a new universal scheduler or safety framewor
 
 Verification is specified in [expanded execution checks](TESTING.md#expanded-execution-checks).
 
+### First compute adapter slice: design baseline
+
+Status: implemented following M2b/M2c, with macOS/Ubuntu normal and sanitizer
+validation complete and scoped independent review approved. This slice precedes M3; replacement and restart
+recovery retain their existing scope.
+
+The first task is a trusted, local CPU worker computing
+`sum((i % 1000) * (i % 1000), i = 0 .. N-1)` in batches. The initial workload
+ceiling is `N = 100,000,000`, with one in-flight worker per host instance, no request queue and a
+single scalar result. This is a workload ceiling, not a CPU-time guarantee.
+The worker checks cancellation between batches of at most 4096 iterations and
+reports completed iterations. The result fits in an unsigned 64-bit integer;
+normal tests use an independent arithmetic result check. No model, GPU, network,
+user-provided executable or descendant process is involved.
+
+**Selected boundary.** Use a dedicated child process owned by a new native adapter,
+with a fixed executable and bounded control/event channels. Keep the existing
+sample adapter and passive, single-writer Core. The host alone updates Core;
+the worker neither holds execution authority nor calls Core. Compared with a
+cooperative thread, the process permits a separate local termination action when
+the trusted worker ignores the cooperative request. A thread would leave that
+failure inseparable from the host; a container/cgroup manager is unnecessary for
+this first task. The process is not an untrusted-code sandbox.
+
+The initial supported policy covers bounded work units, one worker and bounded
+application message storage, cooperative cancellation and a host-driven local
+termination fallback. Require Core to compare trusted task requirements with
+current adapter capability observations before allocating authority; repeat the
+applicable check before native submission. This needs a focused extension of
+Core admission and its refusal reason, not a caller-supplied `is_safe` flag or a
+parallel admission gate. The concrete fields are defined in the
+[local integration contract](#local-compute-integration-contract); they express
+supported limits and observation validity without enumerating hypothetical devices. For this adapter, prelaunch
+readiness means the adapter can launch the fixed executable with the required
+policy, channels and ownership support; it is an adapter-level observation tied
+to the current binding and rechecked at dispatch. It does not mean a child already
+exists. Per-operation child readiness/start is observed after launch and cannot
+retroactively justify admission. The M1 fixture readiness rule retains its own
+meaning; this distinction must be represented explicitly in the Core integration.
+
+Reject requirements for a hard wall-clock stopping bound, host-stall-independent
+supervision, total-process memory/CPU quotas, GPU release or physical stopping.
+A scalar workload and bounded application buffers do not establish a process RSS
+limit. Unknown or unsupported required limits must not be silently omitted.
+Linux cgroup limits are a later option if a concrete task needs them, not a
+prerequisite for this bounded worker. This slice does not close every expanded
+execution requirement for every adapter.
+
+**Ownership and observations.** After admission, the adapter owns the child
+handle and both channel lifetimes until exit is collected and buffered output is
+accepted or disposed. Perform the dispatch permission check immediately before
+launch; only a proven no-child-created failure or a prerequisite change before
+launch uses non-submission closure. Once a child exists, even if executable startup
+fails, retain its ownership and resolve exit/output/cleanup through the submitted
+path.
+A successful launch is submission, not proof that computation started: the worker
+reports readiness/start and actual batch progress. Input is validated before
+launch and again by the fixed worker. Use bounded nonblocking communication;
+coalesce progress so a full event channel cannot prevent checking cancellation.
+Retain terminal/result information until consumed; malformed, truncated or missing
+messages never establish success. Preserve operation identity when translating
+native observations into the existing event and receipt layers.
+
+On cancellation or expiry, Core revokes authority and requests cooperative stop
+once. The adapter separately tracks a stop-response interval on the host's
+monotonic clock, in milliseconds, starting when the host acts on Core's first
+stop decision for the owned child, before attempting the control send. Record the
+send outcome separately; a failed or unwritable channel must not postpone this
+anchor. Cancellation after launch but before child readiness follows this same
+path: retain ownership, withdraw output permission, try the supported cooperative
+request and escalate once if the channel is unavailable or grace expires. Do not
+wait indefinitely for a readiness/ACK event before enabling escalation. The initial example interval is 100 ms, configurable by trusted host
+policy; it is a grace interval, not a stopping SLA. If refusal or elapsed grace
+requires escalation, the host requests termination of the still-owned child once.
+The host must remain scheduled and poll to perform this escalation; stronger
+requirements are refused. Neither successful signal delivery, pipe EOF nor a
+stop ACK proves exit. Collect the child's exit status, resolve output and close
+owned channels before reporting settlement. An escalated exit is reported with
+its observed cause, never fabricated as cooperative cancellation or task success.
+A reap/signal failure or uncertain exit keeps the domain blocked. Never target a
+PID after collecting its child exit; preserve child ownership against PID reuse.
+
+Shutdown follows the same stop/exit/output/channel ordering. It must not detach
+live work or report cleanup merely because the host is being destroyed. The
+nonblocking shutdown/status API and destructor fallback are defined in the local
+integration contract; a destructor cannot promise bounded return and
+confirmed termination under arbitrary OS failure. Host crashes and reconstruction
+of ownership remain unimplemented M3/adapter work, not an implicit guarantee.
+
+**First engineering step.** Validate the process boundary in a small isolated
+probe before integrating it into Core. Observe real progress, cancellation,
+ignored cancellation with escalation, exit collection and channel cleanup. Probe
+execution must use a finite workload and an outer test timeout with cleanup of
+only its own child; a test timeout is not product stopping evidence. Linux must
+run these process checks before Linux support is accepted; Mac may provide an
+earlier POSIX feasibility result. Resolve process API semantics, child identity,
+channel bounds/closure and shutdown ownership through that probe; do not infer
+feasibility from this design. See [compute slice checks](TESTING.md#first-compute-slice-checks).
+
+
+### Local compute integration contract
+
+The local compute process adapter is the first concrete backend, with a CPU-only
+workload. Adapter boundaries follow native execution/ownership APIs, not a fixed
+CPU/GPU hierarchy. A future GPU, remote-service or controller adapter supplies its
+own supported profile and execution/release evidence. Core remains payload- and
+backend-independent.
+
+`ExecutionRequirements` carries an exact `profile_id` and consumed `work_units`.
+`ExecutionCapabilities` binds that profile and its maximum work units to the
+configured provider/binding, capability ID, trusted observer, sequence and an
+exclusive `valid_until` time. A configured capability observer makes requirements
+mandatory. Core rejects absent, mismatched, unavailable or expired observations,
+retains admitted requirements, and checks them again in `claim_dispatch`.
+Conflicting observations with the same sequence are rejected. This is a typed
+profile match with a directly compared workload limit, not a caller's safety flag.
+
+`host-polled-local-compute-v1` means the bounded local task described above: at
+most one worker per host instance, no request queue, <=100,000,000 iterations, fixed-size progress
+storage, cooperative checkpoints and host-driven local termination fallback.
+It does not include a hard stopping deadline, whole-process memory/CPU quota,
+host-independent supervision, remote/GPU release or physical stopping. A caller
+requiring stronger guarantees must use a different profile; this adapter rejects
+it. The trusted host fixes this minimum profile and may lower the workload ceiling;
+request metadata cannot loosen it. Stop grace is a trusted host configuration,
+not a guaranteed time to release resources.
+
+`StartupEvidenceKind::kAdapterReady` explicitly observes prelaunch support. Gates
+configured for it reject `kWorkerReady` as a substitute; existing sample gates
+retain their worker readiness meaning. A spawned child's readiness becomes the
+operation's native started observation. The host refreshes launch capability
+observations before admission and dispatch, with a 1000ms observation validity;
+this interval is neither a stop grace nor proof of future OS resource availability.
+Loss of a required condition during execution revokes authority through the
+existing cancellation path. Native launch may still fail after preflight.
+
+This profile deliberately retains the same deployment conditions during execution:
+each open-host poll with a launched child and unclosed channels rechecks the
+executable path and SIGCHLD policy. Losing the
+path or its execute permission therefore revokes authority even if the existing
+child could continue. This is a conservative deployment policy, not evidence of
+child failure or an OS resource reservation. Launch readiness and running health
+are different concerns; separate them when a backend needs different conditions.
+Changing the probe cadence would also change detection latency and must preserve
+the declared freshness and cancellation semantics.
+
+`claim_dispatch` reserves the actual submission boundary immediately before
+`posix_spawn`. A spawn failure proven to have created no child may be reported
+through `observe_non_submission`, including after that claim, only while there
+are no native acceptance/start/terminal observations. The claim timestamp may
+remain in the receipt as the attempted boundary time. After a child is created,
+its ownership and effects cannot be rewritten as non-submission.
+
+The control channel uses a nonblocking local socket pair so a closed peer is
+handled as a per-send error without changing the embedding process's SIGPIPE
+policy. Events use a nonblocking pipe with fixed 32-byte frames and at most 128
+frames consumed per poll. Control-send errors are separate from event/protocol
+errors; a failed late cancellation cannot erase a valid successful exit.
+The adapter requires default SIGCHLD disposition and sole ownership of child
+reaping; callers must not change that policy or reap the child while it is owned.
+Unrelated inherited descriptors are the embedding host's CLOEXEC responsibility.
+Each owned descriptor is closed once and its numeric handle immediately discarded;
+close failure remains unresolved rather than retrying a potentially reused handle.
+
+The host maps spawn success to native accepted and worker readiness to started.
+It postpones terminal adjudication until collected OS exit and event EOF: valid
+completed data plus exit 0 must pass the independent arithmetic result check;
+valid cancelled data plus exit 20 requires a stop request and incomplete work.
+A signaled/nonzero exit or invalid/missing protocol result is an adapter execution
+failure, with raw exit diagnostics retained, never fabricated cooperative success.
+A lost child ownership observation cannot establish closure. Successful native
+work after revocation is retained as native success, while result delivery is
+denied at the actual sink boundary. Result storage retains at most one value.
+Output disposition and confirmed channel closure precede settlement.
+
+Each host owns a distinct result sink/effect domain and receives a process-local
+unique binding generation on construction. Its work limit applies to that host,
+not to the sum of multiple hosts. An authority from one instance cannot control
+another. These identities are not persistent or transferable across processes;
+restart/reconstruction remains outside this slice. The embedding application
+serializes process creation with channel setup and owns the stated SIGCHLD/reaping
+preconditions; concurrent external fork/exec during setup is outside this profile.
+Setup descriptors obey the same one-close/error propagation rule as persistent
+channels. A no-child launch failure with uncertain setup cleanup records
+non-submission but cannot report settlement. After spawn, setup cleanup failure
+retains child ownership and triggers containment rather than rewriting submission.
+
+`ComputeExecutionHost::begin_shutdown()` closes admission and requests stopping
+once; `poll()` advances currently available observations. `shutdown_status()`
+reports open, closing, closed or unresolved. Closed requires no live owned child
+and resolved Core settlement. Destroying a live host invokes the process owner's
+synchronous terminate/reap fallback, with no bounded-return promise or fabricated
+Core settlement; callers needing observable completion use explicit shutdown.
+Irrecoverably lost child ownership or uncertain descriptor cleanup in this
+fallback reports the failure and terminates the embedding process. This explicit
+fail-fast limitation is not crash recovery or a general-purpose shutdown policy.
+The host is single-threaded and must keep polling. No background controller,
+host-crash recovery or M3 replacement is delivered by this slice.
+
+This `poll()` is a host progress method, not the OS `poll`/`epoll` readiness API.
+It handles expiry, capability checks, process observations, receipt updates and
+closure as applicable to the current operation. For an active child, process
+observations are mapped before completion and shutdown status are evaluated;
+expiry and cancellation can also update receipts earlier in the call.
+Event reads and exit collection do not wait for future
+events, and event consumption has a per-call frame limit. The whole call has no
+hard runtime bound: capability probes include filesystem operations, and receipt
+processing may allocate or copy storage. The caller must schedule progress even
+when no worker event arrives, so deadlines and stop escalation can advance.
+A delayed call delays escalation; stop grace does not bound total stopping time.
+The example's 1ms sleep is a demonstration cadence, not a scheduling guarantee.
+
 ## Results and recovery
 
 Keep request acceptance, cancellation acknowledgement, native termination,

@@ -9,15 +9,15 @@ truthful operation feedback.
 
 ## Status
 
-**M2b cancellation and M2c deadlines are implemented locally; Ubuntu validation
-is pending.** Cancellation and expiry revoke future dispatch/result permission,
+**M2b cancellation and M2c deadlines are implemented, reviewed and validated on
+macOS and Ubuntu.** Cancellation and expiry revoke future dispatch/result permission,
 while native acknowledgement, termination and cleanup remain separate facts.
 An ignored stop may still end in native success; its late result is discarded.
 The same operation blocks new admission until actual closure evidence is complete.
 All nine registered CTests pass on macOS normally and with ASan/UBSan. Independent
 reviews found no remaining blocking code issues in M2b/M2c. See [Testing](docs/TESTING.md)
-for verification and limits. The previously validated M2a Linux result does not
-cover these new changes.
+for verification and limits. Commit `8db3c38` passed all nine tests in both normal
+and ASan/UBSan builds in the [M2 Ubuntu run](https://github.com/xiao-yang25/robot-harness/actions/runs/34936844890).
 
 The declared effect is acceptance of a sample result in a cooperative in-process
 fixture. Provider replacement, restart recovery, ROS integration and physical
@@ -154,8 +154,8 @@ failure and cancellation, M3 adds replacement and recovery, and M4 maps the same
 behavior to ROS 2 Humble. Each increment includes its regression tests. A separate
 Robot Agent can start using the available interfaces before all milestones finish.
 M1 and M2a have passed macOS and Ubuntu validation. M2b cancellation and M2c
-expiry are implemented with local tests; their remaining validation is tracked
-above. M3–M4 remain planned.
+expiry now also have macOS and Ubuntu evidence for their implemented scope.
+M3–M4 remain planned.
 
 For project constraints and the engineering workflow entry, start with
 [repository instructions](AGENTS.md). The accepted boundary and M1–M4 sequence

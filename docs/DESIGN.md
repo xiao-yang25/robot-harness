@@ -5,7 +5,7 @@ D-073 architecture and September 10 product split. The September 14 replanning
 changes the implementation order to runnable behavior slices, preserving those
 ownership boundaries. M0 established the build skeleton; M1 has been implemented
 and merged. M2a implements failure closure; M2b/M2c add cancellation and expiry
-with local validation. M3–M4 remain planned. See README and Testing for tested
+with macOS and Ubuntu validation. M3–M4 remain planned. See README and Testing for tested
 status and validation limits.
 
 ## Source roles
@@ -461,8 +461,8 @@ real-time scheduling guarantee.
 ## M2 planned behavior: failure, cancellation and expiry
 
 This section defines the accepted M2 behavior and slice boundaries. The caller
-surfaces above now implement M2a/M2b/M2c; see Testing for actual evidence and the
-remaining Ubuntu validation gap. Keep the M1 sample calculation, static binding,
+surfaces above now implement M2a/M2b/M2c; see Testing for actual evidence and its
+scope limitations. Keep the M1 sample calculation, static binding,
 single effect domain and single active operation. Add failure controls to the fixture,
 not a generic fault engine or another Core scheduler. M3 still owns provider
 replacement, restart and recovery from contradictory evidence.

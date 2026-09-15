@@ -31,7 +31,7 @@ AddressSanitizer/UndefinedBehaviorSanitizer build in `build-sanitizers`. Both ru
 all registered tests. Undefined-behavior recovery is disabled so a diagnostic
 fails the test instead of merely printing a warning. A failure in either build
 or test phase fails the same job; its check name remains unchanged for branch
-protection. The verified M2a Ubuntu result is recorded below.
+protection. The verified M2a and M2b/M2c Ubuntu results are recorded below.
 
 The checkout step follows the official
 [checkout v6 interface](https://github.com/actions/checkout/tree/v6). No additional
@@ -195,9 +195,13 @@ These are acceptance scenarios for
 Core and host tests; M2b/M2c each have focused tests and a caller example.
 The current M2b/M2c implementation passes all nine registered CTests on macOS
 normally and with ASan/UBSan. M2b independent review passed after the delayed-ACK
-fix below; M2c independent code review found no blocking code issues. Ubuntu has not run this
-revision, so full
-cross-platform M2 validation is still pending.
+fix below; M2c independent code review found no blocking code issues. On September
+15, 2026, implementation commit `8db3c38802950d025ec710dd6f71f43176108d18` passed the
+[M2b/M2c Ubuntu CI run](https://github.com/xiao-yang25/robot-harness/actions/runs/34936844890):
+Ubuntu 22.04, GCC 11.4.0, normal Debug and ASan/UBSan builds each passed all nine
+CTest entries, with undefined-behavior recovery disabled. This closes the Linux
+validation gap for the implemented sample cancellation/deadline behavior. It does
+not validate the future expanded-execution requirements below.
 The M2a implementation based on `fc283ec` passed all five CTests on
 macOS with AppleClang, both normally and with AddressSanitizer and
 UndefinedBehaviorSanitizer. The original pre-dispatch refusal reproducer failed

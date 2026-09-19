@@ -4,6 +4,7 @@
 #include "robot_harness/compute_execution.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -22,12 +23,31 @@ struct TaskOperation {
   std::uint64_t iterations = 0;
 };
 
+// Example-local port for the two actual execution paths. It is not a stable
+// Harness interface or a capability/profile claim. One task at a time owns its use.
+class TaskExecution {
+public:
+  virtual ~TaskExecution() = default;
+  virtual void poll() = 0;
+  virtual BindingPhase phase() const = 0;
+  virtual ComputeSubmission submit(std::uint64_t iterations, const std::string& reference) = 0;
+  virtual bool request_cancel(const OperationAuthority& authority) = 0;
+  virtual std::optional<OperationReceipt> receipt(const OperationAuthority& authority) const = 0;
+  virtual const std::optional<ComputeResult>& result() const = 0;
+  virtual bool ownership_lost() const = 0;
+  virtual void begin_shutdown() = 0;
+};
+
 // Example-owned application logic, not a Harness API. The caller has exclusive
-// use of an initialized host, which outlives this object. No threads or retries.
+// use of its Host or execution port, which outlives this object. No threads or retries.
 class FiniteComputeTask {
 public:
   explicit FiniteComputeTask(ComputeExecutionHost& host,
                              MonotonicTime observation_budget_ms = 7000);
+  explicit FiniteComputeTask(TaskExecution& execution, MonotonicTime observation_budget_ms = 7000);
+  // A caller-supplied interrupted intent, not restored native evidence or a receipt.
+  // Only valid on an empty task; it remains NeedsAttention even after recovery.
+  bool note_interrupted_goal(ComputeGoal goal);
   FiniteComputeTask(const FiniteComputeTask&) = delete;
   FiniteComputeTask& operator=(const FiniteComputeTask&) = delete;
 
@@ -51,7 +71,8 @@ private:
   bool observation_expired(MonotonicTime time) const noexcept;
   void submit_step(MonotonicTime time);
 
-  ComputeExecutionHost& host_;
+  std::unique_ptr<TaskExecution> owned_execution_;
+  TaskExecution& host_;
   const MonotonicTime observation_budget_ms_;
   std::optional<ComputeGoal> goal_;
   std::optional<TaskOperation> operation_;

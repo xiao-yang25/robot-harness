@@ -5,6 +5,42 @@
 
 namespace robot_harness::examples {
 namespace {
+class LocalTaskExecution final : public TaskExecution {
+public:
+  explicit LocalTaskExecution(ComputeExecutionHost& host) : host_(host) {
+  }
+  void poll() override {
+    host_.poll();
+  }
+  BindingPhase phase() const override {
+    return host_.binding_status().phase;
+  }
+  ComputeSubmission submit(std::uint64_t iterations, const std::string& reference) override {
+    ComputeRequest request;
+    request.iterations = iterations;
+    request.request_reference = reference;
+    return host_.submit(request);
+  }
+  bool request_cancel(const OperationAuthority& authority) override {
+    return host_.request_cancel(authority).status != ControlStatus::kRejected;
+  }
+  std::optional<OperationReceipt> receipt(const OperationAuthority& authority) const override {
+    return host_.receipt(authority);
+  }
+  const std::optional<ComputeResult>& result() const override {
+    return host_.result();
+  }
+  bool ownership_lost() const override {
+    return host_.observation().ownership_lost;
+  }
+  void begin_shutdown() override {
+    host_.begin_shutdown();
+  }
+
+private:
+  ComputeExecutionHost& host_;
+};
+
 // Independent, bounded application check: sum one period directly rather than
 // reuse the host's polynomial formula or the worker's accumulated result.
 std::uint64_t reference_sum(std::uint64_t iterations) {
@@ -22,10 +58,27 @@ std::uint64_t reference_sum(std::uint64_t iterations) {
 
 FiniteComputeTask::FiniteComputeTask(ComputeExecutionHost& host,
                                      MonotonicTime observation_budget_ms)
-    : host_(host), observation_budget_ms_(observation_budget_ms) {
+    : owned_execution_(std::make_unique<LocalTaskExecution>(host)), host_(*owned_execution_),
+      observation_budget_ms_(observation_budget_ms) {
   if (observation_budget_ms == 0) {
     throw std::invalid_argument("task observation budget must be positive");
   }
+}
+
+FiniteComputeTask::FiniteComputeTask(TaskExecution& execution, MonotonicTime budget)
+    : host_(execution), observation_budget_ms_(budget) {
+  if (budget == 0)
+    throw std::invalid_argument("task observation budget must be positive");
+}
+
+bool FiniteComputeTask::note_interrupted_goal(ComputeGoal goal) {
+  if (closing_ || goal_ || operation_ || goal.revision == 0 || goal.first_iterations == 0 ||
+      goal.first_iterations > 100000000)
+    return false;
+  goal_ = goal;
+  outcome_ = TaskOutcome::kNeedsAttention;
+  detail_ = "previous Host lost; prior goal outcome unavailable";
+  return true;
 }
 
 bool FiniteComputeTask::revise_goal(ComputeGoal goal) {
@@ -45,8 +98,7 @@ bool FiniteComputeTask::revise_goal(ComputeGoal goal) {
   outcome_ = TaskOutcome::kPending;
   detail_ = operation_ ? "waiting for previous goal cleanup" : "ready for first step";
   if (operation_) {
-    const auto cancelled = host_.request_cancel(operation_->authority);
-    if (cancelled.status == ControlStatus::kRejected) {
+    if (!host_.request_cancel(operation_->authority)) {
       needs_attention("cancellation could not be correlated");
     }
   }
@@ -67,7 +119,7 @@ bool FiniteComputeTask::observation_expired(MonotonicTime time) const noexcept {
 }
 
 void FiniteComputeTask::submit_step(MonotonicTime time) {
-  const auto phase = host_.binding_status().phase;
+  const auto phase = host_.phase();
   if (phase == BindingPhase::kClosed) {
     outcome_ = TaskOutcome::kFailed;
     detail_ = "host is permanently closed";
@@ -83,10 +135,7 @@ void FiniteComputeTask::submit_step(MonotonicTime time) {
   const auto iterations = step_ == 1 ? goal_->first_iterations : *first_sum_ % 8 + 1;
   const auto reference =
       "goal-" + std::to_string(goal_->revision) + "-step-" + std::to_string(step_);
-  ComputeRequest request;
-  request.request_reference = reference;
-  request.iterations = iterations;
-  const auto submission = host_.submit(request);
+  const auto submission = host_.submit(iterations, reference);
   if (submission.authority) {
     operation_ =
         TaskOperation{goal_->revision, step_, *submission.authority, reference, iterations};
@@ -130,7 +179,7 @@ void FiniteComputeTask::tick(MonotonicTime caller_time) {
   const auto receipt = host_.receipt(operation_->authority);
   if (!receipt || receipt->native_outcome == NativeOutcome::kUnknown ||
       receipt->authority_disposition == AuthorityDisposition::kBlockedUnknown ||
-      host_.observation().ownership_lost) {
+      host_.ownership_lost()) {
     needs_attention("operation outcome or ownership cannot be confirmed");
     return;
   }

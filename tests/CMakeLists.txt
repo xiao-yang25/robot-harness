@@ -194,3 +194,26 @@ if(UNIX)
     COMMAND robot_harness_two_step_compute unknown $<TARGET_FILE:robot_harness_compute_test_worker_delayed_exit>)
   set_tests_properties(robot_harness.task_failure_example robot_harness.task_unknown_example PROPERTIES TIMEOUT 20)
 endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(robot_harness_m3c_recovery_tests m3c_recovery_tests.cpp)
+  target_include_directories(robot_harness_m3c_recovery_tests PRIVATE ../src/compute)
+  target_link_libraries(robot_harness_m3c_recovery_tests PRIVATE robot_harness_recovery_task_example)
+  foreach(mode IN ITEMS client owner task)
+    add_test(NAME robot_harness.recovery_${mode}
+      COMMAND robot_harness_m3c_recovery_tests ${mode} $<TARGET_FILE:robot_harness_compute_worker>)
+    set_tests_properties(robot_harness.recovery_${mode} PROPERTIES TIMEOUT 15)
+  endforeach()
+  foreach(mode IN ITEMS normal handoff task-normal task-handoff task-between)
+    add_test(NAME robot_harness.recovery_${mode}_example
+      COMMAND robot_harness_recovery_execution ${mode} $<TARGET_FILE:robot_harness_compute_worker>)
+    set_tests_properties(robot_harness.recovery_${mode}_example PROPERTIES TIMEOUT 25)
+  endforeach()
+  add_test(NAME robot_harness.recovery_fd_collision
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/recovery_fd_collision.sh
+      $<TARGET_FILE:robot_harness_recovery_execution> $<TARGET_FILE:robot_harness_compute_worker>)
+  set_tests_properties(robot_harness.recovery_fd_collision PROPERTIES TIMEOUT 25)
+  add_test(NAME robot_harness.recovery_terminal_example
+    COMMAND robot_harness_recovery_execution terminal $<TARGET_FILE:robot_harness_compute_test_worker_delayed_exit>)
+  set_tests_properties(robot_harness.recovery_terminal_example PROPERTIES TIMEOUT 25)
+endif()

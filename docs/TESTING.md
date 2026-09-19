@@ -468,6 +468,82 @@ tests on macOS. It found
 no remaining blocking findings; no production or physical-stop certification is
 implied.
 
+## M3a replacement checks
+
+Build normally, then run the example and focused checks:
+
+```sh
+./build/robot_harness_replacement_execution
+ctest --test-dir build --output-on-failure -R 'm3a_replacement|replacement_execution_example|compute_replacement'
+```
+
+The registered suite grows from 26 to 29 tests on macOS/Linux. Existing CI runs
+all entries in both Debug and ASan/UBSan without a new workflow job.
+
+| Check | Required observation |
+|---|---|
+| Replacement fixture | B has no native submission while A's work, output disposition or settlement is pending; after settlement it has a fresh operation ID |
+| Stale output/control | Replay A while B is prepared, running and native-success/output-pending; sink denial count increases, accepted storage stays unchanged and B's receipt remains valid; old dispatch/cancel cannot affect B |
+| Positive result and duplicate | B accepts its actual `[25, 36]`, sum `61`, once; replay of an already accepted result cannot add another entry |
+| Missing settlement and shutdown | Time and replay cannot release an unresolved A; shutdown drains staged replays, disables further replay and preserves missing settlement |
+| Compute replacement | Cancel unfinished native work, collect/reap its exit and close channels before admitting B; old authority cannot dispatch or stop B, which produces the known sum `5` |
+
+Replay retains the first real result after explicitly enabling the fixture slot.
+It stages a duplicate as the next callback so tests can exercise B's live delivery
+permission; it does not recompute a result, relabel authority or bypass the sink.
+The retained duplicate is separate from A's original work/output disposal. This
+does not permit settling outstanding native effects or starting B while A is
+still running. The compute case checks real exit and reaping separately and does
+not add synthetic messages to the process protocol.
+
+Clearing the retained slot on adapter close is checked in code review. The public
+post-close replay call returns false independently of whether that slot was cleared,
+so the shutdown test alone does not prove its storage was released before destruction.
+
+On September 15, 2026, the M3a increment based on `6bba453` passed all 29 CTests
+on macOS ARM64 Debug and ASan/UBSan, and Ubuntu 22.04 ARM64 Docker Debug and
+ASan/UBSan with UB recovery disabled (the same environments listed above).
+A focused isolated mutation checking the current operation's authority instead
+of the callback's original authority failed the replay-at-sink regression as
+expected; the unchanged implementation passed. Scoped independent review approved
+the final implementation and independently rebuilt and ran all 29 tests on macOS.
+This increment has not been pushed, so no matching GitHub CI run exists yet.
+Provider generation changes, restart recovery, hard stopping deadlines and robot
+effects remain outside these checks.
+
+## Planned M3b and M3c checks
+
+These checks implement the existing [M3 scope](DESIGN.md#planned-m3b-and-m3c-boundaries).
+They are not registered tests or evidence of PASS. Preserve M1–M3a regressions;
+add focused CTests with each implementation and run the existing macOS/Ubuntu
+normal and sanitizer configurations, plus the required independent review.
+
+| Slice | Required observation |
+|---|---|
+| M3b withdrawal and dependencies | An unavailable required provider/worker/sink blocks affected admission and dispatch; a ready replacement does not clear old pending work/output/cleanup |
+| M3b successful rebind | Actual old-scope settlement and valid new prerequisites permit a fresh binding; a new operation produces an independently checked result |
+| M3b stale or failed transition | Old-binding controls/evidence/output cannot affect the new operation at its submission/result boundary; rejected or incomplete rebinding cannot grant new authority |
+| M3c restart | Host/Core starts recovery-required; old active work or partial/unknown effects remain blocking until corresponding native facts are established |
+| M3c recovery evidence | Missing, wrong-identity, stale/expired or contradictory evidence cannot reopen admission; an interrupted recovery leaves no usable partial grant; valid fresh evidence permits subsequent execution |
+| M3c native ownership | For the selected process path, observe surviving work or confirmed exit/cleanup externally and verify that restart cannot reuse old authority; fixture-only recovery is reported separately |
+
+Cover declared conflict/composite prerequisites through the selected cases rather
+than a separate exhaustive registry. Record which existing regressions already
+cover partial effects or missing settlement, and add only the uncovered boundary.
+Define the new observation/identity context before writing recovery tests; do not
+turn an incremented counter or a synthesized clean flag into the test oracle.
+
+When the minimal task caller is added, register its normal multi-step completion,
+goal change, failure/unknown handling and clean shutdown as integration checks.
+The caller must use public interfaces. A dependent normal step needs the accepted
+prior result and required settlement; replacing a cancelled goal instead follows
+the declared handoff conditions and does not require a discarded result to be
+accepted. Neither path changes Core's unassessed domain verdict.
+Extend that same caller test with M3b/M3c as supported. A future separate Agent
+repository must exercise the actual Harness dependency in a small cross-repository
+test; passing each repository independently is insufficient. ROS dependencies and
+native cross-path checks remain separate M4 work, not part of today's Core CI.
+
 ## PR review and evidence
 
 The shared guide owns review policy; this section maps it to this repository.
@@ -515,7 +591,7 @@ are introduced here.
 | Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; M2a normal and ASan/UBSan passed at `16b2888`; see the linked Actions results above |
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
-| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | Planned; no replacement or recovery implementation exists |
+| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a same-host/same-binding operation replacement implemented; see [29-test evidence](#m3a-replacement-checks). Provider rebinding and restart/recovery remain planned |
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 

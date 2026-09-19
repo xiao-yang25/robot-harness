@@ -72,6 +72,13 @@ target_link_libraries(robot_harness_compute_capability_tests PRIVATE robot_harne
 add_test(NAME robot_harness.compute_capabilities COMMAND robot_harness_compute_capability_tests)
 set_tests_properties(robot_harness.compute_capabilities PROPERTIES TIMEOUT 10)
 
+add_executable(robot_harness_m3a_replacement_tests m3a_replacement_tests.cpp)
+target_link_libraries(robot_harness_m3a_replacement_tests PRIVATE robot_harness_sample_fixture)
+add_test(NAME robot_harness.m3a_replacement COMMAND robot_harness_m3a_replacement_tests)
+add_test(NAME robot_harness.replacement_execution_example COMMAND robot_harness_replacement_execution)
+set_tests_properties(robot_harness.m3a_replacement robot_harness.replacement_execution_example
+  PROPERTIES TIMEOUT 10)
+
 if(UNIX)
   set(compute_worker_mode 0)
   foreach(mode IN ITEMS ignore startup_delay malformed early_exit blocked_control delayed_exit unavailable_control backpressure eof_alive backwards)
@@ -84,7 +91,7 @@ if(UNIX)
   endforeach()
   add_executable(robot_harness_compute_execution_tests compute_execution_tests.cpp)
   target_link_libraries(robot_harness_compute_execution_tests PRIVATE robot_harness_compute)
-  foreach(mode IN ITEMS normal cancel prelaunch cancel_after_exit host_isolation)
+  foreach(mode IN ITEMS normal cancel prelaunch cancel_after_exit host_isolation replacement)
     add_test(NAME robot_harness.compute_${mode}
       COMMAND robot_harness_compute_execution_tests ${mode} $<TARGET_FILE:robot_harness_compute_worker>)
     set_tests_properties(robot_harness.compute_${mode} PROPERTIES TIMEOUT 15)

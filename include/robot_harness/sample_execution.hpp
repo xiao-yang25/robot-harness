@@ -65,6 +65,13 @@ public:
   void set_cancellation_mode(CancellationMode mode) noexcept;
   // Suppress cleanup evidence to exercise a missing report, even during shutdown.
   void set_settlement_reporting_enabled(bool enabled) noexcept;
+  // Fixture-only duplicate delivery: clear the slot, then retain the first result
+  // generated while enabled. Disabled by default; disabling/shutdown clears it.
+  void set_result_replay_enabled(bool enabled) noexcept;
+  // Stage the retained callback as the next event to exercise out-of-order delivery.
+  // Preserve its original authority and data; false if no retained result or closed.
+  bool replay_retained_result();
+  std::size_t result_permission_denial_count() const noexcept;
 
   SampleSubmission prepare(const SampleRequest& request);
   bool dispatch_prepared(const OperationAuthority& authority);

@@ -62,6 +62,9 @@ target_link_libraries(robot_harness_cancellation_execution PRIVATE robot_harness
 add_executable(robot_harness_deadline_execution examples/deadline_execution.cpp)
 target_link_libraries(robot_harness_deadline_execution PRIVATE robot_harness_sample_fixture)
 
+add_executable(robot_harness_replacement_execution examples/replacement_execution.cpp)
+target_link_libraries(robot_harness_replacement_execution PRIVATE robot_harness_sample_fixture)
+
 if(UNIX)
   add_library(robot_harness_compute STATIC
     src/compute_execution.cpp

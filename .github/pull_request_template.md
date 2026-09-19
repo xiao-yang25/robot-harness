@@ -10,6 +10,9 @@ List required checks that remain pending; do not substitute an older CI result. 
 
 ## Independent review
 
+<!-- Contributors may leave required independent review pending; maintainers
+coordinate it. No AI account or maintainer-local tooling is required. -->
+
 <!-- Follow docs/TESTING.md, "PR review and evidence". Record reviewed base/head
 (or base and uncommitted scope), review type and outcome, blocking findings and
 their resolution, and any changes after review with their incremental checks.

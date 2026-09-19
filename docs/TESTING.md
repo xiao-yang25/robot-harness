@@ -4,6 +4,26 @@ Use macOS for fast local Core development and Ubuntu for Linux build and
 correctness coverage. Robot integration and deployment measurements require
 their relevant target environments.
 
+## Current validation baseline
+
+M3c merged as `dabad9b` through [PR #7](https://github.com/xiao-yang25/robot-harness/pull/7).
+Its [main-branch CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35453807474)
+passed all 57 Linux tests in both Debug and ASan/UBSan. The sections below retain
+dated results from earlier increments; their smaller counts are historical, not
+the expected size of the current suite.
+
+| Environment | Current coverage | Limits |
+|---|---|---|
+| GitHub-hosted Ubuntu 22.04 x86_64, GCC | All 57 CTests in Debug and ASan/UBSan | No ROS, hardware or deployment-timing validation |
+| Ubuntu 22.04 ARM64 in local Docker, GCC | Local process and recovery coverage; final launcher fix passed all 10 affected recovery tests in both configurations, following the prior full 56-test runs | Runs in a Linux VM; not a target-device performance result |
+| macOS ARM64, AppleClang | All 47 portable CTests in Debug and ASan/UBSan before the Linux-only launcher correction | Linux recovery targets are not built; macOS is not currently a hosted CI job |
+| Other platforms/toolchains | No verified support claim | CMake platform branches alone are not platform validation |
+
+For a first run use [Build](../README.md#build) and the
+[example guide](../examples/README.md). The normal CTest command discovers all
+tests built for that platform. Later revisions must carry their own CI results;
+the links here establish only the recorded revision.
+
 ## What each environment establishes
 
 | Check | Environment | Evidence boundary |
@@ -31,7 +51,8 @@ AddressSanitizer/UndefinedBehaviorSanitizer build in `build-sanitizers`. Both ru
 all registered tests. Undefined-behavior recovery is disabled so a diagnostic
 fails the test instead of merely printing a warning. A failure in either build
 or test phase fails the same job; its check name remains unchanged for branch
-protection. The verified M2a and M2b/M2c Ubuntu results are recorded below.
+protection. The [current baseline](#current-validation-baseline) summarizes the
+latest merged result; earlier milestone evidence is retained below.
 
 The checkout step follows the official
 [checkout v6 interface](https://github.com/actions/checkout/tree/v6). No additional
@@ -58,9 +79,28 @@ cmake --build build-sanitizers --parallel 2
 ctest --test-dir build-sanitizers --output-on-failure --no-tests=error
 ```
 
-Local macOS commands and the current SDK workaround are in the
-[README](../README.md). A Linux container or VM on a Mac may also catch build
+Local build commands are in the [README](../README.md#build); see
+[SDK selection](#macos-sdk-selection) for a macOS toolchain mismatch.
+A Linux container or VM on a Mac may also catch build
 compatibility issues, but cannot replace target-host timing measurements.
+
+## macOS SDK selection
+
+If the compiler and default SDK are incompatible, explicitly select a compatible
+installed SDK in a fresh build directory. Replace the placeholder below with an
+actual SDK path on your machine:
+
+```sh
+cmake -S . -B build-local -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_OSX_SYSROOT="/path/to/compatible/MacOSX.sdk"
+cmake --build build-local --parallel 2
+(cd build-local && ctest --output-on-failure)
+./build-local/robot_harness_normal_execution
+```
+
+Use `build-local` in subsequent example commands, including worker paths. Keep
+machine-specific settings in local build directories; do not commit SDK paths or
+change the project's compiler requirements to accommodate one workstation.
 
 ## Ubuntu development container
 
@@ -123,7 +163,8 @@ cmake --build /build/sanitizers --parallel 2
 ctest --test-dir /build/sanitizers --output-on-failure --no-tests=error
 ```
 
-Expected for the existing M2 implementation: nine tests in each configuration.
+The current Linux suite registers 57 tests in each configuration. The nine-test
+result above records only the original M2 container setup.
 Record actual results, compiler, kernel/architecture and Docker's supplied image
 identity when run; the Ubuntu tag and package repositories can change. There is
 no image archive or additional project-computed digest in this workflow.
@@ -655,7 +696,7 @@ run is not a new full 57-test run. Focused independent re-review approved the
 correction.
 The existing Ubuntu workflow runs all registered tests normally and under
 ASan/UBSan, so no additional workflow job is needed. Local execution does not
-substitute for the future pushed revision's GitHub CI. Protocol fault injection
+substitute for the submitted revision's GitHub CI. Protocol fault injection
 uses dedicated test peers; these are not external service or security tests.
 A silent connected Host and a stalled owner have no watchdog in this prototype.
 Rare OS failures, owner death with surviving work, machine reboot, durable receipt
@@ -797,12 +838,18 @@ against the pre-fix Core library and passes after the fix. Independent focused
 review also confirms that allocation failure leaves withdrawal retryable. All six
 manual modes above were run successfully with the validated custom build directory
 substituted for `build`, retaining the documented absolute-path expressions.
-No corresponding remote CI has run yet.
+This M3b increment subsequently merged through
+[PR #6](https://github.com/xiao-yang25/robot-harness/pull/6) as `eb2ae06`;
+its [main-branch CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35447391085)
+passed all 47 tests in both configurations. The current larger suite is recorded
+in the [validation baseline](#current-validation-baseline).
 
 ## PR review and evidence
 
-The shared guide owns review policy; this section maps it to this repository.
-Use the [PR template](../.github/pull_request_template.md) to record the proposed
+This section is the contributor-facing review and evidence workflow. Maintainers
+also apply their configured shared engineering guidance; contributors do not need
+that separate checkout or its local tools to prepare a PR. Use the
+[PR template](../.github/pull_request_template.md) to record the proposed
 behavior, tested revision, independent review and limitations. Keep personal
 model settings and private host logs outside the public PR.
 
@@ -850,10 +897,13 @@ are introduced here.
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 
-For Core admission, cancellation, settlement, recovery, and adapter ownership
-changes, use the shared engineering guide's applicable independent-review rule;
-the registered tests alone do not complete that review. Do not create another
-project-specific copy of the review policy.
+Behavior changes involving authority, security/authorization, core public APIs,
+concurrency/cancellation,
+ownership/lifecycle, persistent state/recovery, data integrity or protocols require
+independent review. The maintainer arranges it and records its scope and outcome
+using the workflow above; registered tests alone do not complete that review.
+Explanatory documentation changes without such effects need appropriate checks,
+not an automatic repetition of runtime validation.
 
 No robot target or credential is configured by these instructions. Missing Linux
 or hardware evidence remains explicit; writing a test plan does not satisfy it.

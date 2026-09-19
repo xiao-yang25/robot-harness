@@ -90,6 +90,41 @@ struct OperationAuthority {
   bool is_valid() const noexcept;
 };
 
+enum class BindingPhase { kActive, kWithdrawn, kPreparing, kClosed };
+enum class BindingControlStatus {
+  kApplied,
+  kAlreadyInPhase,
+  kStaleIdentity,
+  kWrongPhase,
+  kUnresolvedWork,
+  kInvalidEvidence,
+  kInvalidTime,
+  kInvalidProvider,
+  kIdentityExhausted,
+  kClosed
+};
+
+struct BindingReadinessEvidence {
+  StartupEvidenceKind kind = StartupEvidenceKind::kBindingIdleAndSettled;
+  BindingIdentity binding;
+  EvidenceRecord record;
+  bool observed = false;
+  MonotonicTime valid_until = 0;  // Exclusive; rechecked at commit.
+};
+
+struct BindingDecision {
+  BindingControlStatus status = BindingControlStatus::kWrongPhase;
+  std::optional<BindingIdentity> candidate;
+  std::optional<OperationAuthority> native_stop_authority;
+};
+
+struct BindingStatus {
+  BindingPhase phase = BindingPhase::kActive;
+  BindingIdentity active;
+  std::optional<BindingIdentity> candidate;
+  bool can_commit = false;  // At the queried time; grants no execution authority.
+};
+
 enum class AdmissionStatus {
   kAdmitted,
   kInvalidRequest,
@@ -187,6 +222,7 @@ struct OperationReceipt {
   std::optional<MonotonicTime> cancellation_requested_at;
   std::optional<MonotonicTime> deadline;
   std::optional<MonotonicTime> expiry_observed_at;
+  std::optional<MonotonicTime> binding_withdrawn_at;
   std::optional<MonotonicTime> native_stop_requested_at;
   StopAcknowledgement stop_acknowledgement = StopAcknowledgement::kNotRequested;
   std::string native_identity;
@@ -238,6 +274,15 @@ public:
   StartupStatus startup_status() const;
   EvidenceDisposition observe_execution_capabilities(const ExecutionCapabilities& capabilities);
   bool supports_execution(const ExecutionRequirements& requirements, MonotonicTime at) const;
+
+  BindingStatus binding_status(MonotonicTime at) const;
+  BindingDecision withdraw_binding(const BindingIdentity& expected_binding, MonotonicTime now);
+  BindingDecision begin_rebind(const BindingIdentity& expected_old_binding,
+                               const std::string& new_provider_id,
+                               const BindingReadinessEvidence& old_scope_evidence,
+                               MonotonicTime now);
+  EvidenceDisposition observe_rebind_readiness(const BindingReadinessEvidence& evidence);
+  BindingDecision commit_rebind(const BindingIdentity& expected_candidate, MonotonicTime now);
 
   AdmissionDecision admit(const OperationRequest& request);
   bool claim_dispatch(const OperationAuthority& authority, MonotonicTime observed_at);

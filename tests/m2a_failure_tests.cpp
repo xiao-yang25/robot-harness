@@ -20,15 +20,16 @@ void unavailable_before_dispatch_closes_without_submission(bool worker_unavailab
                                           [&time] { return time++; });
   require(host.initialize().state == robot_harness::InitializationState::kReady,
           "fixture initializes before availability changes");
+  const auto refused = host.prepare({"refused-a", {2}});
+  require(refused.authority.has_value(), "prepare before dependency loss");
   if (worker_unavailable) {
     host.set_worker_ready(false);
   } else {
     host.set_result_sink_ready(false);
   }
 
-  const auto refused = host.submit({"refused-a", {2}});
-  require(refused.status == robot_harness::SampleSubmissionStatus::kDispatchBlocked &&
-              refused.authority.has_value(),
+  const bool dispatched = host.dispatch_prepared(*refused.authority);
+  require(!dispatched && refused.authority.has_value(),
           "unavailable adapter closes an admitted operation without dispatch");
   require(host.worker_submission_count() == 0 && host.worker_execution_count() == 0 &&
               host.results().empty(),
@@ -46,6 +47,13 @@ void unavailable_before_dispatch_closes_without_submission(bool worker_unavailab
 
   host.set_worker_ready(true);
   host.set_result_sink_ready(true);
+  require(host.submit({"still-withdrawn", {3}}).status ==
+              robot_harness::SampleSubmissionStatus::kAdmissionBlocked,
+          "restoring dependencies alone does not undo withdrawal");
+  require(host.rebind_provider(refused.authority->binding, "restored-worker",
+                               robot_harness::CompletionMode::kSynchronous)
+                  .status == robot_harness::BindingControlStatus::kApplied,
+          "explicit provider handoff after old non-submission closure");
   const auto recovered = host.submit({"recovered-b", {3}});
   require(recovered.status == robot_harness::SampleSubmissionStatus::kSubmitted &&
               host.worker_submission_count() == 1 && host.worker_execution_count() == 1 &&
@@ -58,8 +66,9 @@ void host_preserves_adapter_sequences_with_a_constant_clock() {
                                           [] { return robot_harness::MonotonicTime{100}; });
   require(host.initialize().state == robot_harness::InitializationState::kReady,
           "equal nondecreasing clock values are supported");
+  const auto refused = host.prepare({"not-submitted", {2}});
   host.set_worker_ready(false);
-  const auto refused = host.submit({"not-submitted", {2}});
+  require(!host.dispatch_prepared(*refused.authority), "dependency loss blocks prepared dispatch");
   require(refused.authority.has_value(), "refused operation retains a receipt");
   auto receipt = host.receipt(*refused.authority);
   require(receipt.has_value() && receipt->non_submission_evidence.has_value() &&
@@ -71,6 +80,10 @@ void host_preserves_adapter_sequences_with_a_constant_clock() {
               receipt->settlement_evidence->sequence == 3,
           "host preserves the adapter's non-submission closure sequence");
   host.set_worker_ready(true);
+  require(host.rebind_provider(refused.authority->binding, "restored-worker",
+                               robot_harness::CompletionMode::kSynchronous)
+                  .status == robot_harness::BindingControlStatus::kApplied,
+          "constant-clock handoff still requires fresh ordered evidence");
   host.reject_next_native_submission();
   const auto rejected = host.submit({"rejected", {3}});
   require(rejected.authority.has_value(), "next operation is admitted after ordered closure");
@@ -203,7 +216,7 @@ void native_success_survives_actual_sink_rejection() {
               receipt->observed_native_success &&
               receipt->output == robot_harness::OutputDisposition::kNotDelivered &&
               receipt->output_non_delivery_reason ==
-                  robot_harness::OutputNonDeliveryReason::kSinkRejected &&
+                  robot_harness::OutputNonDeliveryReason::kAuthorityRevoked &&
               receipt->settlement == robot_harness::SettlementStatus::kPending &&
               host.results().empty(),
           "native success and sink delivery failure remain separate facts");
@@ -216,6 +229,13 @@ void native_success_survives_actual_sink_rejection() {
   require(receipt->authority_disposition == robot_harness::AuthorityDisposition::kReleased,
           "sink rejection closes after actual disposal and settlement");
 
+  require(host.submit({"still-withdrawn", {8}}).status ==
+              robot_harness::SampleSubmissionStatus::kAdmissionBlocked,
+          "settlement does not restore withdrawn provider permission");
+  require(host.rebind_provider(undelivered.authority->binding, "restored-sink",
+                               robot_harness::CompletionMode::kDeferred)
+                  .status == robot_harness::BindingControlStatus::kApplied,
+          "explicit fresh handoff follows observed sink loss");
   const auto recovered = host.submit({"recovered-b", {8}});
   require(recovered.status == robot_harness::SampleSubmissionStatus::kSubmitted,
           "caller submits fresh work after sink-rejection closure");

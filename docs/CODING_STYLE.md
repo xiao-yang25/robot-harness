@@ -40,11 +40,16 @@ headers. Comments explain constraints and reasons, rather than restating code.
 
 ## Checking changes
 
+Group implementation files by the [existing module boundaries](DESIGN.md#source-modules-and-public-headers).
+Public entry headers belong in `include/robot_harness/`; module-private headers
+stay beside their implementation under `src/`. Do not expose a private include
+directory through a public CMake dependency.
+
 Run the formatter on changed C++ files and check the resulting diff. For the
 Core header and source, for example, from the repository root:
 
 ```sh
-clang-format --dry-run --Werror include/robot_harness/authority_gate.hpp src/core.cpp
+clang-format --dry-run --Werror include/robot_harness/authority_gate.hpp src/core/authority_gate.cpp
 ```
 
 Use `clang-format -i` with explicit file paths to apply formatting; include new

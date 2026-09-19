@@ -1,250 +1,126 @@
 # Robot Harness
 
-A runtime for reliable robot execution, interruption, handoff, and recovery.
+A C++17 runtime for execution authority, interruption, handoff, and recovery.
 
-Robot Harness is a Physical AI Harness/Runtime project for integrating robot
-capabilities with agents, behavior trees, and ordinary applications. Its first
-implementation is a small, embeddable C++17 core for execution authority and
-truthful operation feedback.
+Robot Harness is a Physical AI Harness/Runtime project for agents, behavior trees,
+and ordinary applications. It separates permission to execute from what actually
+happened: native acceptance, completion, result delivery, and resource cleanup.
+The current implementation runs deterministic examples and bounded local compute
+processes. ROS integration is the next milestone; robot motion is not implemented.
 
-## Status
+[Build and run](#build) · [Examples](examples/README.md) ·
+[Design](docs/DESIGN.md) · [Testing](docs/TESTING.md) ·
+[Contributing](CONTRIBUTING.md)
 
-**M3a operation replacement is merged in `3fd5474` through
-[PR #5](https://github.com/xiao-yang25/robot-harness/pull/5).** All 29 CTests passed on
-macOS ARM64 and Ubuntu ARM64 Docker in normal and ASan/UBSan builds. The example
-changes A to B within one live host/binding: B waits for A's settlement, A's late
-result is rejected at the managed sink, and the compute path confirms child
-exit/reaping before replacement. The [merged main-branch CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35438203500)
-also passed all 29 tests normally and with ASan/UBSan. See [replacement checks](docs/TESTING.md#m3a-replacement-checks).
+## Current scope
 
-The merged baseline `6bba453` includes normal execution, failures, cancellation,
-deadlines and the local compute process adapter. Its recorded
-[main-branch Ubuntu CI](https://github.com/xiao-yang25/robot-harness/actions/runs/34951525988)
-passed 26 tests in both normal and ASan/UBSan builds. The compute adapter supplies
-capability-based admission, running cancellation, exit collection and channel
-cleanup for a bounded local workload. See [compute verification](docs/TESTING.md#local-compute-usage-and-verification)
-and the [public host interface](include/robot_harness/compute_execution.hpp).
+| Available now | What it demonstrates |
+|---|---|
+| Host-driven Core and deterministic sample adapter | Normal execution, failures, cancellation and deadlines with separate receipt facts |
+| Local compute adapter | Bounded work in a child process, cancellation, exit collection and channel cleanup |
+| Operation replacement and live-Host provider rebinding | Conflicting new work waits for old-work settlement; stale results do not acquire new authority |
+| Two-step task example | Dependent work, goal changes and uncertain results using the same task controller |
+| Private Linux recovery prototype | A surviving Owner retains native work across Host/Core restart; fresh activation permits explicit new work without replaying the interrupted goal |
 
-Cancellation and expiry revoke future dispatch/result permission; acknowledgement,
-native termination, result disposition and cleanup remain separate facts. An
-ignored stop can still end in native success while its result is discarded.
-The sample fixture controls result acceptance; the compute profile additionally
-covers declared local process behavior. Neither proves physical stopping, a hard
-stop deadline or host-independent supervision. Stronger tasks require the
-corresponding [stop and resource guarantees](docs/DESIGN.md#stop-and-resource-requirements-before-expanded-execution).
+M3c is merged through [PR #7](https://github.com/xiao-yang25/robot-harness/pull/7).
+Its [main-branch Ubuntu CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35453807474)
+passed all 57 tests in Debug and ASan/UBSan. Current platforms and evidence are
+summarized in [Testing](docs/TESTING.md#current-validation-baseline).
 
-**M3b is merged in `eb2ae06` through [PR #6](https://github.com/xiao-yang25/robot-harness/pull/6).**
-It adds [Core, sample and compute provider rebinding](docs/DESIGN.md#m3b-implementation-design-live-host-binding-handoff):
-withdraw the old binding, preserve its cleanup obligations, then enable a fresh
-provider only after old-scope quiescence and new readiness. Including the task
-caller and withdrawal-allocation regression, all 47 CTests pass
-locally on macOS and Ubuntu ARM64 Docker, in Debug and ASan/UBSan builds. The
-Core/sample, compute and task-caller increments passed independent implementation review.
-The [M3b main-branch CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35447391085)
-also passed. See the
-[handoff examples and verification](docs/TESTING.md#m3b-focused-acceptance-mapping).
-A minimal [two-step task caller](#two-step-task-example) now exercises public
-compute APIs; its verification is tracked in [task checks](docs/TESTING.md#finite-task-caller-checks).
-**M3c now has a private Linux recovery prototype.** A surviving owner retains the
-native worker while Host/Core restarts. The new Host waits for actual old-scope
-cleanup and a fresh activation exchange before explicit new work; old results are
-not replayed. See [design and limits](docs/DESIGN.md#m3c-prototype-session-and-activation-ordering)
-and [running the recovery example](docs/TESTING.md#m3c-prototype-checks).
-The same two-step task controller now runs through an example-local recovery
-bridge. After Host loss it records the old goal as needing attention; permission
-recovery does not replay that goal or advance step two. A separate explicit new
-request starts a fresh task. Real-process examples cover a crash during the first
-step and between settled steps. See [task integration](docs/DESIGN.md#m3c-task-caller-integration).
-
-Local Ubuntu ARM64 Debug and ASan/UBSan each passed the previous 56-test suite;
-macOS Debug and ASan/UBSan each passed 47 portable tests. Delivery review found a
-launcher descriptor collision and it has been corrected: child channel sources
-are now duplicated outside the fixed destination range before mapping. Its new
-regression fails before the fix and passes afterward. All 10 affected recovery
-tests pass in both Ubuntu builds; the suite now registers 57 tests. Focused
-independent re-review approved the launcher correction. Consult the PR's checks
-for Ubuntu CI results associated with the submitted revision. Stable public recovery APIs,
-owner/reboot recovery, M4 ROS integration, a complete Agent and physical-task
-validation remain pending.
-
-Earlier research experiments support the shared-core architecture; they do not
-establish production performance, physical safety, or end-to-end task success.
+Cancellation acknowledgement does not mean the work has stopped. Completion does
+not mean its result was accepted or its resources were released. The recovery
+prototype requires the Owner to survive and continue polling; it does not recover
+persistent tasks or survive Owner/machine restart. These examples do not establish
+physical stopping, hard stop deadlines, or production safety.
 
 ## Build
 
-Requires CMake 3.16 or newer and a C++17 compiler. ROS is not required for the core.
+Start with Git, CMake 3.16 or newer, a C++17 compiler, and a build tool such as Make
+or Ninja. On macOS, install the Xcode Command Line Tools; on Ubuntu, use a working
+C++ development toolchain. ROS, a model, and robot hardware are not required.
+The current [licensing status](#license) applies to this source checkout.
 
 ```sh
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build
+git clone https://github.com/xiao-yang25/robot-harness.git
+cd robot-harness
+cmake -S . -B build -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel 2
 (cd build && ctest --output-on-failure)
-```
-
-For a local Ubuntu development container, see the
-[Docker setup and validation commands](docs/TESTING.md#ubuntu-development-container).
-
-## Normal execution example
-
-After building, run:
-
-```sh
 ./build/robot_harness_normal_execution
 ```
 
-The example submits real sample data to a deterministic worker, receives a result
-through a managed sink, inspects a layered receipt, and submits a second sample.
-It exercises completion during submission and completion deferred until the host
-explicitly advances the worker. No worker thread, ROS installation, or model is
-required.
+The final command runs two samples in each of two completion modes. Look for sums
+`29` and `61`, with native success, accepted output and completed settlement. The
+application/domain verdict remains unassessed. The program exits nonzero if its
+checks fail. This is a deterministic software example, not a robot command.
 
-The caller must distinguish Core admission, native acceptance and completion,
-result acceptance, and required cleanup. A native completion alone does not make
-the domain available for a second conflicting request. The fixture result can be
-checked directly; the domain/task verdict remains unassessed.
+Linux currently registers 57 tests; macOS registers 47 because the recovery
+prototype is Linux-only. Use the [Ubuntu container recipe](docs/TESTING.md#ubuntu-development-container)
+for Linux checks on a Mac. If a local compiler and SDK do not match, see
+[macOS SDK selection](docs/TESTING.md#macos-sdk-selection).
 
-The example is the first caller of provisional repository-local C++ interfaces,
-not a stable installed SDK. Its source is in
-[normal_execution.cpp](examples/normal_execution.cpp).
+## Choose an example
 
-Each completion mode runs sample A (`2, -3, 4`, sum of squares `29`) and then
-sample B (`5, 6`, sum of squares `61`). Results and receipt layers are printed
-from the actual execution. Link `robot_harness_core` for the Core alone, or
-`robot_harness_sample_fixture` to use this deterministic host and worker.
+Run commands from the repository root after building. The
+[example guide](examples/README.md) provides commands, expected observations and
+source links for each path.
 
-## Failure execution example
-
-```sh
-./build/robot_harness_failure_execution
-```
-
-This example drives an accepted operation through a controlled native failure,
-attempts another request while cleanup is pending and checks that it is blocked.
-After processing output disposition and settlement, the caller submits a fresh
-operation whose actual result is `16`. There is no automatic retry. See
-[failure_execution.cpp](examples/failure_execution.cpp) and the
-[M2a interface](docs/DESIGN.md#m2a-caller-and-integration-surface).
-
-## Cancellation and deadline examples
-
-```sh
-./build/robot_harness_cancellation_execution
-./build/robot_harness_deadline_execution
-```
-
-The cancellation example requests a stop that the worker acknowledges and ignores.
-It checks blocked admission, later native success with no delivered result, then
-executes a fresh request after cleanup. The deadline example moves a manual clock
-to the deadline, calls `poll()`, adds a caller cancellation and verifies exactly one
-native stop. Both print actual checks and return nonzero if an expected result fails.
-See [manual verification](docs/TESTING.md#manual-verification) and the sources:
-[cancellation](examples/cancellation_execution.cpp),
-[deadline](examples/deadline_execution.cpp).
-
-## Replacement example
-
-```sh
-./build/robot_harness_replacement_execution
-```
-
-The caller changes A (`2, -3, 4`) to B (`5, 6`). Cancellation revokes A's result
-permission, while B stays blocked until A finishes and settles. Once B has
-computed, the fixture replays A's real result before B's result is delivered.
-The sink rejects the old authority and accepts only B's result, `61`.
-The [example](examples/replacement_execution.cpp) checks these outcomes and exits
-nonzero if they fail. Replay is an explicit fixture control, not a production retry.
-
-## Two-step task example
-
-```sh
-./build/robot_harness_two_step_compute normal "$(pwd)/build/robot_harness_compute_worker"
-```
-
-Run from the repository root; the worker argument must be an absolute path.
-The caller submits `3` iterations and checks the result `5`. It then selects
-`6` iterations from that accepted result and checks `55`. Each step waits for
-actual native cleanup before the next starts. Task success is an application
-judgment; Core's domain verdict remains unassessed.
-
-Use `revise` or `rebind` instead of `normal` to change the goal, wait for old
-cleanup, and produce `14` then `91`; `rebind` also explicitly replaces the
-provider. `shutdown` cancels pending intent and drives closure. Controlled
-failure/unknown modes and their worker commands are in
-[task checks](docs/TESTING.md#finite-task-caller-checks).
-The [example controller](examples/finite_compute_task.hpp) owns goal revisions and
-steps; it is not a public task scheduler or complete Agent.
-
-## Code map
-
-Implementation is grouped by module under `src/core/`, `src/compute/` and
-`src/sample/`. Public headers remain under `include/robot_harness/`; private
-process/protocol headers stay inside `src/compute/`. See
-[module boundaries](docs/DESIGN.md#source-modules-and-public-headers).
-
-| Entry | Role |
+| Start here | Next question to explore |
 |---|---|
-| [Core interface](include/robot_harness/authority_gate.hpp) and [implementation](src/core/authority_gate.cpp) | Operation identity, admission, evidence validation, and current receipt; no sample payload |
-| [Sample host interface](include/robot_harness/sample_execution.hpp) and [implementation](src/sample/sample_execution.cpp) | Host, deterministic adapter/worker, callback staging, and managed result storage |
-| [Compute host](include/robot_harness/compute_execution.hpp) and [implementation](src/compute/compute_execution.cpp) | Local process adapter backed by the private process owner and worker protocol in the same source directory |
-| [Application example](examples/normal_execution.cpp) | Initializes the host and runs A then B in both completion modes |
-| [Replacement example](examples/replacement_execution.cpp) and [M3a tests](tests/m3a_replacement_tests.cpp) | Caller-driven replacement and stale-result rejection at the actual managed sink |
-| [Two-step driver](examples/two_step_compute.cpp), [controller](examples/finite_compute_task.cpp) and [task tests](tests/finite_compute_task_tests.cpp) | Public-API application loop, dependent results, goal changes, failure/uncertainty and cleanup |
-| [Core tests](tests/authority_gate_tests.cpp), [normal fixture tests](tests/sample_execution_tests.cpp) and [M2a tests](tests/m2a_failure_tests.cpp), [cancellation tests](tests/m2b_cancellation_tests.cpp), [deadline tests](tests/m2c_deadline_tests.cpp) | Evidence boundaries, actual normal/failure/cancel/expiry execution, delivery, cleanup and shutdown |
+| [Normal execution](examples/README.md#normal-execution) | How do submission, result delivery and cleanup differ? |
+| [Failure, cancellation and deadlines](examples/README.md#failure-cancellation-and-deadlines) | Why can a stopped or expired request still have unfinished native work? |
+| [Replacement and rebinding](examples/README.md#replacement-and-rebinding) | When can another operation or provider take over? |
+| [Local compute and two-step tasks](examples/README.md#local-compute-and-two-step-tasks) | How does a real child process feed a dependent task? |
+| [Host recovery on Linux](examples/README.md#host-recovery-on-linux) | What survives a Host crash, and why is a new goal explicit? |
 
-For the request-to-result sequence, see [M1 caller and integration surface](docs/DESIGN.md#m1-caller-and-integration-surface).
-For commands and what to observe, see [manual verification](docs/TESTING.md#manual-verification).
+## Interfaces and compatibility
 
-## Continuous integration
+This is an experimental source-tree project. Headers under
+`include/robot_harness/` are its current caller interfaces, with no stable API or
+ABI promise. The CMake project version `0.1.0` is not a declaration of a published
+release. There is no installed SDK, package export or supported `find_package`
+workflow yet.
 
-The [Ubuntu CI workflow](.github/workflows/core.yml) runs the same CMake/CTest
-suite on GitHub-hosted Ubuntu 22.04. macOS remains a local development environment;
-ROS integration and timing measurements use their relevant Ubuntu/Linux targets.
-See [testing environments and evidence boundaries](docs/TESTING.md). A workflow
-file alone is not evidence of a successful Linux run.
+Within this build, `robot_harness_core` supplies the payload-independent Core;
+`robot_harness_sample_fixture` adds the deterministic host; `robot_harness_compute`
+adds the local process adapter on macOS/Linux. The task controller and recovery
+bridge are example support. Headers under `src/compute/`, including the Linux
+recovery protocol, are private implementation details.
 
-## macOS SDK selection
+Core is host-driven. Adapters enforce authority at their submission boundaries;
+applications choose goals and recovery strategy. Existing robot runtimes retain
+communication, scheduling, device control and native safety protection. See
+[product boundaries](docs/DESIGN.md#product-boundary).
 
-If the compiler and default SDK are incompatible, explicitly select a compatible
-installed SDK for the local build. Replace the example path below with an actual
-SDK path on your machine:
+## Repository guide
 
-```sh
-cmake -S . -B build-local -DBUILD_TESTING=ON -DCMAKE_OSX_SYSROOT="/path/to/compatible/MacOSX.sdk"
-cmake --build build-local
-(cd build-local && ctest --output-on-failure)
-```
+| Location | Purpose |
+|---|---|
+| [include/robot_harness](include/robot_harness) | Current caller-facing headers |
+| [src/core](src/core), [src/compute](src/compute), [src/sample](src/sample) | Module implementations and private process/protocol details |
+| [examples](examples/README.md) | Runnable callers and the example task controller |
+| [tests](tests) | Core, adapter and task regressions registered with CTest |
+| [Design](docs/DESIGN.md) | Accepted behavior, ownership, module boundaries and milestone scope |
+| [Testing](docs/TESTING.md) | Platform evidence, Docker/sanitizer commands, manual checks and review requirements |
+| [Coding style](docs/CODING_STYLE.md) | Naming, headers and formatting |
+| [Contributing](CONTRIBUTING.md) | Reporting issues, preparing changes and review workflow |
+| [AGENTS.md](AGENTS.md) | Agent-specific project constraints and knowledge entry points |
 
-Machine-specific versions, paths, and diagnostic logs stay in the host's task
-record. A local SDK selection is not a project requirement for other platforms.
+## Next steps
 
-## Responsibilities
+M1/M2 provide normal and failure/cancel/deadline paths. M3 adds replacement,
+provider rebinding and the limited Linux recovery path above. M4 will select a
+ROS 2 Humble lifecycle/action interface and validate the same execution boundaries
+against native observations. See the [implementation sequence](docs/DESIGN.md#implementation-sequence)
+for scope; planned behavior is not an implemented feature.
 
-- **Core:** operation identity, execution admission, generation fencing,
-  settlement state, recovery, and layered operation results.
-- **Adapters:** enforce authority at declared submission points and report native
-  execution and settlement evidence.
-- **Existing robot runtimes:** retain communication, scheduling, model execution,
-  device I/O, continuous control, and native safety protection.
-- **Agents and applications:** choose goals, skills, and task recovery strategies.
+Adapter integration instructions and packaging will grow from actual integration
+feedback. Stable API/version policies and release tooling belong to a later
+release-readiness step; there is no release-date commitment.
 
-The core is host-driven and payload-independent. The first version does not add a
-general scheduler, model-serving engine, robot controller, or agent framework.
+## License
 
-## Implementation sequence
-
-M1 delivers one normal sample operation through a native worker to a managed
-result sink, with correlated events and a layered receipt. The minimal Core and
-deterministic adapter are delivered together. M2 adds
-failure and cancellation, M3 adds replacement and recovery, and M4 maps the same
-behavior to ROS 2 Humble. Each increment includes its regression tests. A separate
-Robot Agent can start using the available interfaces before all milestones finish.
-M1 and M2a have passed macOS and Ubuntu validation. M2b cancellation and M2c
-expiry now also have macOS and Ubuntu evidence for their implemented scope.
-M3a implements operation replacement in the same host/binding; M3b implements
-provider rebinding and a two-step task caller. M3c has a private Linux recovery
-prototype connected to that same task caller. Stable recovery APIs and M4 ROS
-integration remain pending.
-
-For project constraints and the engineering workflow entry, start with
-[repository instructions](AGENTS.md). The accepted boundary and M1–M4 sequence
-are in [Design](docs/DESIGN.md); runnable checks and remaining environment gaps
-are in [Testing](docs/TESTING.md).
+A project license has not yet been selected, and this repository does not include
+a `LICENSE` file. Do not treat source visibility or the CMake version as an
+open-source licensing grant. Contribution terms remain pending; see
+[Contributing](CONTRIBUTING.md#licensing-status).

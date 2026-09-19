@@ -17,6 +17,7 @@ to this repository.
 | Concern | Project source |
 |---|---|
 | Product purpose, implemented status, next increment | [README](README.md) |
+| Contributor onboarding and runnable examples | [Contributing](CONTRIBUTING.md), [Examples](examples/README.md) |
 | Accepted execution boundary and M1–M4 scope | [Design](docs/DESIGN.md) |
 | General software design principles | [Design principles](docs/DESIGN.md#design-principles) |
 | Commands, environments, acceptance mapping, result locations | [Testing](docs/TESTING.md) |

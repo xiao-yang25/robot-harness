@@ -1,6 +1,8 @@
 #include "robot_harness/authority_gate.hpp"
 
+#include <algorithm>
 #include <array>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -44,7 +46,8 @@ bool follows_same_source_records(const EvidenceRecord& evidence, const Operation
 }
 
 bool is_revoked(const OperationReceipt& receipt) {
-  return receipt.cancellation_requested_at.has_value() || receipt.expiry_observed_at.has_value();
+  return receipt.cancellation_requested_at.has_value() || receipt.expiry_observed_at.has_value() ||
+         receipt.binding_withdrawn_at.has_value();
 }
 
 MonotonicTime latest_effect_time(const OperationReceipt& receipt) {
@@ -76,6 +79,9 @@ MonotonicTime latest_time(const OperationReceipt& receipt) {
   if (receipt.expiry_observed_at && *receipt.expiry_observed_at > time) {
     time = *receipt.expiry_observed_at;
   }
+  if (receipt.binding_withdrawn_at) {
+    time = std::max(time, *receipt.binding_withdrawn_at);
+  }
   return time;
 }
 
@@ -85,7 +91,8 @@ bool has_reached_deadline(const OperationReceipt& receipt, MonotonicTime time) {
 
 bool revocation_precedes(const OperationReceipt& receipt, MonotonicTime time) {
   return (receipt.cancellation_requested_at && time >= *receipt.cancellation_requested_at) ||
-         (receipt.expiry_observed_at && time >= *receipt.expiry_observed_at);
+         (receipt.expiry_observed_at && time >= *receipt.expiry_observed_at) ||
+         (receipt.binding_withdrawn_at && time >= *receipt.binding_withdrawn_at);
 }
 
 }  // namespace
@@ -103,7 +110,9 @@ bool OperationAuthority::is_valid() const noexcept {
 
 struct AuthorityGate::Implementation {
   explicit Implementation(AuthorityGateConfig supplied_config)
-      : config(std::move(supplied_config)) {
+      : config(std::move(supplied_config)),
+        generation_high_water(config.binding.provider_generation),
+        last_binding_control_at(config.started_at) {
   }
 
   struct StartupFact {
@@ -112,11 +121,31 @@ struct AuthorityGate::Implementation {
     std::optional<EvidenceRecord> record;
   };
 
+  struct ReadinessFact {
+    std::optional<BindingReadinessEvidence> evidence;
+    bool conflicted = false;
+  };
+
+  struct Candidate {
+    BindingIdentity binding;
+    MonotonicTime prepared_at = 0;
+    BindingReadinessEvidence old_scope;
+    std::array<ReadinessFact, 3> readiness;
+    std::optional<ExecutionCapabilities> capabilities;
+    bool capabilities_conflicted = false;
+  };
+
   AuthorityGateConfig config;
   InitializationState initialization_state = InitializationState::kRecoveryRequired;
   StartupFact binding_idle;
   StartupFact worker_ready;
   StartupFact result_sink_ready;
+  BindingPhase binding_phase = BindingPhase::kActive;
+  std::uint64_t generation_high_water;
+  MonotonicTime last_binding_control_at;
+  std::optional<MonotonicTime> withdrawn_at;
+  std::optional<EvidenceRecord> last_old_scope_record;
+  std::optional<Candidate> candidate;
   OperationId next_operation_id = 1;
   std::optional<OperationReceipt> current_receipt;
   std::optional<EvidenceRecord> last_native_record;
@@ -124,7 +153,77 @@ struct AuthorityGate::Implementation {
   std::optional<ExecutionCapabilities> execution_capabilities;
 
   bool current_authority_matches(const OperationAuthority& authority) const {
-    return current_receipt.has_value() && authority_matches(current_receipt->authority, authority);
+    return current_receipt.has_value() && authority.binding == config.binding &&
+           authority_matches(current_receipt->authority, authority);
+  }
+
+  int readiness_index(StartupEvidenceKind kind) const {
+    if (kind == StartupEvidenceKind::kBindingIdleAndSettled) {
+      return 0;
+    }
+    if (kind == config.readiness_kind) {
+      return 1;
+    }
+    return kind == StartupEvidenceKind::kResultSinkReady ? 2 : -1;
+  }
+
+  const std::string& readiness_source(int index) const {
+    return index == 0   ? config.binding_observer
+           : index == 1 ? config.worker_observer
+                        : config.result_sink_observer;
+  }
+
+  MonotonicTime latest_binding_time() const {
+    auto time = last_binding_control_at;
+    if (current_receipt) {
+      time = std::max(time, latest_time(*current_receipt));
+    }
+    for (const auto* fact : {&binding_idle, &worker_ready, &result_sink_ready}) {
+      if (fact->record) {
+        time = std::max(time, fact->record->observed_at);
+      }
+    }
+    if (execution_capabilities) {
+      time = std::max(time, execution_capabilities->record.observed_at);
+    }
+    if (candidate) {
+      for (const auto& fact : candidate->readiness) {
+        if (fact.evidence) {
+          time = std::max(time, fact.evidence->record.observed_at);
+        }
+      }
+      if (candidate->capabilities) {
+        time = std::max(time, candidate->capabilities->record.observed_at);
+      }
+    }
+    return time;
+  }
+
+  bool old_work_closed() const {
+    return !current_receipt || current_is_releasable();
+  }
+
+  bool can_commit(MonotonicTime now) const {
+    if (binding_phase != BindingPhase::kPreparing || !candidate || now < latest_binding_time() ||
+        !old_work_closed() || now >= candidate->old_scope.valid_until ||
+        (current_receipt &&
+         candidate->old_scope.record.observed_at < latest_effect_time(*current_receipt))) {
+      return false;
+    }
+    for (const auto& fact : candidate->readiness) {
+      if (!fact.evidence || fact.conflicted || !fact.evidence->observed ||
+          now < fact.evidence->record.observed_at || now >= fact.evidence->valid_until) {
+        return false;
+      }
+    }
+    if (!config.execution_capability_observer.empty()) {
+      const auto& caps = candidate->capabilities;
+      if (!caps || candidate->capabilities_conflicted || !caps->available ||
+          now < caps->record.observed_at || now >= caps->valid_until) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool current_is_releasable() const {
@@ -221,7 +320,8 @@ AuthorityGate::~AuthorityGate() = default;
 
 EvidenceDisposition AuthorityGate::observe_startup(const StartupEvidence& evidence) {
   auto& state = *implementation_;
-  if (state.initialization_state == InitializationState::kClosed ||
+  if (state.binding_phase != BindingPhase::kActive ||
+      state.initialization_state == InitializationState::kClosed ||
       state.current_receipt.has_value() || !(evidence.binding == state.config.binding)) {
     return EvidenceDisposition::kRejected;
   }
@@ -308,6 +408,47 @@ StartupStatus AuthorityGate::startup_status() const {
 EvidenceDisposition
 AuthorityGate::observe_execution_capabilities(const ExecutionCapabilities& capabilities) {
   auto& state = *implementation_;
+  if (state.candidate && capabilities.binding == state.candidate->binding &&
+      state.binding_phase == BindingPhase::kPreparing) {
+    auto& candidate = *state.candidate;
+    if (state.config.execution_capability_observer.empty() ||
+        !is_record_well_formed(capabilities.record, state.config.execution_capability_observer,
+                               candidate.prepared_at)) {
+      return EvidenceDisposition::kRejected;
+    }
+    if (candidate.capabilities) {
+      auto& previous = *candidate.capabilities;
+      if (capabilities.record.sequence < previous.record.sequence) {
+        return EvidenceDisposition::kRejected;
+      }
+      if (capabilities.record.sequence == previous.record.sequence) {
+        const bool identical = records_match(capabilities.record, previous.record) &&
+                               capabilities.capability_id == previous.capability_id &&
+                               capabilities.profile_id == previous.profile_id &&
+                               capabilities.maximum_work_units == previous.maximum_work_units &&
+                               capabilities.available == previous.available &&
+                               capabilities.valid_until == previous.valid_until;
+        if (!identical) {
+          candidate.capabilities_conflicted = true;
+          previous.record.observed_at =
+              std::max(previous.record.observed_at, capabilities.record.observed_at);
+        }
+        return identical && !candidate.capabilities_conflicted ? EvidenceDisposition::kDuplicate
+                                                               : EvidenceDisposition::kRejected;
+      }
+      if (capabilities.record.observed_at < previous.record.observed_at) {
+        return EvidenceDisposition::kRejected;
+      }
+    }
+    if (capabilities.capability_id != state.config.capability_id ||
+        capabilities.profile_id.empty() || capabilities.maximum_work_units == 0 ||
+        capabilities.valid_until <= capabilities.record.observed_at) {
+      return EvidenceDisposition::kRejected;
+    }
+    candidate.capabilities = capabilities;
+    candidate.capabilities_conflicted = false;
+    return EvidenceDisposition::kAccepted;
+  }
   if (state.initialization_state == InitializationState::kClosed ||
       state.config.execution_capability_observer.empty() ||
       !(capabilities.binding == state.config.binding) ||
@@ -341,14 +482,214 @@ AuthorityGate::observe_execution_capabilities(const ExecutionCapabilities& capab
 bool AuthorityGate::supports_execution(const ExecutionRequirements& requirements,
                                        MonotonicTime at) const {
   const auto& state = *implementation_;
-  if (!state.execution_capabilities || requirements.profile_id.empty() ||
-      requirements.work_units == 0) {
+  if (state.binding_phase != BindingPhase::kActive ||
+      state.initialization_state == InitializationState::kClosed || !state.execution_capabilities ||
+      requirements.profile_id.empty() || requirements.work_units == 0) {
     return false;
   }
   const auto& capabilities = *state.execution_capabilities;
   return capabilities.available && capabilities.profile_id == requirements.profile_id &&
          requirements.work_units <= capabilities.maximum_work_units &&
          at >= capabilities.record.observed_at && at < capabilities.valid_until;
+}
+
+BindingStatus AuthorityGate::binding_status(MonotonicTime at) const {
+  const auto& state = *implementation_;
+  return {state.binding_phase, state.config.binding,
+          state.candidate ? std::optional<BindingIdentity>(state.candidate->binding) : std::nullopt,
+          state.can_commit(at)};
+}
+
+BindingDecision AuthorityGate::withdraw_binding(const BindingIdentity& expected_binding,
+                                                MonotonicTime now) {
+  auto& state = *implementation_;
+  if (state.binding_phase == BindingPhase::kClosed) {
+    return {BindingControlStatus::kClosed, {}, {}};
+  }
+  const auto& expected = state.candidate ? state.candidate->binding : state.config.binding;
+  if (!(expected_binding == expected)) {
+    return {BindingControlStatus::kStaleIdentity, {}, {}};
+  }
+  if (now < state.latest_binding_time()) {
+    return {BindingControlStatus::kInvalidTime, {}, {}};
+  }
+  if (state.binding_phase == BindingPhase::kWithdrawn) {
+    return {BindingControlStatus::kAlreadyInPhase, {}, {}};
+  }
+  const bool withdraw_current = !state.candidate && state.current_receipt &&
+                                state.current_authority_matches(state.current_receipt->authority) &&
+                                !state.current_is_releasable();
+  BindingDecision decision{BindingControlStatus::kApplied, {}, {}};
+  if (withdraw_current) {
+    // Copy before mutating the gate: allocation failure must leave withdrawal
+    // retryable rather than consume a stop action that never reaches the host.
+    decision.native_stop_authority = state.current_receipt->authority;
+  }
+  state.last_binding_control_at = now;
+  state.initialization_state = InitializationState::kRecoveryRequired;
+  state.binding_phase = BindingPhase::kWithdrawn;
+  if (state.candidate) {
+    state.candidate.reset();
+    return {BindingControlStatus::kApplied, {}, {}};
+  }
+  state.withdrawn_at = now;
+  if (withdraw_current) {
+    state.current_receipt->binding_withdrawn_at = now;
+    if (!state.revoke(now).should_request_native_stop) {
+      decision.native_stop_authority.reset();
+    }
+  }
+  return decision;
+}
+
+BindingDecision AuthorityGate::begin_rebind(const BindingIdentity& expected_old_binding,
+                                            const std::string& new_provider_id,
+                                            const BindingReadinessEvidence& old_scope_evidence,
+                                            MonotonicTime now) {
+  auto& state = *implementation_;
+  if (state.binding_phase == BindingPhase::kClosed) {
+    return {BindingControlStatus::kClosed, {}, {}};
+  }
+  if (!(expected_old_binding == state.config.binding)) {
+    return {BindingControlStatus::kStaleIdentity, {}, {}};
+  }
+  if (now < state.latest_binding_time()) {
+    return {BindingControlStatus::kInvalidTime, {}, {}};
+  }
+  if (state.candidate) {
+    return {BindingControlStatus::kAlreadyInPhase, state.candidate->binding, {}};
+  }
+  if (state.binding_phase != BindingPhase::kWithdrawn) {
+    return {BindingControlStatus::kWrongPhase, {}, {}};
+  }
+  if (!state.old_work_closed()) {
+    return {BindingControlStatus::kUnresolvedWork, {}, {}};
+  }
+  if (new_provider_id.empty()) {
+    return {BindingControlStatus::kInvalidProvider, {}, {}};
+  }
+  const auto earliest = state.current_receipt ? std::max(*state.withdrawn_at,
+                                                         latest_effect_time(*state.current_receipt))
+                                              : *state.withdrawn_at;
+  const auto& evidence = old_scope_evidence;
+  if (!(evidence.binding == state.config.binding) ||
+      evidence.kind != StartupEvidenceKind::kBindingIdleAndSettled || !evidence.observed ||
+      !is_record_well_formed(evidence.record, state.config.binding_observer, earliest) ||
+      evidence.record.observed_at > now || evidence.valid_until <= now) {
+    return {BindingControlStatus::kInvalidEvidence, {}, {}};
+  }
+  for (const auto* previous : {&state.binding_idle.record, &state.last_old_scope_record}) {
+    if (*previous && (evidence.record.sequence <= (*previous)->sequence ||
+                      evidence.record.observed_at < (*previous)->observed_at)) {
+      return {BindingControlStatus::kInvalidEvidence, {}, {}};
+    }
+  }
+  if (state.generation_high_water == std::numeric_limits<std::uint64_t>::max()) {
+    return {BindingControlStatus::kIdentityExhausted, {}, {}};
+  }
+  // Perform allocations before changing the live phase or reserving an identity.
+  Implementation::Candidate candidate;
+  candidate.binding = state.config.binding;
+  candidate.binding.provider_id = new_provider_id;
+  candidate.binding.provider_generation = state.generation_high_water + 1;
+  candidate.prepared_at = now;
+  candidate.old_scope = evidence;
+  BindingDecision decision{BindingControlStatus::kApplied, candidate.binding, {}};
+  auto old_record = evidence.record;
+  state.candidate = std::move(candidate);
+  state.last_old_scope_record = std::move(old_record);
+  ++state.generation_high_water;
+  state.last_binding_control_at = now;
+  state.binding_phase = BindingPhase::kPreparing;
+  return decision;
+}
+
+EvidenceDisposition
+AuthorityGate::observe_rebind_readiness(const BindingReadinessEvidence& evidence) {
+  auto& state = *implementation_;
+  if (state.binding_phase != BindingPhase::kPreparing || !state.candidate ||
+      !(evidence.binding == state.candidate->binding)) {
+    return EvidenceDisposition::kRejected;
+  }
+  const auto index = state.readiness_index(evidence.kind);
+  if (index < 0 || !is_record_well_formed(evidence.record, state.readiness_source(index),
+                                          state.candidate->prepared_at)) {
+    return EvidenceDisposition::kRejected;
+  }
+  auto& fact = state.candidate->readiness[static_cast<std::size_t>(index)];
+  if (fact.evidence) {
+    auto& previous = *fact.evidence;
+    if (evidence.record.sequence < previous.record.sequence) {
+      return EvidenceDisposition::kRejected;
+    }
+    if (evidence.record.sequence == previous.record.sequence) {
+      const bool identical = records_match(evidence.record, previous.record) &&
+                             evidence.observed == previous.observed &&
+                             evidence.valid_until == previous.valid_until;
+      if (!identical) {
+        fact.conflicted = true;
+        previous.record.observed_at =
+            std::max(previous.record.observed_at, evidence.record.observed_at);
+      }
+      return identical && !fact.conflicted ? EvidenceDisposition::kDuplicate
+                                           : EvidenceDisposition::kRejected;
+    }
+    if (evidence.record.observed_at < previous.record.observed_at) {
+      return EvidenceDisposition::kRejected;
+    }
+  }
+  if (evidence.valid_until <= evidence.record.observed_at) {
+    return EvidenceDisposition::kRejected;
+  }
+  fact.evidence = evidence;
+  fact.conflicted = false;
+  return EvidenceDisposition::kAccepted;
+}
+
+BindingDecision AuthorityGate::commit_rebind(const BindingIdentity& expected_candidate,
+                                             MonotonicTime now) {
+  auto& state = *implementation_;
+  if (state.binding_phase == BindingPhase::kClosed) {
+    return {BindingControlStatus::kClosed, {}, {}};
+  }
+  if (now < state.latest_binding_time()) {
+    return {BindingControlStatus::kInvalidTime, {}, {}};
+  }
+  if (!state.candidate) {
+    return {state.binding_phase == BindingPhase::kActive && state.withdrawn_at &&
+                    expected_candidate == state.config.binding
+                ? BindingControlStatus::kAlreadyInPhase
+                : BindingControlStatus::kStaleIdentity,
+            {},
+            {}};
+  }
+  if (!(expected_candidate == state.candidate->binding)) {
+    return {BindingControlStatus::kStaleIdentity, {}, {}};
+  }
+  if (!state.old_work_closed()) {
+    return {BindingControlStatus::kUnresolvedWork, {}, {}};
+  }
+  if (!state.can_commit(now)) {
+    return {BindingControlStatus::kInvalidEvidence, {}, {}};
+  }
+  // Prepare copies first. Moving the new binding/facts into the live state cannot throw.
+  auto binding = state.candidate->binding;
+  std::array<Implementation::StartupFact, 3> facts;
+  for (std::size_t i = 0; i < facts.size(); ++i) {
+    facts[i] = {true, true, state.candidate->readiness[i].evidence->record};
+  }
+  auto capabilities = state.candidate->capabilities;
+  state.config.binding = std::move(binding);
+  state.binding_idle = std::move(facts[0]);
+  state.worker_ready = std::move(facts[1]);
+  state.result_sink_ready = std::move(facts[2]);
+  state.execution_capabilities = std::move(capabilities);
+  state.last_old_scope_record.reset();
+  state.candidate.reset();
+  state.last_binding_control_at = now;
+  state.initialization_state = InitializationState::kReady;
+  state.binding_phase = BindingPhase::kActive;
+  return {BindingControlStatus::kApplied, {}, {}};
 }
 
 AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
@@ -361,7 +702,7 @@ AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
   if (request.capability_id != state.config.capability_id ||
       request.effect_domain != state.config.binding.effect_domain ||
       request.opaque_request_reference.empty() || request.target_reference.empty() ||
-      request.requested_at < state.config.started_at) {
+      request.requested_at < state.last_binding_control_at || state.next_operation_id == 0) {
     decision.status = AdmissionStatus::kInvalidRequest;
     return decision;
   }
@@ -369,7 +710,8 @@ AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
     decision.status = AdmissionStatus::kExpired;
     return decision;
   }
-  if (state.initialization_state != InitializationState::kReady) {
+  if (state.binding_phase != BindingPhase::kActive ||
+      state.initialization_state != InitializationState::kReady) {
     decision.status = AdmissionStatus::kRecoveryRequired;
     return decision;
   }
@@ -418,7 +760,8 @@ AdmissionDecision AuthorityGate::admit(const OperationRequest& request) {
 
 bool AuthorityGate::claim_dispatch(const OperationAuthority& authority, MonotonicTime observed_at) {
   auto& state = *implementation_;
-  if (state.initialization_state != InitializationState::kReady ||
+  if (state.binding_phase != BindingPhase::kActive ||
+      state.initialization_state != InitializationState::kReady ||
       !state.current_authority_matches(authority) || observed_at < authority.admitted_at ||
       state.current_receipt->dispatch != DispatchStatus::kPending ||
       is_revoked(*state.current_receipt) ||
@@ -680,7 +1023,9 @@ EvidenceDisposition AuthorityGate::observe_native(const NativeEvidence& evidence
 
 bool AuthorityGate::can_deliver_result(const OperationAuthority& authority) const {
   const auto& state = *implementation_;
-  return state.current_authority_matches(authority) && !is_revoked(*state.current_receipt) &&
+  return state.binding_phase != BindingPhase::kWithdrawn &&
+         state.binding_phase != BindingPhase::kPreparing &&
+         state.current_authority_matches(authority) && !is_revoked(*state.current_receipt) &&
          state.current_receipt->native_outcome == NativeOutcome::kSucceeded &&
          state.current_receipt->output == OutputDisposition::kPending;
 }
@@ -830,7 +1175,7 @@ EvidenceDisposition AuthorityGate::observe_settlement(const SettlementEvidence& 
 
 std::optional<OperationReceipt> AuthorityGate::receipt(const OperationAuthority& authority) const {
   const auto& state = *implementation_;
-  if (!state.current_authority_matches(authority)) {
+  if (!state.current_receipt || !authority_matches(state.current_receipt->authority, authority)) {
     return std::nullopt;
   }
   return state.current_receipt;
@@ -838,6 +1183,8 @@ std::optional<OperationReceipt> AuthorityGate::receipt(const OperationAuthority&
 
 void AuthorityGate::close_admission() noexcept {
   implementation_->initialization_state = InitializationState::kClosed;
+  implementation_->binding_phase = BindingPhase::kClosed;
+  implementation_->candidate.reset();
 }
 
 }  // namespace robot_harness

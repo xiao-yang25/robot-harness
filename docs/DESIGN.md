@@ -76,6 +76,33 @@ handling to survive a stalled model call or failed caller needs an explicitly
 validated deployment for that requirement; adding a process alone is not evidence
 that it is met. The current profile limits remain unchanged.
 
+### Source modules and public headers
+
+Implementation directories follow the existing build targets and responsibilities:
+
+| Location | Responsibility / dependency |
+|---|---|
+| `src/core/` | Payload-independent authority and receipt state; no compute, fixture or OS dependency |
+| `src/compute/` | Local compute host, private native process owner, private worker protocol and worker executable; the host depends on Core |
+| `src/sample/` | Deterministic sample fixture and its host; depends on Core, not on compute |
+| `examples/` | Applications consuming public APIs, including the finite task caller |
+| `tests/` | Behavioral checks and controlled workers; only process/protocol tests receive the private compute include directory |
+
+The three public entry headers stay directly under `include/robot_harness/`:
+`authority_gate.hpp`, `compute_execution.hpp`, and `sample_execution.hpp`.
+The host headers depend on the Core header; Core does not depend on either host.
+Private process/protocol headers stay with their implementation and are not
+propagated to library consumers. Public include paths, symbols, CMake target names
+and executable names are unchanged by this source organization.
+
+This grouping makes the existing module boundaries visible without adding runtime
+layers. There is no current need for a directory per public header, forwarding
+headers, one CMake file per source directory, or a common adapter base class.
+Revisit public subdirectories when a module acquires several independently useful
+headers or an actual consumer requires a distinct packaging boundary. Splitting
+the authority implementation itself should follow a separate responsibility or
+invariant boundary, not file length alone.
+
 ## Execution ownership
 
 The core is a C++17 passive state machine driven by a host-owned single logical
@@ -564,10 +591,10 @@ establishes crash recovery, external shared-domain isolation or physical stoppin
 
 ## Planned M3b and M3c boundaries
 
-These slices allocate the existing M3 requirements; they are not implemented by
-M3a. The current public gate has a configured binding and no rebind or recovery
-commit API. Initial generation fields and fresh initialization do not establish
-restart recovery. Concrete API and deployment choices remain implementation work.
+These slices allocate the existing M3 requirements. M3a alone did not implement
+them; M3b now adds live-gate rebinding in the sample and compute hosts.
+The example task caller now exercises those public interfaces; M3c recovery remains pending. Initial generation
+fields and fresh initialization do not establish restart recovery.
 
 **M3b — provider withdrawal and rebinding within a live host.** Close affected
 admission when a required provider/dependency is unavailable. Retain the old
@@ -604,6 +631,252 @@ Provider replacement, host failure and task continuation are distinct cases. A
 fixture may exercise adverse event ordering, but a claim about process restart
 or surviving work also needs observations at that actual process boundary.
 Focused acceptance is maintained in [M3b/M3c checks](TESTING.md#planned-m3b-and-m3c-checks).
+
+### M3b implementation design: live-host binding handoff
+
+Status: Core transitions and the sample and compute host handoffs are implemented.
+The two-step task caller is described below. Keep
+one passive Core, one host writer, one conservative effect domain and at most one
+operation. M3b changes the provider incarnation within that domain, not the host
+process, effect scope, capability semantics or trusted policy. Host/Core crash,
+unresolved contradictory outcomes and cross-process identity reconstruction remain
+M3c work. A missing old closure report therefore blocks M3b indefinitely rather
+than being repaired by rebinding.
+
+**Keep the old owner until closure.** `close_admission()` remains irreversible
+shutdown. Withdrawal is a separate reversible binding lifecycle, but withdrawal
+of an individual operation's permission is irreversible. Preserve the old receipt,
+native owner, event correlation and cleanup path until their existing closure
+predicate is satisfied. Never replace the gate or call initial `initialize()` to
+forget those obligations. With no admitted operation, the trusted adapter must
+still establish old-scope quiescence before preparing a replacement.
+
+The repository-local control surface is deliberately small. Return types
+distinguish applied, already in that phase, stale identity, unresolved
+old work, invalid evidence and permanently closed without granting authority on
+failure:
+
+| Gate operation | Preconditions and effect |
+|---|---|
+| `withdraw_binding(expected_binding, now)` | In Active, match the active identity, withdraw permission and return any one-time stop action with its original operation authority. In Preparing, match only the candidate identity, abort that candidate and return to Withdrawn without another native stop. In Withdrawn, the old active identity is an idempotent no-op. Reject all other identities and backward times; Closed never reopens. No receipt means no synthetic operation or stop action. |
+| `begin_rebind(expected_old_binding, new_provider_id, old_scope_evidence, now)` | Require withdrawn phase, old closure, fresh old-scope quiescence evidence and no candidate. Reserve a fresh candidate identity, clear only candidate readiness/capabilities, and return the candidate. It grants no execution permission. |
+| `observe_rebind_readiness(evidence)` | Accept observations only for that candidate, its configured sources and selected readiness kind. Record the latest per-kind value, ordering and validity; never update the old receipt from candidate evidence. |
+| `commit_rebind(expected_candidate, now)` | Recheck old closure and all candidate facts, then activate the candidate in one serialized transition. Invalid or incomplete evidence leaves admission closed and the old obligations intact. No operation is automatically submitted. |
+
+Expose the binding phase, active identity, optional candidate identity and readiness
+through a small status query. Keep an old receipt queryable until the next operation
+is admitted, consistent with the current single-receipt surface; receipt copies
+remain the caller's responsibility. The phase view is distinct from the old
+operation's native outcome and settlement. Active means an installed binding, not
+permission by itself: initial startup readiness and execution requirements still
+apply. After a rebind commits, the retained old receipt is read-only; old-binding
+callbacks cannot mutate it or the new binding, even before a new operation exists.
+
+| Phase/event | Result |
+|---|---|
+| Active → withdrawal | Withdrawn; old work may still run, with its output permission revoked |
+| Withdrawn + unresolved old work | Remain withdrawn; accept valid old terminal/output-disposal/settlement observations only for their original operation |
+| Withdrawn + old closure → begin | Preparing; candidate readiness starts empty, admission remains blocked |
+| Preparing + valid fresh observations → commit | Active with new identity; a later caller submission receives a new operation authority |
+| Preparing → withdraw the expected candidate | Discard candidate readiness, retire its identity, return to withdrawn; no return to old execution authority |
+| Any phase → shutdown | Permanently closed; continue required old cleanup, reject begin/commit forever |
+
+An old-binding withdrawal cannot abort a newer candidate or a committed new
+binding. Repeated begin while preparing returns the existing phase without
+replacing the candidate or resetting its time origin; a different target requires
+explicitly discarding the current candidate. Repeated successful commit must not
+allocate another identity or reset readiness. Rejected control requests must not
+implicitly change the active/candidate selection.
+
+**Identity and evidence.** Core reserves each candidate's provider generation
+from a monotonic high-water mark within the live gate, including discarded
+candidates. Rebinding back to a previously used provider name still receives a
+new generation. Keep the same effect domain and composition revision in this
+slice, because its dependency topology is unchanged; changing the topology or
+enforcement scope needs a separate design. Reject generation exhaustion instead
+of wrapping. Operation IDs also continue across rebinding; none are reset.
+
+Candidate readiness uses the existing binding-idle/settled, configured worker-or-
+adapter-ready, and result-sink-ready concerns. Add validity to the candidate
+observations: candidate identity, concern, boolean value, configured-source
+`EvidenceRecord`, and exclusive `valid_until`. Observations must be generated
+after candidate preparation, ordered within each concern and satisfy
+`prepared_at <= observed_at <= now < valid_until` at commit. Equal-sequence
+identical duplicates are harmless; a conflicting duplicate cannot retain a usable
+positive fact. Missing/false/expired or contradictory concerns block commit;
+only an appropriately newer valid observation can resolve that concern. No fixed
+TTL is prescribed by Core. Old-binding observations, or those for an abandoned
+candidate, cannot populate the new candidate even if their source names match.
+
+Old-scope settlement is a separate prerequisite: a candidate's idle observation
+does not close old work. `old_scope_evidence` is a positive old-binding idle/settled
+observation from the configured binding observer, with its record and exclusive
+validity end. It is required even with no prior operation. Core validates its
+identity/source, order against earlier same-concern facts, and observation time
+at or after withdrawal and any required receipt closure, no later than begin.
+Its validity must cover both begin and commit; refresh it by discarding the
+candidate and beginning again if it expires. A current old receipt must separately
+satisfy its existing release predicate. An initial startup-idle fact cannot stand
+in for this post-withdrawal observation. The host keeps the old scope quiescent
+and reports any new outstanding work by aborting preparation; candidate setup
+has no execution authority and cannot introduce task effects into that scope.
+
+Where the existing capability profile is required, extend
+`observe_execution_capabilities` to route by binding identity: while Preparing,
+candidate observations populate a separate candidate slot; any valid old-binding
+update stays separate and cannot make the candidate ready. Keep the existing
+profile/work-limit fields, configured observer and sequence checks. For candidate
+capabilities, a same-source/same-sequence conflicting value poisons the slot for
+commit instead of merely rejecting the update and preserving a positive. Only a
+strictly newer consistent observation can resolve it. Wrong-source/identity or
+older observations are rejected without poisoning a valid slot. Require capability
+observations from the candidate's preparation context and valid supported profile
+at commit, then install the candidate slot as the active capabilities together
+with the binding. Never copy old capabilities, use a task request to loosen policy,
+or alter active-profile duplicate semantics as an incidental refactor.
+Keep observer identities, capability ID, profile policy and settlement scope fixed
+by the trusted host. A caller supplies neither a safety boolean nor a replacement
+policy. Apply the existing time/sequence validation and reject backward control
+times; do not restart a monotonic clock or receipt evidence stream during M3b.
+
+The validity interval above gates the rebind commit; it is not a new independent
+execution lease or stopping-time guarantee. After commit the host still checks
+native prerequisites at prepare/dispatch and while driving work, maps an observed
+required dependency loss to withdrawal, and rechecks execution capabilities at
+the existing boundaries. Recovery of a dependency alone cannot restore a withdrawn
+binding. Core observes reported facts; it does not detect native failure itself.
+
+**Host integration.** Withdrawal revocation precedes the native stop request. Add
+a distinct binding-withdrawal reason to operation feedback rather than reporting
+it as user cancellation; preserve cancellation and expiry when they also occur.
+Reuse the one-time stop path, non-submission closure and native cleanup logic.
+Prepared-but-undispatched requests close as proven non-submissions; accepted work
+continues to be observed until closure. Already delivered results remain facts.
+Include the withdrawal reason consistently in permission, output non-delivery,
+stop-once and causal-time checks; updating only the visible receipt is insufficient.
+
+Core prepares the returned stop authority before mutating withdrawal or receipt
+state. If that copy cannot allocate, the gate remains unchanged and the caller
+can retry; it must not record a stop that was never returned to the host. Once
+withdrawal succeeds, repeated withdrawal/cancellation does not emit a second stop.
+
+Prepare replacement adapter resources and all fallible setup before committing
+Core; install the prepared owner using a non-throwing host transition before any
+new submit/result processing. Setup failure leaves the binding blocked and cleans
+only the candidate's resources. Old callbacks keep captured old identities and
+never read a mutable current-binding field to identify their originating work.
+
+The sample host replaces a quiescent provider fixture, retaining only explicitly
+scoped completed-result copies for stale-delivery tests. The compute host replaces
+its provider binding/configuration only after the old child is reaped and channels
+are closed; trusted executable selection stays outside task requests. Its result
+domain stays stable within the host. This needs a real rebind of the same gate,
+not construction of a second independent compute host/domain. Do not persist
+process-local generations or claim host-crash recovery.
+
+The sample exposes `withdraw_binding(expected_binding)` and
+`rebind_provider(expected_old_binding, provider_id, completion_mode)`. The latter
+performs the begin/observe/commit sequence synchronously from trusted native fixture
+observations, after old work, staged callbacks and the receipt have all closed.
+Its facts are valid for that single serialized handoff time; no task executes while
+preparing. It creates a new adapter, then swaps ownership without throwing after
+Core commits. An invalid provider or failed preparation leaves admission blocked.
+The managed result history, cumulative counters and explicitly retained completed
+callback copy move to the new fixture; pending work and failure/stop controls do
+not. References returned by `results()` must be reacquired after rebinding.
+
+After initial readiness, a sample `poll()` observes worker/sink loss and withdraws
+the binding. It is also called at prepare, dispatch and event-processing boundaries.
+Restored availability or `initialize()` alone cannot undo that withdrawal. Initial
+startup observations before first readiness still use the existing M1 flow.
+The failure tests now prepare before inducing dependency loss to retain their
+non-submission checks; they explicitly rebind before submitting the next request.
+Observed sink loss revokes result authority, so the sample records
+`kAuthorityRevoked` while preserving any native success. Core still supports an
+actual sink refusal without withdrawal as `kSinkRejected`.
+
+The compute host exposes the same binding query/withdrawal controls and
+`rebind_provider(expected_old_binding, provider_id, worker_executable)`. The worker
+path is trusted same-build deployment configuration; a request cannot supply it.
+The host's work ceiling, stop grace, profile, observers and effect domain stay fixed.
+Preparation checks both the released Core receipt and native ownership: a launched
+old child must have a recorded reaped exit, event EOF and closed channels, without
+lost ownership. A failed launch needs known setup cleanup. Mapping/cleanup gaps
+keep rebinding blocked. Withdrawal before dispatch records non-submission through
+the existing closure path; running withdrawal requests the existing one-time stop.
+
+Compute rebinding performs a bounded single-candidate begin/observe/commit sequence,
+with fresh adapter/capability observations from `can_launch()` and an old-scope
+quiescence observation. Their 1000 ms validity uses the existing capability horizon;
+commit reads the current clock and rejects expired evidence. This is an observation
+validity rule, not a runtime or stopping-time bound. Readiness failure aborts the
+candidate and retires its identity without changing the active configuration.
+The new path is allocated before commit and installed by a nonthrowing swap.
+No child is spawned by rebind: the next admitted operation launches the selected
+worker, and actual launch may still fail after a successful preflight. Rebinding
+retains the previous result, receipt and process observation until the next
+admitted request, which releases the already closed process object. `observation()`
+therefore describes that historical child, not a newly launched candidate.
+
+Compute checks active deployment capability at initialize, prepare, dispatch and
+poll, including idle polling after first readiness. Observed loss withdraws the
+binding and retains a distinct receipt reason; restoring the executable path does
+not reopen it. Initial failed startup can still be retried before first readiness.
+Checks remain host-driven and do not identify or authenticate executable bytes;
+trusted deployment and same-build protocol compatibility remain requirements.
+
+Core, sample and compute handoffs are implemented. The example task caller below
+uses the public interfaces without a mission framework or new default threads.
+
+Rejected alternatives: rebuilding a gate loses old obligations and can reuse
+identities; reopening `close_admission()` breaks shutdown; replacing a provider
+by editing generation fields bypasses readiness; accepting a one-shot readiness
+bundle without ordered observations can forget a newer negative fact. One bounded
+candidate is sufficient here; no general registry, queue or transaction framework
+is needed. Revisit this design if multiple in-flight domains, mutable trust policy
+or survival across host failure becomes necessary.
+
+### Finite two-step compute caller
+
+The example-owned [FiniteComputeTask](../examples/finite_compute_task.hpp) borrows
+one initialized compute host for exclusive, serialized use. The host outlives it.
+The [driver](../examples/two_step_compute.cpp) keeps ticking throughout operation,
+failure, uncertain feedback and shutdown. No model call may block that responsibility.
+This is application logic, not a new public Harness API or a durable mission engine.
+
+Each goal has an increasing revision and a bounded first input. Each submitted
+operation retains its goal revision, step, request reference and authority.
+The first input `3` gives `5`; the second input is `first_sum % 8 + 1`, giving
+`6` and then `55`. Every result is checked against a direct bounded sum of one
+1000-value period, independently of the worker accumulation and host formula.
+A dependent step requires native success, accepted/correlated output and released
+authority. The application reports task success only after both steps pass;
+Core's domain verdict stays unassessed.
+
+Changing the goal retains only the latest intent, cancels the old operation and
+waits for its authority release before submitting. Old results never become new
+goal inputs. Repeated revisions do not extend the outstanding observation window.
+The deployment driver may explicitly withdraw and rebind the provider while the
+caller waits; provider selection and trusted launch configuration stay outside
+task strategy. No automatic retry follows execution failure or renewed readiness.
+An explicit newer goal may replace a known failed goal after old cleanup.
+
+While a goal is pending, unresolved result/cleanup past the caller's observation
+window, a missing receipt,
+unknown native outcome, blocked-unknown authority, or ownership loss stops task
+progression as `NeedsAttention`. This state rejects further goal revisions and
+keeps polling/cancelling the retained operation. The window is measured by an
+injected nondecreasing caller clock; it neither changes the host clock nor promises
+native stopping by that time. The example's controlled unknown case advances this
+clock while a real fixture child delays exit. It proves conservative caller behavior,
+not a native-unknown, lost-reaper or host-crash recovery path. Shutdown separately
+cancels pending intent and drives the host until its native obligations close.
+
+The caller directly uses the existing host because this slice has one capability
+and no demonstrated need for an abstraction shared across backends. A generic
+scheduler, copied Core state machine, implicit retry policy, persistence layer,
+and new threads would add unsupported behavior here. Revisit only when a concrete
+consumer requires them; full Agent strategy remains a separate project.
 
 ## M1 caller and integration surface
 

@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(robot_harness VERSION 0.1.0 LANGUAGES CXX)
 
 add_library(robot_harness_core STATIC
-  src/core.cpp
+  src/core/authority_gate.cpp
 )
 
 target_compile_features(robot_harness_core PUBLIC cxx_std_17)
@@ -22,7 +22,7 @@ elseif(MSVC)
 endif()
 
 add_library(robot_harness_sample_fixture STATIC
-  src/sample_execution.cpp
+  src/sample/sample_execution.cpp
 )
 
 target_compile_features(robot_harness_sample_fixture PUBLIC cxx_std_17)
@@ -65,21 +65,33 @@ target_link_libraries(robot_harness_deadline_execution PRIVATE robot_harness_sam
 add_executable(robot_harness_replacement_execution examples/replacement_execution.cpp)
 target_link_libraries(robot_harness_replacement_execution PRIVATE robot_harness_sample_fixture)
 
+add_executable(robot_harness_rebinding_execution examples/rebinding_execution.cpp)
+target_link_libraries(robot_harness_rebinding_execution PRIVATE robot_harness_sample_fixture)
+
 if(UNIX)
   add_library(robot_harness_compute STATIC
-    src/compute_execution.cpp
-    src/compute_process.cpp
+    src/compute/compute_execution.cpp
+    src/compute/compute_process.cpp
   )
   target_compile_features(robot_harness_compute PUBLIC cxx_std_17)
   target_link_libraries(robot_harness_compute PUBLIC robot_harness_core)
-  target_include_directories(robot_harness_compute PRIVATE src)
-  add_executable(robot_harness_compute_worker src/compute_worker.cpp)
+  add_executable(robot_harness_compute_worker src/compute/compute_worker.cpp)
   target_compile_features(robot_harness_compute_worker PRIVATE cxx_std_17)
   add_executable(robot_harness_compute_execution examples/compute_execution.cpp)
   target_link_libraries(robot_harness_compute_execution PRIVATE robot_harness_compute)
+  add_executable(robot_harness_compute_rebinding_execution examples/compute_rebinding_execution.cpp)
+  target_link_libraries(robot_harness_compute_rebinding_execution PRIVATE robot_harness_compute)
+  # Application example support; not installed or part of the Harness public API.
+  add_library(robot_harness_task_example STATIC examples/finite_compute_task.cpp)
+  target_link_libraries(robot_harness_task_example PUBLIC robot_harness_compute)
+  target_include_directories(robot_harness_task_example PUBLIC examples)
+  add_executable(robot_harness_two_step_compute examples/two_step_compute.cpp)
+  target_link_libraries(robot_harness_two_step_compute PRIVATE robot_harness_task_example)
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(robot_harness_compute PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(robot_harness_compute_worker PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(robot_harness_task_example PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(robot_harness_two_step_compute PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
 

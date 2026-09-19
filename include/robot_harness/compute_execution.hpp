@@ -86,6 +86,15 @@ public:
 
   static MonotonicTime now() noexcept;
   StartupStatus initialize();
+  BindingStatus binding_status() const;
+  BindingDecision withdraw_binding(const BindingIdentity& expected_binding);
+  // Trusted deployment selection, never taken from ComputeRequest. Same-build
+  // protocol/profile only; workload and stop policy remain fixed for this host.
+  // Requires explicit withdrawal and old child exit/reaping/channel cleanup.
+  // Prepares configuration without spawning; the next request launches the worker.
+  BindingDecision rebind_provider(const BindingIdentity& expected_old_binding,
+                                  const std::string& provider_id,
+                                  const std::string& worker_executable);
   ComputeSubmission prepare(const ComputeRequest& request);
   bool dispatch_prepared(const OperationAuthority& authority);
   ComputeSubmission submit(const ComputeRequest& request);

@@ -62,7 +62,8 @@ std::uint64_t expected_sum(std::uint64_t iterations) {
 
 struct ComputeExecutionHost::Implementation {
   explicit Implementation(ComputeHostConfig supplied)
-      : config(std::move(supplied)), gate(make_gate_config(binding, ComputeExecutionHost::now())) {
+      : config(std::move(supplied)),
+        gate(make_gate_config(make_binding(), ComputeExecutionHost::now())) {
     if (config.worker_executable.empty() || config.worker_executable.front() != '/' ||
         config.maximum_iterations == 0 || config.maximum_iterations > 100000000 ||
         config.stop_grace_ms > 60000) {
@@ -71,7 +72,6 @@ struct ComputeExecutionHost::Implementation {
   }
 
   ComputeHostConfig config;
-  const BindingIdentity binding = make_binding();
   AuthorityGate gate;
   std::unique_ptr<detail::ComputeProcess> process;
   std::optional<OperationAuthority> authority;
@@ -94,15 +94,121 @@ struct ComputeExecutionHost::Implementation {
       evidence_error = true;
     }
   }
+  static MonotonicTime evidence_expiry(MonotonicTime time) {
+    return time > std::numeric_limits<MonotonicTime>::max() - 1000
+               ? std::numeric_limits<MonotonicTime>::max()
+               : time + 1000;
+  }
   bool observe_capabilities(MonotonicTime time) {
+    const auto status = gate.binding_status(time);
+    if (status.phase != BindingPhase::kActive) {
+      return false;
+    }
     const bool available = detail::ComputeProcess::can_launch(config.worker_executable);
-    const auto expiry = time > std::numeric_limits<MonotonicTime>::max() - 1000
-                            ? std::numeric_limits<MonotonicTime>::max()
-                            : time + 1000;
-    accept(gate.observe_execution_capabilities({binding, kCapability, kLocalComputeProfile,
+    accept(gate.observe_execution_capabilities({status.active, kCapability, kLocalComputeProfile,
                                                 config.maximum_iterations, available,
-                                                record(kObserver, time), expiry}));
+                                                record(kObserver, time), evidence_expiry(time)}));
+    if (initialized && !available) {
+      withdraw_binding(status.active);
+    }
     return available;
+  }
+  BindingDecision withdraw_binding(const BindingIdentity& expected_binding) {
+    const auto time = ComputeExecutionHost::now();
+    const auto decision = gate.withdraw_binding(expected_binding, time);
+    if (decision.status == BindingControlStatus::kApplied) {
+      if (decision.native_stop_authority && authority &&
+          matches(*decision.native_stop_authority, *authority)) {
+        apply_stop({ControlStatus::kApplied, true}, time);
+      }
+      const auto receipt = authority ? gate.receipt(*authority) : std::nullopt;
+      if (receipt && receipt->dispatch == DispatchStatus::kPending) {
+        settle_unsubmitted();
+      }
+    }
+    return decision;
+  }
+  bool old_scope_is_clear() const {
+    if (evidence_error) {
+      return false;
+    }
+    if (authority) {
+      const auto receipt = gate.receipt(*authority);
+      if (!receipt || receipt->authority_disposition != AuthorityDisposition::kReleased) {
+        return false;
+      }
+    }
+    if (!process) {
+      return true;
+    }
+    const auto& observed = process->observation();
+    if (observed.ownership_lost) {
+      return false;
+    }
+    // Successful close_channels requires the recorded waitpid exit and event EOF.
+    // Failed launches may have no child, but their setup cleanup must be known.
+    return observed.launched
+               ? observed.exit_status && observed.event_eof && observed.channels_closed
+               : observed.io_error == 0;
+  }
+  BindingDecision rebind_provider(const BindingIdentity& expected_old_binding,
+                                  const std::string& provider_id,
+                                  const std::string& worker_executable) {
+    const auto status = gate.binding_status(ComputeExecutionHost::now());
+    if (shutdown != ComputeShutdownStatus::kOpen) {
+      return {BindingControlStatus::kClosed, {}, {}};
+    }
+    if (!(expected_old_binding == status.active)) {
+      return {BindingControlStatus::kStaleIdentity, {}, {}};
+    }
+    if (status.phase != BindingPhase::kWithdrawn) {
+      return {BindingControlStatus::kWrongPhase, {}, {}};
+    }
+    if (!old_scope_is_clear()) {
+      return {BindingControlStatus::kUnresolvedWork, {}, {}};
+    }
+    if (provider_id.empty() || worker_executable.empty() || worker_executable.front() != '/') {
+      return {BindingControlStatus::kInvalidProvider, {}, {}};
+    }
+    // Allocate candidate configuration before committing; the install below is noexcept.
+    auto executable = worker_executable;
+    const auto prepared_at = ComputeExecutionHost::now();
+    const auto begun =
+        gate.begin_rebind(expected_old_binding, provider_id,
+                          {StartupEvidenceKind::kBindingIdleAndSettled, expected_old_binding,
+                           record(kObserver, prepared_at), true, evidence_expiry(prepared_at)},
+                          prepared_at);
+    if (begun.status != BindingControlStatus::kApplied || !begun.candidate) {
+      return begun;
+    }
+    try {
+      const auto& candidate = *begun.candidate;
+      const bool ready = detail::ComputeProcess::can_launch(executable);
+      const auto observed_at = ComputeExecutionHost::now();
+      const auto expiry = evidence_expiry(observed_at);
+      gate.observe_rebind_readiness({StartupEvidenceKind::kBindingIdleAndSettled, candidate,
+                                     record(kObserver, observed_at), true, expiry});
+      gate.observe_rebind_readiness({StartupEvidenceKind::kAdapterReady, candidate,
+                                     record(kObserver, observed_at), ready, expiry});
+      gate.observe_rebind_readiness({StartupEvidenceKind::kResultSinkReady, candidate,
+                                     record(kSink, observed_at), true, expiry});
+      gate.observe_execution_capabilities({candidate, kCapability, kLocalComputeProfile,
+                                           config.maximum_iterations, ready,
+                                           record(kObserver, observed_at), expiry});
+      const auto committed = gate.commit_rebind(candidate, ComputeExecutionHost::now());
+      if (committed.status != BindingControlStatus::kApplied) {
+        gate.withdraw_binding(candidate, ComputeExecutionHost::now());
+        return committed;
+      }
+      config.worker_executable.swap(executable);
+      initialized = true;
+      // Retain the old receipt/result/process observation until the next admitted
+      // request, which resets the already closed process through the existing path.
+      return committed;
+    } catch (...) {
+      gate.withdraw_binding(*begun.candidate, ComputeExecutionHost::now());
+      throw;
+    }
   }
   void native(NativeEventKind kind, MonotonicTime time) {
     accept(gate.observe_native({*authority, native_identity, kind, record(kNative, time)}));
@@ -234,18 +340,36 @@ ComputeExecutionHost::~ComputeExecutionHost() = default;
 
 StartupStatus ComputeExecutionHost::initialize() {
   auto& state = *implementation_;
-  if (!state.initialized && state.shutdown == ComputeShutdownStatus::kOpen) {
-    const auto time = now();
+  const auto time = now();
+  const auto binding = state.gate.binding_status(time);
+  if (state.shutdown == ComputeShutdownStatus::kOpen && binding.phase == BindingPhase::kActive) {
     const bool ready = state.observe_capabilities(time);
-    state.accept(state.gate.observe_startup({StartupEvidenceKind::kBindingIdleAndSettled,
-                                             state.binding, state.record(kObserver, time), true}));
-    state.accept(state.gate.observe_startup(
-        {StartupEvidenceKind::kAdapterReady, state.binding, state.record(kObserver, time), ready}));
-    state.accept(state.gate.observe_startup(
-        {StartupEvidenceKind::kResultSinkReady, state.binding, state.record(kSink, time), true}));
-    state.initialized = ready && !state.evidence_error;
+    if (!state.initialized) {
+      state.accept(
+          state.gate.observe_startup({StartupEvidenceKind::kBindingIdleAndSettled, binding.active,
+                                      state.record(kObserver, time), true}));
+      state.accept(state.gate.observe_startup({StartupEvidenceKind::kAdapterReady, binding.active,
+                                               state.record(kObserver, time), ready}));
+      state.accept(state.gate.observe_startup({StartupEvidenceKind::kResultSinkReady,
+                                               binding.active, state.record(kSink, time), true}));
+      state.initialized = ready && !state.evidence_error;
+    }
   }
   return state.gate.startup_status();
+}
+
+BindingStatus ComputeExecutionHost::binding_status() const {
+  return implementation_->gate.binding_status(now());
+}
+
+BindingDecision ComputeExecutionHost::withdraw_binding(const BindingIdentity& expected_binding) {
+  return implementation_->withdraw_binding(expected_binding);
+}
+
+BindingDecision ComputeExecutionHost::rebind_provider(const BindingIdentity& expected_old_binding,
+                                                      const std::string& provider_id,
+                                                      const std::string& worker_executable) {
+  return implementation_->rebind_provider(expected_old_binding, provider_id, worker_executable);
 }
 
 ComputeSubmission ComputeExecutionHost::prepare(const ComputeRequest& request) {
@@ -268,7 +392,7 @@ ComputeSubmission ComputeExecutionHost::prepare(const ComputeRequest& request) {
   state.observe_capabilities(now());
   OperationRequest operation;
   operation.capability_id = kCapability;
-  operation.effect_domain = state.binding.effect_domain;
+  operation.effect_domain = state.gate.binding_status(now()).active.effect_domain;
   operation.opaque_request_reference = request.request_reference;
   operation.target_reference = kSink;
   operation.requested_at = now();
@@ -298,11 +422,11 @@ bool ComputeExecutionHost::dispatch_prepared(const OperationAuthority& authority
       state.process) {
     return false;
   }
+  state.observe_capabilities(now());
   const auto receipt = state.gate.receipt(authority);
   if (!receipt || receipt->dispatch != DispatchStatus::kPending) {
     return false;
   }
-  state.observe_capabilities(now());
   auto process = std::make_unique<detail::ComputeProcess>(
       state.config.worker_executable, state.request->iterations, state.config.stop_grace_ms);
   const auto time = now();
@@ -348,6 +472,9 @@ void ComputeExecutionHost::poll() {
   if (state.shutdown == ComputeShutdownStatus::kClosed) {
     return;
   }
+  if (state.shutdown == ComputeShutdownStatus::kOpen && state.initialized) {
+    state.observe_capabilities(now());
+  }
   const auto time = now();
   state.expire(time);
   if (state.authority && !state.process) {
@@ -359,12 +486,11 @@ void ComputeExecutionHost::poll() {
   }
   if (state.process && state.process->observation().launched &&
       !state.process->observation().channels_closed) {
-    if (state.shutdown == ComputeShutdownStatus::kOpen) {
-      state.observe_capabilities(now());
-      if (!state.gate.supports_execution(
-              {state.request->required_profile_id, state.request->iterations}, now())) {
-        request_cancel(*state.authority);
-      }
+    const auto binding = state.gate.binding_status(now());
+    if (state.shutdown == ComputeShutdownStatus::kOpen && binding.phase == BindingPhase::kActive &&
+        !state.gate.supports_execution(
+            {state.request->required_profile_id, state.request->iterations}, now())) {
+      state.withdraw_binding(binding.active);
     }
     state.process->poll(now());
     const auto& observed = state.process->observation();

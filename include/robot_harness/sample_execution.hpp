@@ -57,6 +57,12 @@ public:
   SampleExecutionHost& operator=(SampleExecutionHost&&) = delete;
 
   StartupStatus initialize();
+  BindingStatus binding_status() const;
+  BindingDecision withdraw_binding(const BindingIdentity& expected_binding);
+  // Trusted fixture configuration, not a field of SampleRequest. Replaces the
+  // quiescent provider with a fresh adapter; never withdraws old work implicitly.
+  BindingDecision rebind_provider(const BindingIdentity& expected_old_binding,
+                                  const std::string& provider_id, CompletionMode completion_mode);
   void set_worker_ready(bool is_ready);
   void set_result_sink_ready(bool is_ready);
   void reject_next_native_submission() noexcept;

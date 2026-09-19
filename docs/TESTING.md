@@ -192,7 +192,9 @@ The host tests use `reject_next_native_submission()` and
 boundary. Submission count includes rejected native attempts; execution count
 includes started work that fails. Read those counts alongside receipts and actual
 sink contents. No-submission, rejection and native failure produce no result;
-sink rejection preserves native success while reporting failed delivery.
+sink rejection preserves native success while reporting failed delivery. With M3b,
+observed sample dependency loss withdraws the binding, so delivery is recorded as
+authority-revoked and the next request requires explicit rebinding.
 
 For M2b, run the cancellation example and focused checks:
 
@@ -319,7 +321,7 @@ the actual managed sink; setting receipt fields directly is not sufficient.
 
 | Slice / trigger | Required observable result |
 |---|---|
-| M2a: worker or sink becomes unavailable after initialization, before dispatch | Adapter makes no native submission; admitted authority is closed only with correlated non-submission and cleanup evidence; no retained request can execute later. A fresh caller request works after availability is restored |
+| M2a: worker or sink becomes unavailable after initialization, before dispatch | Adapter makes no native submission; admitted authority is closed only with correlated non-submission and cleanup evidence; no retained request can execute later. After M3b, restoring availability alone stays blocked; explicit fresh rebinding permits a new caller request |
 | M2a: native rejects a submitted request | Native acceptance is rejected, execution count and result count stay zero; attempted submission is distinguishable from accepted work; explicit cleanup permits a later caller request without retrying the old one |
 | M2a: accepted work fails before result delivery | Actual fixture failure is reported; no successful output is fabricated; terminal alone blocks B, and native-use/output cleanup followed by settlement permits B |
 | M2a: sink rejects the result after native success | Preserve native success, record failed delivery, inspect an empty sink; discard remaining output before settlement. No silent result retry or permanent pending state after proven cleanup |
@@ -507,15 +509,20 @@ A focused isolated mutation checking the current operation's authority instead
 of the callback's original authority failed the replay-at-sink regression as
 expected; the unchanged implementation passed. Scoped independent review approved
 the final implementation and independently rebuilt and ran all 29 tests on macOS.
-This increment has not been pushed, so no matching GitHub CI run exists yet.
+That local review preceded the push. The increment subsequently merged through
+[PR #5](https://github.com/xiao-yang25/robot-harness/pull/5) as `3fd5474`, with the
+same file tree as reviewed commit `22e5b28`. Its
+[main-branch Ubuntu CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35438203500)
+passed all 29 tests in normal and ASan/UBSan configurations on September 19, 2026.
 Provider generation changes, restart recovery, hard stopping deadlines and robot
 effects remain outside these checks.
 
 ## Planned M3b and M3c checks
 
 These checks implement the existing [M3 scope](DESIGN.md#planned-m3b-and-m3c-boundaries).
-They are not registered tests or evidence of PASS. Preserve M1–M3a regressions;
-add focused CTests with each implementation and run the existing macOS/Ubuntu
+This table states scope, not evidence of PASS. The first Core/sample M3b increment
+is mapped and tested below, followed by compute rebinding and task-caller integration.
+M3c remains pending. Preserve M1–M3a regressions and run the existing macOS/Ubuntu
 normal and sanitizer configurations, plus the required independent review.
 
 | Slice | Required observation |
@@ -533,16 +540,153 @@ cover partial effects or missing settlement, and add only the uncovered boundary
 Define the new observation/identity context before writing recovery tests; do not
 turn an incremented counter or a synthesized clean flag into the test oracle.
 
-When the minimal task caller is added, register its normal multi-step completion,
+The minimal task caller registers normal multi-step completion,
 goal change, failure/unknown handling and clean shutdown as integration checks.
 The caller must use public interfaces. A dependent normal step needs the accepted
 prior result and required settlement; replacing a cancelled goal instead follows
 the declared handoff conditions and does not require a discarded result to be
 accepted. Neither path changes Core's unassessed domain verdict.
-Extend that same caller test with M3b/M3c as supported. A future separate Agent
+The caller also exercises M3b rebinding; extend it with M3c when supported. A future separate Agent
 repository must exercise the actual Harness dependency in a small cross-repository
 test; passing each repository independently is insufficient. ROS dependencies and
 native cross-path checks remain separate M4 work, not part of today's Core CI.
+
+### M3b focused acceptance mapping
+
+The [live-host handoff design](DESIGN.md#m3b-implementation-design-live-host-binding-handoff)
+is implemented for Core and the sample fixture, followed by the compute host. Tests expose observable refusals and actual sink
+behavior, rather than checking only an internal phase enum:
+
+| Case | Observable acceptance evidence |
+|---|---|
+| Withdraw before/after dispatch | No native submit for an undispatched revoked operation; accepted old work gets at most one stop across withdrawal/cancel/expiry; missing old cleanup continues to block replacement |
+| Provider/dependency unavailable | Loss of a required provider/adapter/sink blocks prepare/dispatch; new-provider readiness cannot settle old work; restored availability alone does not undo withdrawal |
+| Candidate preparation and failure | Require fresh old-binding quiescence even without a prior operation; reject an initial idle fact, wrong binding/source or expired old-scope evidence. Candidate-identity withdrawal aborts preparation, old-identity withdrawal cannot abort it; retry cannot reuse abandoned identity; candidate setup failure and permanent shutdown cannot reopen execution |
+| Readiness ordering | Missing/false/expired facts block commit; reject wrong-source/identity input; poison matching equal-sequence contradictions for readiness and candidate capabilities rather than retain an earlier positive. Newer negative supersedes positive; valid newer evidence resolves the concern and permits commit |
+| Actual replacement | A new operation after commit executes using the new provider and returns its independently known result; old controls/results cannot affect it or mutate the retained old receipt between commit and the next admission; initial Active without startup readiness still rejects work |
+| Compute owner | Same host/gate/domain, old child confirmed exited/reaped and channels closed before provider rebind; do not substitute cross-host isolation or a new PID for evidence of rebind |
+
+Run the first-increment example and focused tests:
+
+```sh
+./build/robot_harness_rebinding_execution
+(cd build && ctest --output-on-failure -R 'm3b_rebinding|rebinding_execution_example')
+```
+
+`m3b_rebinding_core` covers the public control/evidence boundary, and
+`m3b_rebinding_sample` replaces the actual sample adapter in the same host, retains
+an old completed result for sink rejection, and checks the new result against 61.
+The example demonstrates blocked handoff until closure, then a new provider with
+a fresh generation. These three CTests are registered in the existing Ubuntu CI;
+no extra job is needed.
+
+`m3b_withdrawal_allocation` additionally injects allocation failure while preparing
+the returned stop authority, first before any identity copy and then after a partial
+copy. It verifies unchanged binding/receipt state on exception, retry delivering
+the original operation's stop action, and no duplicate stop on later withdrawal
+or cancellation. Allocation replacement is confined to this single-threaded test
+executable; it does not change the production allocator or measure native stopping.
+
+On September 19, 2026, the uncommitted Core/sample increment on base `3fd5474`
+passed all 32 CTests on macOS ARM64 (AppleClang 21, SDK 26.5) and Ubuntu 22.04
+ARM64 Docker (GCC 11.4), each in Debug and ASan/UBSan configurations with UBSan
+recovery disabled. Independent implementation review passed, with a separate clean
+macOS Debug build and all 32 tests passing. These are local results, not a new
+GitHub CI run or evidence for compute-host rebinding. The
+sample uses deterministic callbacks; no stopping-time measurement is claimed.
+
+The compute increment adds three process scenarios and a runnable example:
+
+```sh
+./build/robot_harness_compute_rebinding_execution \
+  "$(pwd)/build/robot_harness_compute_worker" \
+  "$(pwd)/build/robot_harness_compute_worker"
+(cd build && ctest --output-on-failure -R 'compute_rebind')
+```
+
+- `compute_rebind_handoff`: a real delayed-exit worker completes its calculation
+  while still alive; withdrawal denies handoff until exit/reaping/channel cleanup.
+  `waitpid(..., WNOHANG)` then reports `ECHILD`. In the same host/domain, install
+  the early-exit fixture and observe failure, then install the normal worker and
+  check the result `5`. Verify old controls are rejected and policy limits remain.
+- `compute_rebind_unavailable`: remove a temporary executable link before any task
+  or after preparation. No child is launched; a failed candidate stays withdrawn
+  and consumes its generation. Restoring the link/initializing alone stays blocked;
+  explicit handoff allows work. Shutdown after commit without another task preserves
+  the old accepted result and closes normally.
+- `compute_rebind_running_loss`: remove a required launch prerequisite while the
+  actual child runs. Poll observes withdrawal, preserves its distinct reason, and
+  drives cleanup before a replacement can compute its own result.
+- `compute_rebinding_execution_example`: withdraw a launched worker, observe blocked
+  handoff, drive native closure, rebind and compute the known sum `332833505`.
+
+The compute increment passes all 36 CTests on macOS ARM64 (AppleClang 21, SDK 26.5)
+and Ubuntu 22.04 ARM64 Docker (GCC 11.4), each in Debug and ASan/UBSan with UBSan
+recovery disabled. Independent compute-increment review passed, including a separate
+macOS Debug build and the four focused process checks. The additions
+run through the existing Ubuntu job in both configurations; these local results
+do not establish a new GitHub CI pass.
+No OS close/reaper error injection or cross-host restart claim is added. Synthetic
+old-result replay remains the Core/sample check; process tests establish actual
+ownership release and executable selection without injecting a new process protocol.
+
+Include an old result delivered while the new operation is itself eligible to
+deliver; otherwise a denial could merely reflect that no operation currently has
+permission. Keep initial M1 readiness and M3a same-binding replacement working.
+Use fixture observations for controlled missing/contradictory facts, and real
+process observations for compute ownership. Identity-exhaustion and rejected-time
+branches can be focused Core checks, without a new exhaustive assertion registry.
+
+### Finite task caller checks
+
+The [controller](../examples/finite_compute_task.cpp) and
+[focused tests](../tests/finite_compute_task_tests.cpp) use public compute APIs.
+Build normally, then run from the repository root with absolute worker paths:
+
+```sh
+./build/robot_harness_two_step_compute normal "$(pwd)/build/robot_harness_compute_worker"
+./build/robot_harness_two_step_compute revise "$(pwd)/build/robot_harness_compute_worker"
+./build/robot_harness_two_step_compute rebind "$(pwd)/build/robot_harness_compute_worker"
+./build/robot_harness_two_step_compute shutdown "$(pwd)/build/robot_harness_compute_worker"
+./build/robot_harness_two_step_compute failure "$(pwd)/build/tests/robot_harness_compute_test_worker_early_exit"
+./build/robot_harness_two_step_compute unknown "$(pwd)/build/tests/robot_harness_compute_test_worker_delayed_exit"
+ctest --test-dir build --output-on-failure -R 'task_'
+```
+
+Normal completion prints `first=5 final=55`; revised/rebound goals print
+`first=14 final=91`. Each mode checks its expected outcome and closed host before
+returning zero. Failure and unknown modes deliberately use test workers; they are
+not successful task results. `cleanup=1` refers to host closure, separately from
+the printed task state. A missing executable or unexpected outcome returns nonzero.
+
+The six `task_*_example` checks cover those executable paths. Four focused checks
+test distinct progression boundaries:
+
+| Check | Observation |
+|---|---|
+| `task_dependency` | A real delayed-exit child has calculated the first result but still owns native resources; no second step is admitted until accepted result and release. Final result is independently `55`; Core domain verdict remains unassessed |
+| `task_revision` | Observe running work, submit two newer goals, reject a duplicate revision, and retain old authority until release. Only the latest goal runs, giving `14` then `91` |
+| `task_uncertainty` | Advance only the caller clock while actual child cleanup is pending. Keep uncertainty sticky, reject new goals, admit no retry and continue native cleanup |
+| `task_termination` | Native failure prevents step two; external provider replacement does not retry the failed goal. Shutdown during running work and between steps prevents further admission and reaches host closure |
+
+The uncertainty fixture does not inject native `Unknown`, reaper ownership loss,
+or cross-restart recovery. It establishes the caller's conservative response to
+an unconfirmed observation window; existing Core/process checks retain their own
+scope. These ten tests are automatically included by the existing Ubuntu Debug
+and sanitizer jobs. All 46 CTests pass on macOS ARM64 (AppleClang 21, SDK 26.5)
+and Ubuntu 22.04 ARM64 Docker (GCC 11.4), each in Debug and ASan/UBSan
+with UBSan recovery disabled. Independent caller-increment review passed, including
+a separate macOS Debug build and all ten focused task checks. After the source
+module regrouping, clean builds in all four configurations again passed 46/46.
+The seven moved implementation/private files retain identical contents; existing
+behavior reviews remain applicable. Public headers and target names are unchanged.
+The subsequent withdrawal-allocation fix adds one regression, bringing the suite
+to 47 tests. All 47 pass in the same four configurations; the regression fails
+against the pre-fix Core library and passes after the fix. Independent focused
+review also confirms that allocation failure leaves withdrawal retryable. All six
+manual modes above were run successfully with the validated custom build directory
+substituted for `build`, retaining the documented absolute-path expressions.
+No corresponding remote CI has run yet.
 
 ## PR review and evidence
 
@@ -591,7 +735,7 @@ are introduced here.
 | Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; M2a normal and ASan/UBSan passed at `16b2888`; see the linked Actions results above |
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
-| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a same-host/same-binding operation replacement implemented; see [29-test evidence](#m3a-replacement-checks). Provider rebinding and restart/recovery remain planned |
+| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a operation replacement is merged; M3b live-host rebinding and the two-step caller are implemented locally; see [rebind checks](#m3b-focused-acceptance-mapping) and [task checks](#finite-task-caller-checks). M3c restart/recovery remains planned |
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 

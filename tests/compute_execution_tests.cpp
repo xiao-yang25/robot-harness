@@ -82,6 +82,43 @@ void normal(const std::string& worker) {
   require(!host.receipt(first), "old authority does not select new operation");
   close(host);
 }
+void replacement(const std::string& worker) {
+  ComputeExecutionHost host({worker, 100000000, 1000});
+  initialize(host);
+  const auto a = submit(host);
+  pump_until(host, [&] { return host.observation().completed_iterations > 0; });
+  const int a_pid = host.observation().child_process_id;
+  require(host.observation().completed_iterations < 100000000 && !host.observation().exit_code,
+          "replace A while native calculation is unfinished");
+  require(host.request_cancel(a).status == ControlStatus::kApplied, "cancel A for replacement");
+  require(host.submit({"B", 3}).admission_status == AdmissionStatus::kDomainOccupied &&
+              host.observation().child_process_id == a_pid,
+          "B cannot replace the owned child before settlement");
+  settle(host, a);  // Includes OS waitpid/ECHILD evidence before admitting B.
+  require(!host.result() && host.receipt(a)->output == OutputDisposition::kNotDelivered,
+          "cancelled A cannot publish its result");
+  const auto prepared = host.prepare({"B", 3});
+  require(prepared.status == ComputeSubmissionStatus::kPrepared && prepared.authority,
+          "prepare B only after A exit and cleanup");
+  const auto b = *prepared.authority;
+  require(b.operation_id != a.operation_id && b.binding == a.binding && !host.result(),
+          "same host grants a fresh operation authority");
+  require(!host.dispatch_prepared(a) &&
+              host.request_cancel(a).status == ControlStatus::kNoActiveOperation &&
+              !host.receipt(b)->cancellation_requested_at,
+          "old controls cannot discard or revoke prepared B");
+  require(host.dispatch_prepared(b), "dispatch B with fresh authority");
+  require(host.request_cancel(a).status == ControlStatus::kNoActiveOperation &&
+              !host.observation().stop_requested_at,
+          "old cancel cannot send native stop to B");
+  settle(host, b);
+  require(host.result() && host.result()->operation_id == b.operation_id &&
+              host.result()->request_reference == "B" && host.result()->sum == 5 &&
+              host.receipt(b)->native_outcome == NativeOutcome::kSucceeded,
+          "B computes its own known result after A was reaped");
+  close(host);
+}
+
 void cancel_running(const std::string& worker, bool ignored) {
   ComputeExecutionHost host({worker, 100000000, ignored ? 20U : 1000U});
   initialize(host);
@@ -313,6 +350,8 @@ int main(int argc, char** argv) {
     const std::string mode = argv[1], worker = argv[2];
     if (mode == "normal")
       normal(worker);
+    else if (mode == "replacement")
+      replacement(worker);
     else if (mode == "cancel")
       cancel_running(worker, false);
     else if (mode == "ignore")

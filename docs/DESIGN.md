@@ -5,7 +5,8 @@ D-073 architecture and September 10 product split. The September 14 replanning
 changes the implementation order to runnable behavior slices, preserving those
 ownership boundaries. M0 established the build skeleton; M1 has been implemented
 and merged. M2a implements failure closure; M2b/M2c add cancellation and expiry
-with macOS and Ubuntu validation. M3–M4 remain planned. See README and Testing for tested
+with macOS and Ubuntu validation. M3a adds replacement within one live host/binding;
+provider rebinding, restart recovery and M4 remain planned. See README and Testing for tested
 status and validation limits.
 
 ## Source roles
@@ -48,6 +49,32 @@ integration and feedback may grow around it when actual consumers need them.
 P1 uses the `TRUSTED_EMBEDDED` profile: callers and adapters cooperate at the
 declared boundary. An in-process library cannot isolate malicious code or prevent
 direct native calls that bypass that boundary. An isolated gateway is later scope.
+
+### Relationship to agent and mission runtimes
+
+Here, Harness refers to reusable execution integration and operation governance.
+An intelligence harness for model calls, context and action proposals belongs to
+the Agent side. The current library supplies part of an execution runtime; it is
+not a complete mission scheduler or durable task engine.
+
+The caller owns goals, task steps and task-level recovery decisions. Core owns
+operation authority and receipt composition, while adapters and native systems
+supply execution and settlement observations within their declared scope. A task
+summary does not replace those facts or establish domain success by itself.
+Correlated task and operation states are therefore expected; they are not two
+competing owners of the same fact.
+
+These responsibilities do not prescribe one process or repository per layer.
+Keep model and application dependencies outside this library; extract reusable
+calling or feedback helpers when actual consumers expose repeated work. Existing
+domain runtimes retain navigation, control and device responsibilities.
+
+The local compute worker is a separate process, but its event handling, deadline
+checks and stop escalation still depend on host progress. It does not provide
+host-independent supervision. A future consumer that requires execution or stop
+handling to survive a stalled model call or failed caller needs an explicitly
+validated deployment for that requirement; adding a process alone is not evidence
+that it is met. The current profile limits remain unchanged.
 
 ## Execution ownership
 
@@ -494,6 +521,89 @@ Concrete C++ types stay repository-local while the examples settle. Add only the
 source/header/example/test directories used by the current slice; no empty module
 scaffold or new production dependency is needed. The example is an actual caller
 of the library and adapter, not a script that prints expected events.
+
+## M3a operation replacement boundary
+
+M3a exercises a caller changing operation A to B within one live host and the same
+provider binding. The caller retains B's intent, requests cancellation of A and
+resubmits B only after A's declared settlement. Core continues to allocate a new
+operation authority and enforce the occupied domain. A new replacement command,
+implicit queue, automatic retry or provider generation change is unnecessary for
+this slice. Provider rebinding and host/Core restart belong to later M3 work.
+
+The example and regressions must distinguish these boundaries:
+
+- Native work still pending, or terminal/output observed but settlement missing:
+  B is rejected without another native submission.
+- A settled: B obtains a different operation ID and can execute in the same binding.
+- An A result callback replayed while B is prepared, running or ready to deliver:
+  it reaches the managed sink's current permission check and is denied without
+  attributing A's output to B's receipt or accepted results. Old dispatch/cancel
+  requests cannot control B; the host still observes time for B's own deadline.
+- B's actual result is accepted once; a replay cannot duplicate it. Shutdown must
+  drain staged callbacks under closed admission and release replay storage.
+
+The deterministic fixture optionally retains the first generated result callback
+after `set_result_replay_enabled(true)`. Calling that setter clears the previous
+slot; later native results do not overwrite it. `replay_retained_result()` stages
+a copy as the next event, with the original authority, identity and data, through
+the existing host event path. This explicit fixture ordering lets A arrive when
+B has native success but has not yet delivered its result. Replay never recomputes
+the result or creates authority. Disabling replay or closing clears the slot.
+It is one retained fixture copy for testing duplicate delivery after original work
+and output disposal, not an outstanding native effect or a recovery log. The
+original result and cleanup must still be observed before B can be admitted.
+No arbitrary callback/authority injection is exposed. A sink permission-denial
+counter, alongside actual result storage, makes rejection at that boundary visible.
+
+The compute regression separately checks cancellation, OS exit/reaping and cleanup
+before a new request uses the same host. The child has exited and its channels are
+closed before replacement, so synthetic old-result replay belongs to the fixture,
+not the compute protocol. Both paths reuse unchanged Core authority rules; neither
+establishes crash recovery, external shared-domain isolation or physical stopping.
+
+## Planned M3b and M3c boundaries
+
+These slices allocate the existing M3 requirements; they are not implemented by
+M3a. The current public gate has a configured binding and no rebind or recovery
+commit API. Initial generation fields and fresh initialization do not establish
+restart recovery. Concrete API and deployment choices remain implementation work.
+
+**M3b — provider withdrawal and rebinding within a live host.** Close affected
+admission when a required provider/dependency is unavailable. Retain the old
+operation's effect and cleanup obligations while withdrawing its authority; a
+replacement provider being ready cannot settle the old provider's work. Commit
+a fresh binding only when the declared old-scope settlement and new dependency
+conditions are satisfied. Old controls, observations and outputs cannot become
+evidence for the new binding. Recheck required availability at actual dispatch.
+
+M3b also owns the conflict/composite-availability requirement needed by these
+cases: account for every declared prerequisite and block conflicting effects
+while any required old obligation remains unresolved. Start with the declared
+conservative domain and actual worker/adapter/sink dependencies; this is not a
+requirement to build a general conflict graph or scheduler. If that representation
+cannot express the selected case, resolve the concrete gap before implementation.
+
+**M3c — host/Core restart and recovery from unknown state.** Begin closed in
+recovery-required state and reconstruct permission from fresh observations of
+the relevant native execution, outputs, settlement and binding. Cover old work
+still active, partially completed effects and contradictory terminal evidence;
+neither a new process nor saved task status establishes a clean execution scope.
+Invalid, stale, expired or conflicting recovery evidence must not reopen it.
+Interrupted or failed recovery must not leave partially usable new authority.
+
+Before implementing M3c, specify who observes or controls surviving native work,
+how old identities remain distinguishable across restart, and how observation
+freshness is established in the new host's time/sequence context. Do not assume
+process-local counters or monotonic timestamps survive restart. If the adapter
+cannot establish the required facts, report unresolved recovery and keep conflict
+admission closed; requesting operator attention is not permission to clear it.
+Core recovery does not automatically resume a caller's mission or retry an effect.
+
+Provider replacement, host failure and task continuation are distinct cases. A
+fixture may exercise adverse event ordering, but a claim about process restart
+or surviving work also needs observations at that actual process boundary.
+Focused acceptance is maintained in [M3b/M3c checks](TESTING.md#planned-m3b-and-m3c-checks).
 
 ## M1 caller and integration surface
 

@@ -138,6 +138,16 @@ public:
   void set_settlement_reporting_enabled(bool enabled) noexcept {
     settlement_reporting_enabled_ = enabled;
   }
+  void set_result_replay_enabled(bool enabled) noexcept {
+    result_replay_enabled_ = enabled;
+    replay_result_.reset();
+  }
+  std::optional<NativeCallback> retained_result() const {
+    return is_closed_ ? std::nullopt : replay_result_;
+  }
+  std::size_t result_permission_denial_count() const noexcept {
+    return result_permission_denial_count_;
+  }
   std::size_t stop_request_count() const noexcept {
     return stop_request_count_;
   }
@@ -189,6 +199,7 @@ public:
       return ResultAcceptance::kInvalid;
     }
     if (!permission()) {
+      ++result_permission_denial_count_;
       return ResultAcceptance::kPermissionDenied;
     }
     if (!is_result_sink_ready()) {
@@ -212,6 +223,8 @@ public:
     }
     worker_ready_ = false;
     result_sink_ready_ = false;
+    replay_result_.reset();
+    result_replay_enabled_ = false;
     is_closed_ = true;
   }
 
@@ -248,7 +261,12 @@ private:
       return;
     }
     if (callback_) {
-      callback_({kind, work.authority, work.native_identity, sequence, std::move(result)});
+      NativeCallback callback{kind, work.authority, work.native_identity, sequence,
+                              std::move(result)};
+      if (kind == CallbackKind::kResult && result_replay_enabled_ && !replay_result_) {
+        replay_result_ = callback;
+      }
+      callback_(std::move(callback));
     }
   }
 
@@ -293,6 +311,9 @@ private:
   bool fail_next_native_execution_ = false;
   CancellationMode cancellation_mode_ = CancellationMode::kCooperative;
   bool settlement_reporting_enabled_ = true;
+  bool result_replay_enabled_ = false;
+  std::optional<NativeCallback> replay_result_;
+  std::size_t result_permission_denial_count_ = 0;
   std::size_t stop_request_count_ = 0;
   std::optional<WorkItem> pending_work_;
   std::vector<SampleResult> results_;
@@ -649,6 +670,24 @@ void SampleExecutionHost::set_cancellation_mode(CancellationMode mode) noexcept 
 
 void SampleExecutionHost::set_settlement_reporting_enabled(bool enabled) noexcept {
   implementation_->adapter.set_settlement_reporting_enabled(enabled);
+}
+
+void SampleExecutionHost::set_result_replay_enabled(bool enabled) noexcept {
+  implementation_->adapter.set_result_replay_enabled(enabled);
+}
+
+bool SampleExecutionHost::replay_retained_result() {
+  auto& state = *implementation_;
+  auto callback = state.adapter.retained_result();
+  if (!callback) {
+    return false;
+  }
+  state.staged_events.push_front({std::move(*callback), state.read_time()});
+  return true;
+}
+
+std::size_t SampleExecutionHost::result_permission_denial_count() const noexcept {
+  return implementation_->adapter.result_permission_denial_count();
 }
 
 std::size_t SampleExecutionHost::native_stop_request_count() const noexcept {

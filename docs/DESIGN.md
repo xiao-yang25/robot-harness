@@ -6,8 +6,10 @@ changes the implementation order to runnable behavior slices, preserving those
 ownership boundaries. M0 established the build skeleton; M1 has been implemented
 and merged. M2a implements failure closure; M2b/M2c add cancellation and expiry
 with macOS and Ubuntu validation. M3a adds replacement within one live host/binding;
-provider rebinding, restart recovery and M4 remain planned. See README and Testing for tested
-status and validation limits.
+M3b adds provider rebinding within a live Host and a finite task caller.
+M3c adds a private Linux Host-recovery prototype with the same task caller;
+M4 remains planned. See README and Testing for tested status
+and validation limits.
 
 ## Source roles
 
@@ -593,8 +595,9 @@ establishes crash recovery, external shared-domain isolation or physical stoppin
 
 These slices allocate the existing M3 requirements. M3a alone did not implement
 them; M3b now adds live-gate rebinding in the sample and compute hosts.
-The example task caller now exercises those public interfaces; M3c recovery remains pending. Initial generation
-fields and fresh initialization do not establish restart recovery.
+The example task caller now exercises those public interfaces. M3c has a separate
+private Linux prototype below, connected through an example-local execution port.
+Initial generation fields and fresh initialization do not establish restart recovery.
 
 **M3b — provider withdrawal and rebinding within a live host.** Close affected
 admission when a required provider/dependency is unavailable. Retain the old
@@ -631,6 +634,187 @@ Provider replacement, host failure and task continuation are distinct cases. A
 fixture may exercise adverse event ordering, but a claim about process restart
 or surviving work also needs observations at that actual process boundary.
 Focused acceptance is maintained in [M3b/M3c checks](TESTING.md#planned-m3b-and-m3c-checks).
+
+### M3c first recovery slice: design and experiment boundary
+
+Status: a private Linux recovery prototype is implemented alongside the existing
+adapter; it is not a stable recovery API or production supervisor. M3b is merged
+at `eb2ae06`. The first case remains finite local computation, with one result
+domain and at most one outstanding worker.
+
+The failure under study is abrupt loss of the process containing Host and Core
+while a worker is running or has emitted its terminal result before native cleanup. A new
+Host must not treat its empty memory as proof that the old execution scope is
+clear. Recovery of permission does not recover the caller's goal or prove its
+old result was durably consumed.
+
+The current `ComputeExecutionHost` deliberately owns an isolated, process-local
+scope. Its normal worker exits on control EOF or failed required output, but its
+Host owns the child wait relationship, result memory and channel endpoints.
+Constructing and initializing another current Host creates another isolated
+scope; it is not an existing recovery API or a defect that it can initialize.
+Process-local identity counters and the diagnostic child PID are not recovery
+credentials. A dead Host's destructor does not run. Current `finish()` publishes a result only
+after collected exit and event EOF; worker emission is not public result acceptance.
+
+**Selected prototype.** Separate the finite compute native owner from the
+restartable Host/Core process. The owner directly launches, stops and reaps its
+workers, retains bounded operation/output-disposition facts, and owns the worker
+channels for one scope. It stays alive across the tested Host crash. The new
+Host/Core receives observations through a newly established local session;
+Core retains the execution-permission rules. The owner enforces the current
+session at the native submission and result boundaries, rather than duplicating
+Core's receipt/state machine. This is an adapter process boundary, not a generic
+scheduler, fleet service or second task planner. The current in-process adapter
+continues to expose its existing weaker profile.
+
+A trusted local test launcher provisions one owner and serial Host sessions for
+that scope. The first prototype uses dedicated local channels with no externally
+reachable service or reconnect-by-PID interface. Replacing the Host requires
+confirmed death/closure of the previous session; two live Hosts are not allowed
+to share authority. Parent/child ownership and channel installation, rather than
+a user-supplied identifier, establish which owner is being contacted.
+
+| Concern | Required behavior of the prototype |
+|---|---|
+| Session loss | Owner fences the lost session's submissions and future result delivery, requests stop, and continues native observation/cleanup independently of Host polling. This adds no hard stopping-time guarantee |
+| Restart identity | Owner allocates a never-reused session epoch during its lifetime; bind the new Gate's identity and all commands/replies to this epoch and dedicated channel. Old operation IDs, authority copies and buffered old replies cannot acquire the new session's permission |
+| Old work | Keep the old worker identity and native closure/output obligations until actually resolved. A worker exit is distinct from required output disposal and channel cleanup; missing or contradictory facts keep recovery blocked |
+| Fresh observations | Request a fresh, correlated snapshot after session loss/fencing, with owner ordering and a new-session request identifier. Use new-Host local observation/expiry bounds; never compare a stored old-Host monotonic timestamp to a new time origin. Recheck the owner's current session and closed scope at activation |
+| Activation | Begin new Core in recovery-required state. Prepare new identity/readiness and complete old-scope validation before enabling execution. Interrupted recovery cannot expose partial authority. Owner checks session validity at the real dispatch boundary even if a prior ready reply was delayed |
+| Old result | Preserve native outcome separately from delivery. Discard output still owned by the lost session; output already handed to the dead Host does not prove caller consumption. Report unrecoverable task outcome truthfully and do not replay or retry automatically |
+| Owner failure | No recovery if the owner/session connection is lost or its identity is inconsistent. A fresh owner is not a substitute for closure of the previous scope; owner restart, OS reboot and durable recovery are outside this first slice |
+
+The owner session epoch is scoped to that owner lifetime, not a globally unique
+or durable identity. Supported recovery never replaces the owner. If the owner
+is lost, the launcher must refuse to start a replacement for the same scope;
+only separately established teardown of all old work could justify reprovisioning,
+which this slice does not implement. No fallback to today's isolated Host may
+be advertised as recovery of that scope.
+
+**Alternatives and cost.** Relying only on worker EOF is smaller but leaves no
+surviving collector of old closure and output facts. A PID file or saved receipt
+cannot restore wait ownership and may refer to stale work. Restarting an entire
+externally supervised execution unit is a valid alternative if that supervisor
+can prove the whole scope has been torn down; it does not support observing a
+surviving worker during Host-only recovery. The selected owner process costs one
+extra process and a bounded local protocol, and permits that observation directly.
+Do not implement both strategies in this slice. Revisit the choice if a target
+runtime already supplies an adequate owner or deployment only needs unit teardown.
+
+The concrete protocol and activation ordering are specified below. Current
+`AuthorityGate::observe_startup` becomes Ready once its three positive facts are
+present; feeding it recovery observations one by one is not a recovery commit.
+The prototype uses existing staged rebinding checks instead. Public API names,
+serialization across versions, a durable journal and receipt replay are not frozen
+by this design. No parallel semantic evaluator or digest registry is introduced.
+
+The first research experiment kills a real Host with a live worker suspended
+after partial progress was observed, and with a fixture that confirms terminal
+emission before suspension. The first case does not establish the exact iteration
+or absence of a terminal frame at the instant of suspension. A Linux test subreaper collects orphaned workers
+so the experiment can finish cleanly; that instrumentation does not implement the
+selected direct-owner design. Controlled suspension can hold the cut point; it
+must not be described as a spontaneous leak or measured stop latency. The product
+prototype independently exercises the [M3c acceptance path](TESTING.md#m3c-first-slice-validation)
+with its own actual owner, restarted Host and real worker.
+
+### M3c prototype session and activation ordering
+
+The first implementation is a private Linux-only prototype, not a stable public
+adapter. A trusted launcher creates one owner and serial Host processes. Dedicated
+Unix sequenced-packet socket pairs carry fixed-size, same-build messages; no
+listener, PID-based attachment, cross-machine protocol or persistent journal is
+introduced. The launcher duplicates both child channel sources above the fixed
+child destinations before mapping, so inherited descriptor numbers cannot cause
+one mapping to overwrite the other source. Untransferred endpoints have scoped
+ownership through setup/spawn failure. Both ends process bounded messages without
+blocking. Each end holds
+at most one unsent message; outbound backpressure expires and closes the session.
+While polled, Client also expires incomplete handshakes and submission acceptance.
+Owner does not time out a silent connected Host after flushing its reply; there
+is no heartbeat or hung-Host detector. Native execution itself has no protocol
+completion deadline.
+The owner continues worker cleanup while the Host is absent. Its launcher must
+keep polling; owner failure or a stalled launcher is not independently supervised.
+
+The owner allocates session epochs starting at 2, never reusing one during its
+lifetime; 1 is the initial empty-scope marker. A new Host creates a fresh Gate
+configured with the preceding session identity in that owner's scope and withdraws
+it before any startup evidence. This does not restore an old receipt: the owner
+must independently observe closure of all work left in the scope, including work
+from earlier abandoned sessions. Old task outcome remains unavailable.
+
+The exchange is Hello → Query → Snapshot → Activate → Activated. Every response
+matches the dedicated channel, current session and a monotonically increasing
+request ID. A clear Snapshot requires collected native exit, event EOF and closed
+worker channels, no unresolved ownership/protocol/cleanup fault, and current
+launch prerequisites. The snapshot request ID is a one-use activation token.
+Owner checks its local 1000ms expiry, current session and scope again at Activate;
+Host independently checks freshness from its own Query issuance time. No timestamp
+is transferred between clocks. A blocked snapshot grants nothing and may be
+queried again. Malformed, contradictory, wrong-session or expired activation closes
+the session; it does not silently restart recovery or allocate another owner.
+
+Only after a complete clear Snapshot does Host call existing `begin_rebind` with
+the owner-attested old-scope evidence. Core remains Preparing. Activated reattests
+current scope, session, launch prerequisites and the new result channel after
+candidate preparation. Only that matching fresh response supplies candidate
+readiness and permits `commit_rebind`;
+ordinary `observe_startup` is not used. New generation equals the owner epoch.
+This reuses Core's staged validation rather than adding a reset or assuming an
+empty new Gate proves old quiescence. An activation interrupted at either end
+cannot generate a valid new submission. Disconnect permanently closes that Host's
+Gate and fences its session at the owner.
+
+After activation, Core admits and claims dispatch. Owner accepts Submit only for
+the active session, a fresh request/operation ID, a bounded workload and a clear
+native slot. Accepted means successful spawn. Result is sent only after native
+exit, event EOF and channel cleanup; Host correlates it and verifies the expected
+sum before recording native outcome, output and settlement. A native launch
+failure is reported separately and cannot masquerade as a running worker.
+
+Session loss cancels pending output delivery, requests stop and continues polling
+the real owned child. A terminal result retained for a dead session is discarded,
+never delivered to a replacement Host. Owner-side output facts establish disposal
+or transport handoff, not caller consumption. Prototype commands do not yet offer
+a general task API, explicit caller cancellation/deadlines or durable result replay;
+the existing adapter retains its implemented API and profile. Owner or launcher
+loss is outside supported recovery and cannot authorize reprovisioning the scope.
+
+### M3c task-caller integration
+
+The same example-owned `FiniteComputeTask` uses two execution paths: the
+existing public compute Host and the private Linux recovery Client. An
+example-local `TaskExecution` port is used for the operations actually consumed by
+that controller. The existing Host constructor remains usable through a local
+bridge; the Linux bridge lives in the example layer and consumes the private
+prototype. No Core or installed public API changes, capability-profile equivalence,
+new scheduler, durable task journal or automatic retry are implied.
+
+A trusted surviving launcher remembers that a prior goal was interrupted. It
+supplies that intent to the restarted task via `note_interrupted_goal`, which
+records NeedsAttention with no invented operation receipt or recovered result.
+This controller cannot accept goal revisions or advance either step, even after
+execution authority recovers. Only a separate explicit caller request starts a
+fresh controller/goal after old-scope closure. The old task's outcome remains
+unknown. Remembering intent in this launcher is not durable recovery or proof
+that the previous result was or was not consumed.
+
+The recovery bridge correlates the current session's authority and result with
+local goal/step metadata. The second input still comes from the accepted and
+settled first result and the existing independent application arithmetic check.
+Client loss stops progression. This prototype has no per-operation cancellation
+message: interruption closes the session, allowing Owner to stop/clean up, but
+reports no operation cancel acknowledgement or confirmed local cleanup. The
+launcher must keep driving Owner. The original Host keeps its existing richer
+cancellation and provider-rebinding behavior.
+
+An alternative was a second recovery-only task state machine, which would copy
+the dependency and unknown-outcome policy; the port instead keeps that policy in
+one controller. Acceptance includes original caller regressions, a normal
+recovery-backed two-step task, actual Host loss during old execution and between
+steps, no replay while awaiting explicit new intent, and owner-channel loss.
 
 ### M3b implementation design: live-host binding handoff
 

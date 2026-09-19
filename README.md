@@ -33,18 +33,39 @@ covers declared local process behavior. Neither proves physical stopping, a hard
 stop deadline or host-independent supervision. Stronger tasks require the
 corresponding [stop and resource guarantees](docs/DESIGN.md#stop-and-resource-requirements-before-expanded-execution).
 
-The working M3b increment adds [Core, sample and compute provider rebinding](docs/DESIGN.md#m3b-implementation-design-live-host-binding-handoff):
+**M3b is merged in `eb2ae06` through [PR #6](https://github.com/xiao-yang25/robot-harness/pull/6).**
+It adds [Core, sample and compute provider rebinding](docs/DESIGN.md#m3b-implementation-design-live-host-binding-handoff):
 withdraw the old binding, preserve its cleanup obligations, then enable a fresh
 provider only after old-scope quiescence and new readiness. Including the task
 caller and withdrawal-allocation regression, all 47 CTests pass
 locally on macOS and Ubuntu ARM64 Docker, in Debug and ASan/UBSan builds. The
 Core/sample, compute and task-caller increments passed independent implementation review.
-These uncommitted changes have no corresponding GitHub CI run yet. See the
+The [M3b main-branch CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35447391085)
+also passed. See the
 [handoff examples and verification](docs/TESTING.md#m3b-focused-acceptance-mapping).
 A minimal [two-step task caller](#two-step-task-example) now exercises public
 compute APIs; its verification is tracked in [task checks](docs/TESTING.md#finite-task-caller-checks).
-M3c restart recovery, M4 ROS integration,
-a complete Agent and physical-task validation remain separate pending work.
+**M3c now has a private Linux recovery prototype.** A surviving owner retains the
+native worker while Host/Core restarts. The new Host waits for actual old-scope
+cleanup and a fresh activation exchange before explicit new work; old results are
+not replayed. See [design and limits](docs/DESIGN.md#m3c-prototype-session-and-activation-ordering)
+and [running the recovery example](docs/TESTING.md#m3c-prototype-checks).
+The same two-step task controller now runs through an example-local recovery
+bridge. After Host loss it records the old goal as needing attention; permission
+recovery does not replay that goal or advance step two. A separate explicit new
+request starts a fresh task. Real-process examples cover a crash during the first
+step and between settled steps. See [task integration](docs/DESIGN.md#m3c-task-caller-integration).
+
+Local Ubuntu ARM64 Debug and ASan/UBSan each passed the previous 56-test suite;
+macOS Debug and ASan/UBSan each passed 47 portable tests. Delivery review found a
+launcher descriptor collision and it has been corrected: child channel sources
+are now duplicated outside the fixed destination range before mapping. Its new
+regression fails before the fix and passes afterward. All 10 affected recovery
+tests pass in both Ubuntu builds; the suite now registers 57 tests. Focused
+independent re-review approved the launcher correction. Consult the PR's checks
+for Ubuntu CI results associated with the submitted revision. Stable public recovery APIs,
+owner/reboot recovery, M4 ROS integration, a complete Agent and physical-task
+validation remain pending.
 
 Earlier research experiments support the shared-core architecture; they do not
 establish production performance, physical safety, or end-to-end task success.
@@ -218,8 +239,10 @@ behavior to ROS 2 Humble. Each increment includes its regression tests. A separa
 Robot Agent can start using the available interfaces before all milestones finish.
 M1 and M2a have passed macOS and Ubuntu validation. M2b cancellation and M2c
 expiry now also have macOS and Ubuntu evidence for their implemented scope.
-M3a now exercises operation replacement in the same host/binding; provider
-rebinding, restart recovery and M4 ROS integration remain planned.
+M3a implements operation replacement in the same host/binding; M3b implements
+provider rebinding and a two-step task caller. M3c has a private Linux recovery
+prototype connected to that same task caller. Stable recovery APIs and M4 ROS
+integration remain pending.
 
 For project constraints and the engineering workflow entry, start with
 [repository instructions](AGENTS.md). The accepted boundary and M1–M4 sequence

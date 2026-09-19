@@ -522,7 +522,8 @@ effects remain outside these checks.
 These checks implement the existing [M3 scope](DESIGN.md#planned-m3b-and-m3c-boundaries).
 This table states scope, not evidence of PASS. The first Core/sample M3b increment
 is mapped and tested below, followed by compute rebinding and task-caller integration.
-M3c remains pending. Preserve M1–M3a regressions and run the existing macOS/Ubuntu
+M3c has the Linux prototype and two-step task integration mapped below.
+Preserve M1–M3a regressions and run the existing macOS/Ubuntu
 normal and sanitizer configurations, plus the required independent review.
 
 | Slice | Required observation |
@@ -542,14 +543,124 @@ turn an incremented counter or a synthesized clean flag into the test oracle.
 
 The minimal task caller registers normal multi-step completion,
 goal change, failure/unknown handling and clean shutdown as integration checks.
-The caller must use public interfaces. A dependent normal step needs the accepted
+The existing local Host path uses public interfaces. The Linux recovery prototype
+uses an example-local bridge to its private Client, without declaring a stable
+recovery API. A dependent normal step needs the accepted
 prior result and required settlement; replacing a cancelled goal instead follows
 the declared handoff conditions and does not require a discarded result to be
 accepted. Neither path changes Core's unassessed domain verdict.
-The caller also exercises M3b rebinding; extend it with M3c when supported. A future separate Agent
+The caller exercises M3b rebinding and now the limited M3c recovery path below. A future separate Agent
 repository must exercise the actual Harness dependency in a small cross-repository
 test; passing each repository independently is insufficient. ROS dependencies and
 native cross-path checks remain separate M4 work, not part of today's Core CI.
+
+### M3c first-slice validation
+
+These requirements apply to the [recovery prototype](DESIGN.md#m3c-first-recovery-slice-design-and-experiment-boundary).
+The original 47 CTests validate M3b; ten additional Linux CTests exercise the
+private recovery prototype below. Research crash experiments remain separate
+from product CTest. Linux Docker is suitable for initial process ownership checks;
+GPU/device behavior, physical stopping and deployment latency need target hardware.
+
+1. **Observe the current boundary.** Kill a real Host with a live worker paused
+   after partial progress was observed; this does not prove computation was still
+   incomplete at the instant of suspension. Separately cut after terminal emission
+   but before native cleanup using a checked protocol fixture and an explicit stop
+   barrier; do not infer that cut from elapsed time. Observe the worker's actual
+   state and exit with a surviving test collector. A separate fresh process must
+   not be mistaken for the worker's new parent or a source of the old result.
+   Record deliberate suspension, subreaper adoption and cleanup as test controls.
+2. **Demonstrate the owner prototype.** Keep the actual worker-owning process
+   alive, kill Host A, and start Host B on the same scope. While the owner still
+   holds old work or required output/channel cleanup, B admits no conflicting
+   operation. After real closure and a fresh recovery exchange, one explicit
+   caller request executes and yields an independently checked result.
+3. **Reject invalid recovery.** Missing, stale, expired, wrong-session or
+   contradictory observations, old commands/results and interruption before
+   activation must leave admission closed. A delayed ready response must not
+   bypass the current-session check at the owner's submission boundary. Cover
+   owner connection loss during recovery without silently creating a fresh owner.
+4. **Keep task truth.** Native success with lost result delivery does not become
+   task success; no automatic retry or step-two execution after restart. Continue
+   cleanup even when the caller reports an unknown or failed task outcome.
+
+Only implemented product scenarios enter CMake/CTest, with bounded waits and
+cleanup of owned test processes. The existing Ubuntu ordinary and ASan/UBSan
+workflow discovers registered tests automatically; do not add research programs
+or fabricate passing recovery jobs before that implementation exists. Core and
+portable Host regressions remain in the macOS suite; Linux-specific ownership
+checks must be labeled with their actual platform scope.
+
+### M3c prototype checks
+
+On Linux, the ordinary build also produces `robot_harness_recovery_execution`.
+From the repository root, after building:
+
+```sh
+./build/robot_harness_recovery_execution normal "$PWD/build/robot_harness_compute_worker"
+./build/robot_harness_recovery_execution handoff "$PWD/build/robot_harness_compute_worker"
+./build/robot_harness_recovery_execution task-handoff "$PWD/build/robot_harness_compute_worker"
+ctest --test-dir build --output-on-failure -R recovery
+```
+
+The parent launcher is the actual native owner. Each Host/Core is a separate
+exec'ed process. The handoff example deliberately suspends the owned worker,
+kills Host A with SIGKILL, observes that Host B is blocked, then resumes the old
+worker so it can stop and be reaped. B recovers and explicitly submits three
+iterations, yielding `5`. This controlled pause proves blocking during unresolved
+ownership; it does not measure stop latency. The terminal test uses the existing
+delayed-exit fixture and confirms a completed frame plus a stopped live worker
+before killing A. No old task is retried or resumed.
+
+| CTest suffix | Implemented boundary |
+|---|---|
+| `recovery_client` | Wrong session/request, contradictory snapshot, incomplete or expired activation, owner loss, old output, allocation failure and bounded outbound backpressure keep the Gate closed |
+| `recovery_owner` | Submission before activation, invalid/expired activation token and stale-session submission launch no worker; new sessions do not reuse epochs |
+| `recovery_normal_example` | Fresh activation, real native execution, independently checked result `5` and cleanup |
+| `recovery_handoff_example` | Actual Host crash, a stopped live old worker blocks replacement, real closure precedes new explicit execution |
+| `recovery_fd_collision` | Occupied inherited descriptors overlap fixed child targets; both independently mapped channels still complete normal execution and cleanup |
+| `recovery_terminal_example` | Old terminal emission is not new-session task success; pending old ownership blocks recovery until cleanup |
+
+The task variants use the same `FiniteComputeTask` as the existing local Host.
+`task-normal` checks `3 → 5 → 6 → 55`. `task-handoff` kills Host A with its first
+worker held alive; `task-between` kills it after accepting/settling the first
+result, before submitting step two. The restarted controller marks the remembered
+old intent NeedsAttention and cannot revise it or advance a step. Its ready
+report confirms zero admissions, no result and unchanged uncertainty. Only then
+does the surviving caller send a separate new-goal command. The new task runs
+`4 → 14 → 7 → 91`; total launches remain exactly three, including A's first step.
+The launcher retains intent only in memory, not a durable result or receipt.
+
+| Additional CTest suffix | Implemented boundary |
+|---|---|
+| `recovery_task` | Owner-channel loss after a queued submission leaves task NeedsAttention; no retry, dependent step or accepted result; bridge rejects mismatched authority |
+| `recovery_task-normal_example` | Same controller completes two dependent real compute operations through the recovery bridge |
+| `recovery_task-handoff_example` | Real Host death with old worker alive; unknown old goal never resumes; explicit new goal waits for scope closure |
+| `recovery_task-between_example` | Real Host death between settled steps; permission recovery does not imply recovered first result or automatic step two |
+
+The Linux suite now contains 57 tests; macOS retains the 47 portable regressions.
+The earlier prototype's allocation injection failed before its fix and passed
+afterward; it remains in the suite. Before the launcher correction, full-suite
+results were Ubuntu ARM64 Debug and ASan/UBSan each 56/56,
+macOS ARM64 Debug and ASan/UBSan each 47/47. Earlier incremental reviews passed.
+Delivery review subsequently reproduced a channel-mapping failure with inherited
+descriptors 3 through 60 occupied. The launcher now duplicates both child sources
+above its fixed 64/65 destinations before setting up file actions. Scoped ownership
+closes all untransferred endpoints if socket creation, duplication, attachment or
+spawn fails. The new `recovery_fd_collision` regression runs the normal example
+under that layout: it fails before the fix and passes afterward. All 10 affected
+recovery tests passed in Debug and ASan/UBSan after the correction. Unchanged Core,
+Host and portable task checks retain the prior full-suite evidence; this targeted
+run is not a new full 57-test run. Focused independent re-review approved the
+correction.
+The existing Ubuntu workflow runs all registered tests normally and under
+ASan/UBSan, so no additional workflow job is needed. Local execution does not
+substitute for the future pushed revision's GitHub CI. Protocol fault injection
+uses dedicated test peers; these are not external service or security tests.
+A silent connected Host and a stalled owner have no watchdog in this prototype.
+Rare OS failures, owner death with surviving work, machine reboot, durable receipt
+replay, stable public recovery APIs and physical effects remain outside this slice.
+
 
 ### M3b focused acceptance mapping
 
@@ -735,7 +846,7 @@ are introduced here.
 | Ubuntu Core workflow | Parse workflow YAML, inspect its commands/permissions and diff; after push, inspect the completed `Core on Ubuntu` job for the tested commit | M0 passed at `0be526a`; M1 passed at `7eb0e76`; M2a normal and ASan/UBSan passed at `16b2888`; see the linked Actions results above |
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
-| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a operation replacement is merged; M3b live-host rebinding and the two-step caller are implemented locally; see [rebind checks](#m3b-focused-acceptance-mapping) and [task checks](#finite-task-caller-checks). M3c restart/recovery remains planned |
+| M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a operation replacement, M3b live-host rebinding and the two-step caller are merged; see [rebind checks](#m3b-focused-acceptance-mapping) and [task checks](#finite-task-caller-checks). M3c has the private Linux [prototype checks](#m3c-prototype-checks); the two-step caller uses its private bridge; stable public recovery APIs remain pending |
 | M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 

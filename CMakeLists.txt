@@ -95,6 +95,24 @@ if(UNIX)
   endif()
 endif()
 
+# Private prototype: Linux local owner/session transport, not an installed API.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_library(robot_harness_recovery_prototype STATIC
+    src/compute/recovery_owner.cpp src/compute/recovery_client.cpp)
+  target_compile_features(robot_harness_recovery_prototype PUBLIC cxx_std_17)
+  target_link_libraries(robot_harness_recovery_prototype PUBLIC robot_harness_compute)
+  target_compile_options(robot_harness_recovery_prototype PRIVATE -Wall -Wextra -Wpedantic)
+  add_library(robot_harness_recovery_task_example STATIC examples/recovery_task_execution.cpp)
+  target_include_directories(robot_harness_recovery_task_example PRIVATE src/compute)
+  target_link_libraries(robot_harness_recovery_task_example PUBLIC robot_harness_task_example
+    robot_harness_recovery_prototype)
+  target_compile_options(robot_harness_recovery_task_example PRIVATE -Wall -Wextra -Wpedantic)
+  add_executable(robot_harness_recovery_execution examples/recovery_execution.cpp)
+  target_include_directories(robot_harness_recovery_execution PRIVATE src/compute)
+  target_link_libraries(robot_harness_recovery_execution PRIVATE robot_harness_recovery_task_example)
+  target_compile_options(robot_harness_recovery_execution PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()

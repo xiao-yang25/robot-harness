@@ -24,6 +24,71 @@ For a first run use [Build](../README.md#build) and the
 tests built for that platform. Later revisions must carry their own CI results;
 the links here establish only the recorded revision.
 
+## Optional Humble Nav2 observation
+
+The source-tree-only [Nav2 example](../integrations/ros2/nav2_observation/README.md)
+is built separately from the default Core/compute targets. Its README supplies
+Ubuntu 22.04 / Humble commands and the trusted fresh-deployment requirement.
+The new [ROS workflow](../.github/workflows/ros2.yml) compiles it and runs
+`nav2_requires_fresh_deployment` and `nav2_motion_window`; it does not launch a
+simulator. The latter includes finite-window counterexamples for deceleration,
+clock/odometry ordering, stale/duplicate data, drift and invalid/excessive velocity.
+Local execution
+of the original build/guard commands passed (1/1 guard); the new motion predicate
+was checked in a final optional CTest run that passed both registered checks (2/2)
+after the bounded acquisition fix. This working-tree increment has
+not yet been pushed, so it has no remote workflow result.
+
+Local amd64 Docker on Apple Silicon, using Humble and Gazebo Classic, observed:
+
+| Case | Required observation and result |
+|---|---|
+| Normal, final browser path | One native send; accepted UUID retained through feedback/result; Core-protected output accepted; Gazebo displacement 2.473 m and goal error 0.230 m; settlement pending; actual second admission refused |
+| Missing startup binding evidence | Core refuses admission; zero native sends and negligible Gazebo movement |
+| Cancellation before dispatch | Revoked Core authority cannot claim dispatch; zero native sends and negligible Gazebo movement |
+| Deployment guard | Missing fresh isolated deployment premise exits with rejection before ROS startup |
+| Same-owner post-result motion | Final normal run: 31 samples over 1.02 simulation seconds, maximum speed 0.000103031 m/s; Gazebo displacement 2.496 m and goal error 0.216 m; output accepted, settlement pending, second admission blocked |
+| Post-result odometry loss | Final fault run: navigation and output accepted; removing the owner subscription yields zero motion samples and no motion confirmation; second admission remains blocked |
+
+The research workspace retains raw observations under
+`experiments/ros2_navigation/results/`: `viewer-harness-check.log`, session
+`m4-live-0ce9951f22fd`, `harness-deny-startup-01`,
+`harness-cancel-before-dispatch-01` and `harness-final-build.log`. The
+same-owner increment retains `motion-owner-final-build.log`,
+`motion-owner-normal-03/native-goal.jsonl` and
+`motion-owner-withhold-01/native-goal.jsonl`. The first two motion runs remain
+failed evidence: native success arrived during deceleration. A regression failed
+before the bounded acquisition fix, whose final normal and fault runs passed.
+The updated browser path also passed (`viewer-motion-check.log`, session
+`m4-live-bb3d0a6ee867`): 2.498 m displacement, finite motion observed, settlement
+still pending, no JavaScript errors and owned-container cleanup checked.
+Independent review found no remaining blockers for this increment; it does not
+accept native closure or a persistent Host. These observations concern the
+uncommitted worktree based on `b0929ab`, not a released revision. The
+research launcher/recorder and browser viewer are not yet packaged here for
+external users. Earlier startup-query failures are retained as incomplete runs;
+waiting for actual clock/odometry publications precedes the successful runs.
+
+This demonstrates normal submission and observation under a fresh/exclusive
+simulator premise. It does not prove motion-time cancellation, native quiescence,
+stop deadlines, restart recovery, target timing or physical robot safety. No
+settlement evidence is fabricated from arrival or container teardown. Existing
+Core suite results below remain tied to their recorded versions; this increment
+does not claim a new full-stack sanitizer run.
+
+The independently extracted normal-observation slice was rebuilt locally on
+Ubuntu 22.04/Humble amd64 without the research drive interface or JSON observer
+dependency. Both registered checks passed (2/2). A fresh headless Nav2/Gazebo run
+of the final binary moved 2.495 m with goal error 0.220 m, one native send, accepted
+output, a confirmed finite motion window, pending settlement and refused second
+admission. The research workspace retains `observation-slice-final-build.log` and
+`observation-slice-normal-02/native-goal.jsonl`. Earlier build/normal-01 records
+precede cleanup of constant closure flags; the observation-only C++ summary now
+omits `native_closed` because this profile does not observe native closure.
+This is local evidence for the
+uncommitted slice; its remote CI has not run. Earlier denial/fault results above
+remain evidence for the unchanged default behavior, not additional reruns.
+
 ## What each environment establishes
 
 | Check | Environment | Evidence boundary |
@@ -894,7 +959,7 @@ are introduced here.
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a operation replacement, M3b live-host rebinding and the two-step caller are merged; see [rebind checks](#m3b-focused-acceptance-mapping) and [task checks](#finite-task-caller-checks). M3c has the private Linux [prototype checks](#m3c-prototype-checks); the two-step caller uses its private bridge; stable public recovery APIs remain pending |
-| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | Planned; target access, dependencies, commands, cleanup and evidence entry must be supplied with this slice |
+| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | First normal Nav2 observation plus startup/pre-dispatch denial validated locally; see the optional Humble section. Native settlement, motion-time cancellation, replacement and loss remain pending |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 
 Behavior changes involving authority, security/authorization, core public APIs,

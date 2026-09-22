@@ -1,0 +1,36 @@
+name: Optional Nav2 example on Humble
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nav2-build:
+    name: Compile Nav2 example and check observations
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install optional message dependency
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake ros-humble-nav2-msgs
+      - name: Configure and build optional example
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          cmake -S integrations/ros2/nav2_observation -B build-nav2 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+          cmake --build build-nav2 --target robot_harness_nav2_observation nav2_motion_window_test --parallel 2
+      - name: Check deployment guard and motion observations
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          ctest --test-dir build-nav2 -R '^nav2_(requires_fresh_deployment|motion_window)$' --output-on-failure --no-tests=error
+      # Gazebo movement and native goal checks are separate simulation evidence.

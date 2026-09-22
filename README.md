@@ -6,7 +6,8 @@ Robot Harness is a Physical AI Harness/Runtime project for agents, behavior tree
 and ordinary applications. It separates permission to execute from what actually
 happened: native acceptance, completion, result delivery, and resource cleanup.
 The current implementation runs deterministic examples and bounded local compute
-processes. ROS integration is the next milestone; robot motion is not implemented.
+processes. M4 now includes an experimental normal Nav2 navigation observation
+in simulation; physical robot integration remains unimplemented.
 
 [Build and run](#build) · [Examples](examples/README.md) ·
 [Design](docs/DESIGN.md) · [Testing](docs/TESTING.md) ·
@@ -20,6 +21,7 @@ processes. ROS integration is the next milestone; robot motion is not implemente
 | Local compute adapter | Bounded work in a child process, cancellation, exit collection and channel cleanup |
 | Operation replacement and live-Host provider rebinding | Conflicting new work waits for old-work settlement; stale results do not acquire new authority |
 | Two-step task example | Dependent work, goal changes and uncertain results using the same task controller |
+| [Optional Humble/Nav2 observation](integrations/ros2/nav2_observation/README.md) | One Core-admitted simulated navigation goal, correlated feedback/result, protected output and finite post-result motion observation; settlement stays pending and a second goal is refused |
 | Private Linux recovery prototype | A surviving Owner retains native work across Host/Core restart; fresh activation permits explicit new work without replaying the interrupted goal |
 
 M3c is merged through [PR #7](https://github.com/xiao-yang25/robot-harness/pull/7).
@@ -109,10 +111,19 @@ communication, scheduling, device control and native safety protection. See
 ## Next steps
 
 M1/M2 provide normal and failure/cancel/deadline paths. M3 adds replacement,
-provider rebinding and the limited Linux recovery path above. M4 will select a
-ROS 2 Humble lifecycle/action interface and validate the same execution boundaries
-against native observations. See the [implementation sequence](docs/DESIGN.md#implementation-sequence)
-for scope; planned behavior is not an implemented feature.
+provider rebinding and the limited Linux recovery path above. **M4 is in progress**
+on Ubuntu 22.04 / ROS 2 Humble. Its first optional navigation increment reuses Core
+for admission, dispatch and result delivery. Local simulation observations show
+actual movement; they do not establish native settlement or safe replacement.
+See the [ROS integration status](docs/ROS2_INTEGRATION.md) and
+[validation scope](docs/TESTING.md#optional-humble-nav2-observation).
+
+Next, combine navigation-specific native work closure, applied drive stop, fresh
+motion and a usable native context in the same Owner, then validate Core
+settlement and admitted A to B. Motion-time cancellation, revised goals and loss
+cases follow. The existing Core build stays ROS-independent. A
+reproducible external-user simulator package and integration tutorial remain
+follow-ups, not capabilities supplied by the current C++ example alone.
 
 Adapter integration instructions and packaging will grow from actual integration
 feedback. Stable API/version policies and release tooling belong to a later

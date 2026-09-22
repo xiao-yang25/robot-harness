@@ -1,17 +1,55 @@
 # ROS 2 integration: probe and robot simulation
 
-Status: **M4 in progress; experimental normal Nav2 observation implemented**.
-The [optional example](../integrations/ros2/nav2_observation/README.md) documents
-its build, trusted deployment premise and exact limits. Local Humble/Gazebo
-validation covers one Core-admitted goal with actual displacement, correlated
-feedback/result and protected output. No settlement evidence is supplied; the
-second admission is blocked. Startup denial and pre-dispatch cancellation are
-separate zero-send cases. See [Testing](TESTING.md#optional-humble-nav2-observation).
-This is neither a reusable ROS Host nor completed cancellation/recovery support.
-The existing [execution boundaries](DESIGN.md#product-boundary) and
-[implementation sequence](DESIGN.md#implementation-sequence) remain authoritative.
-This document selects a bounded first slice inside M4; it does not declare M4 complete
-or introduce a stable public ROS API.
+Status: **M4 in progress**. Two optional builds share the C++ Owner:
+`robot_harness_nav2_observation` retains the first, observation-only behavior;
+`robot_harness_nav2_settlement` adds a bounded sequential A-to-B experiment.
+The [example README](../integrations/ros2/nav2_observation/README.md) defines
+build commands and the trusted fresh/exclusive deployment premise.
+The second profile is experimental and requires the research native fixture;
+public simulator packaging and motion-time cancellation/replacement remain pending.
+Core and its public API remain ROS-independent.
+
+## Sequential settlement boundary
+
+Execution profile `nav2-fixed-context-sequence-v1` declares the two fixed goals:
+(-2.0, -0.5) → (0.7, -0.5) → (-1.5, -0.5). The original
+`nav2-normal-observation-only-v1` profile remains exclusive to the observation binary.
+
+One Owner keeps the Gate, operation authority, result sink, node and single-threaded
+executor alive. A callback captures its operation identity; a callback from A
+cannot mutate B's native state or result. Callback exceptions are retained by
+the Owner and rethrown outside ROS promise callbacks; a missing/invalid result
+observation cannot crash through a fulfilled promise or authorize settlement. A's native UUID is correlated with the
+fixed tree's planner/controller UUIDs and sealed worker acknowledgements. The
+Owner then closes the BT worker, seals generation 1 at the drive, observes the
+applying update and collects a fresh finite quiet window.
+
+With the drive still sealed, the launcher creates B's distinct native namespace.
+The launcher response establishes only process creation. The Owner probes active
+planner/controller/smoother and navigator, the controller's own TF buffer, the
+planner's own current costmap/robot bounds, B's Action endpoint and immutable
+command producer identities. It checks fresh quiet motion again. Only then does
+it submit A's `SettlementEvidence` under `fresh-context-generation-drive-v1`,
+refresh the execution profile, and request B admission from Core. B's generation
+opens after admission; a separate Core dispatch claim immediately precedes the
+actual Action send. Retained generation-1 drive acknowledgements cannot close B.
+
+B navigates back toward (-1.5, -0.5), then closes its native work/drive and records
+fresh quiet motion. **B's receipt stays pending and a third admission is denied**:
+this two-task example has not prepared a C context. A reusable indefinitely
+cycling Host would need an explicit next-context lifecycle and resource policy.
+Creating C solely to label B settled would hide this boundary and add unnecessary
+processes. Neither arrival, a pause, a fixed wait nor container teardown supplies
+settlement evidence.
+
+Missing worker/applied-drive acknowledgement, missing fresh odometry or an
+unready B context leaves A unsettled and prevents B admission/open/send.
+Readiness is a sampled observation in a trusted, exclusive fixture, not an atomic
+lease over remote processes. Runtime context loss, Owner death/restart, stop
+latency bounds and real hardware safety are outside this increment. The fixture's
+immutable producer-to-generation binding and drive rejection of old commands
+remain essential assumptions, supported by separate native isolation experiments.
+The product Owner reads native facts directly; no Python summary grants authority.
 
 ## User-facing M4 outcome
 
@@ -71,8 +109,8 @@ has pose/distance feedback and an empty result payload; arrival interpretation
 cannot reuse the compute result checker. A zero velocity command or a brief still
 frame is insufficient for a general stopping guarantee. Use fresh simulator
 observations over a declared window plus the applicable controller/work-closure
-facts; the navigation-specific settlement design still needs investigation and
-review before enabling conflicting work. Missing evidence keeps it unresolved.
+facts; the bounded sequential profile above applies only with its complete native
+fixture. Missing evidence keeps it unresolved.
 Compare with direct Nav2 usage at the same declared guarantee: navigation itself
 is Nav2's capability; the demo must show the additional Harness admission/result/
 settlement behavior rather than attribute ordinary motion to Harness.
@@ -81,9 +119,8 @@ Record actual simulation, not an authored robot animation. Include an uncut
 reference run alongside a short explanatory edit; disclose speed changes/cuts and
 label all footage as simulation. A rosbag replay, if used, is labeled replay.
 Physical hardware follows only after the device's own stop/loss protections are
-validated. The current implementation covers only the normal observation
-increment above. Motion-time cancellation, revision and navigation settlement
-remain to be designed and validated; historical probe approval does not cover
+validated. The sequential profile extends normal observation with the boundary above.
+Motion-time cancellation, revision and loss/recovery remain to be validated; historical probe approval does not cover
 those future behaviors.
 
 ## Delivery increments
@@ -99,5 +136,6 @@ those future behaviors.
 
 Each increment includes its design, usage, test and CI changes. Homepage and
 contributor navigation can ship independently. Research fixtures and private
-execution records stay outside the product repository. This first increment
-introduces no experimental native-closure dependency or settlement API.
+execution records stay outside the product repository. The default observation build introduces no native-closure dependency. The
+second executable opts into the fixture interfaces and JSON evidence matcher;
+neither introduces a stable public settlement API.

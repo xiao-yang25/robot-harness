@@ -6,12 +6,16 @@ Robot Harness is a Physical AI Harness/Runtime project for agents, behavior tree
 and ordinary applications. It separates permission to execute from what actually
 happened: native acceptance, completion, result delivery, and resource cleanup.
 The current implementation runs deterministic examples and bounded local compute
-processes. M4 now includes an experimental normal Nav2 navigation observation
-in simulation; physical robot integration remains unimplemented.
+processes. M4 now includes experimental Nav2 observation and bounded sequential
+A-to-B settlement in simulation; physical robot integration remains unimplemented.
 
 [Build and run](#build) · [Examples](examples/README.md) ·
 [Design](docs/DESIGN.md) · [Testing](docs/TESTING.md) ·
 [Contributing](CONTRIBUTING.md)
+
+The optional ROS integration also provides a bounded same-Owner sequential
+A-to-B settlement profile. Its required native fixture and remaining limitations
+are documented in [ROS integration](docs/ROS2_INTEGRATION.md#sequential-settlement-boundary).
 
 ## Current scope
 
@@ -22,6 +26,7 @@ in simulation; physical robot integration remains unimplemented.
 | Operation replacement and live-Host provider rebinding | Conflicting new work waits for old-work settlement; stale results do not acquire new authority |
 | Two-step task example | Dependent work, goal changes and uncertain results using the same task controller |
 | [Optional Humble/Nav2 observation](integrations/ros2/nav2_observation/README.md) | One Core-admitted simulated navigation goal, correlated feedback/result, protected output and finite post-result motion observation; settlement stays pending and a second goal is refused |
+| [Optional sequential Nav2 settlement](docs/ROS2_INTEGRATION.md#sequential-settlement-boundary) | Same Owner verifies native closure and a fresh B context, settles A through Core, admits and executes B; B closes but remains unsettled without a C context |
 | Private Linux recovery prototype | A surviving Owner retains native work across Host/Core restart; fresh activation permits explicit new work without replaying the interrupted goal |
 
 M3c is merged through [PR #7](https://github.com/xiao-yang25/robot-harness/pull/7).
@@ -112,18 +117,16 @@ communication, scheduling, device control and native safety protection. See
 
 M1/M2 provide normal and failure/cancel/deadline paths. M3 adds replacement,
 provider rebinding and the limited Linux recovery path above. **M4 is in progress**
-on Ubuntu 22.04 / ROS 2 Humble. Its first optional navigation increment reuses Core
-for admission, dispatch and result delivery. Local simulation observations show
-actual movement; they do not establish native settlement or safe replacement.
-See the [ROS integration status](docs/ROS2_INTEGRATION.md) and
-[validation scope](docs/TESTING.md#optional-humble-nav2-observation).
+on Ubuntu 22.04 / ROS 2 Humble. The original observation binary retains pending
+settlement and a refused second goal. A separate optional sequential profile
+connects native work/drive closure and a fresh B context to actual Core A settlement
+and B admission. See the [bounded contract](docs/ROS2_INTEGRATION.md#sequential-settlement-boundary)
+and [validation scope](docs/TESTING.md#optional-sequential-nav2-settlement).
 
-Next, combine navigation-specific native work closure, applied drive stop, fresh
-motion and a usable native context in the same Owner, then validate Core
-settlement and admitted A to B. Motion-time cancellation, revised goals and loss
-cases follow. The existing Core build stays ROS-independent. A
-reproducible external-user simulator package and integration tutorial remain
-follow-ups, not capabilities supplied by the current C++ example alone.
+Next come motion-time cancellation, revised goals and loss cases. The existing
+Core build stays ROS-independent. A reproducible external-user simulator package,
+integration tutorial and final demonstration remain follow-ups. The optional
+C++ example alone does not supply the required native fixture.
 
 Adapter integration instructions and packaging will grow from actual integration
 feedback. Stable API/version policies and release tooling belong to a later

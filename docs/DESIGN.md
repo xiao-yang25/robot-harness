@@ -541,10 +541,12 @@ observation: it waits for a first low-speed sample and one continuous quiet
 window, within eight wall seconds total. Missing/invalid evidence cannot confirm
 that window. This is not persistent supervision or native work-closure evidence.
 Startup relies on a trusted fresh/exclusive isolated deployment.
-No settlement evidence is supplied: the receipt remains pending and a second
-admission is refused. This is an observation increment, not a completed normal
-execution/settlement loop or reusable ROS Host. Native closure, motion-time
-cancellation, replacement and loss/rebinding remain M4 work. The bounded sum
+The `robot_harness_nav2_observation` binary supplies no settlement evidence: its
+receipt remains pending and a second admission is refused. The separate optional
+[sequential profile](ROS2_INTEGRATION.md#sequential-settlement-boundary) adds native
+closure and Core A settlement/B admission under a fixed two-context contract.
+Neither is a reusable ROS Host. Motion-time cancellation, replacement and
+loss/rebinding remain M4 work. The bounded sum
 probe is retained only for questions that navigation cannot answer directly.
 
 M1 is deliberately a restricted usable slice, not an assertion that all P1 safety
@@ -1416,3 +1418,14 @@ copy the historical experiment artifact system into product tests. No new
 project-computed digest is needed for ordinary local development. The applicable
 repository standard is the [D-068 product application](standards/MINIMAL_INTEGRITY_STANDARD.md).
 Historical qualification procedures remain in the research workspace.
+
+### M4 bounded sequential navigation
+
+The optional [sequential ROS profile](ROS2_INTEGRATION.md#sequential-settlement-boundary)
+uses the existing Core settlement/admission contract. Native closure, fresh motion
+and a usable next task context are all required before A settlement. B closes
+without settlement because no C context is prepared. The default observation-only
+profile and ROS-independent Core retain their existing behavior. One Owner owns
+the callbacks and Gate throughout; task identity captured by callbacks prevents
+late A observations from becoming B evidence. This experimental integration does
+not change D-073 recovery boundaries or define a general navigation Host.

@@ -21,16 +21,21 @@ jobs:
       - name: Install optional message dependency
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends cmake ros-humble-nav2-msgs
+          apt-get install -y --no-install-recommends cmake ros-humble-nav2-msgs nlohmann-json3-dev ros-humble-std-srvs ros-humble-rosidl-default-generators
       - name: Configure and build optional example
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
-          cmake -S integrations/ros2/nav2_observation -B build-nav2 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
-          cmake --build build-nav2 --target robot_harness_nav2_observation nav2_motion_window_test --parallel 2
+          cmake -S integrations/ros2/fixture_interfaces -B build-nav2-interfaces -DCMAKE_INSTALL_PREFIX="$PWD/install-nav2-interfaces"
+          cmake --build build-nav2-interfaces --parallel 2
+          cmake --install build-nav2-interfaces
+          source install-nav2-interfaces/share/m4_drive_probe/local_setup.bash
+          cmake -S integrations/ros2/nav2_observation -B build-nav2 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DROBOT_HARNESS_NAV2_SETTLEMENT=ON -DCMAKE_PREFIX_PATH="$PWD/install-nav2-interfaces"
+          cmake --build build-nav2 --target robot_harness_nav2_observation robot_harness_nav2_settlement nav2_motion_window_test nav2_closure_observations_test --parallel 2
       - name: Check deployment guard and motion observations
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
-          ctest --test-dir build-nav2 -R '^nav2_(requires_fresh_deployment|motion_window)$' --output-on-failure --no-tests=error
+          source install-nav2-interfaces/share/m4_drive_probe/local_setup.bash
+          ctest --test-dir build-nav2 -R '^nav2_(requires_fresh_deployment|motion_window|closure_observations)$' --output-on-failure --no-tests=error
       # Gazebo movement and native goal checks are separate simulation evidence.

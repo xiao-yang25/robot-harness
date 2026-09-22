@@ -36,8 +36,8 @@ clock/odometry ordering, stale/duplicate data, drift and invalid/excessive veloc
 Local execution
 of the original build/guard commands passed (1/1 guard); the new motion predicate
 was checked in a final optional CTest run that passed both registered checks (2/2)
-after the bounded acquisition fix. This working-tree increment has
-not yet been pushed, so it has no remote workflow result.
+after the bounded acquisition fix. Those were pre-submission local checks; the first slice subsequently merged
+through PR #9, with Core and Humble CI passing on master `2ed8cb2`.
 
 Local amd64 Docker on Apple Silicon, using Humble and Gazebo Classic, observed:
 
@@ -85,9 +85,55 @@ admission. The research workspace retains `observation-slice-final-build.log` an
 `observation-slice-normal-02/native-goal.jsonl`. Earlier build/normal-01 records
 precede cleanup of constant closure flags; the observation-only C++ summary now
 omits `native_closed` because this profile does not observe native closure.
-This is local evidence for the
-uncommitted slice; its remote CI has not run. Earlier denial/fault results above
+That local slice subsequently merged through PR #9; its master Humble CI passed
+2/2 and Core Debug/sanitizer checks each passed 57/57 on `2ed8cb2`. Earlier denial/fault results above
 remain evidence for the unchanged default behavior, not additional reruns.
+
+## Optional sequential Nav2 settlement
+
+The optional Humble workflow now builds both navigation binaries and the
+message-only fixture interfaces. It runs the existing motion/deployment checks
+and `nav2_closure_observations`: matching child/worker identities, missing facts,
+BT/drive ordering, malformed observations and retained/wrong drive generations.
+These unit checks do not run a simulator or establish physical stopping.
+
+The second slice must pass a real normal A-to-B run and separate withheld
+planner acknowledgement, drive acknowledgement, odometry, B map and B controller
+cases. The Owner must emit the actual Core settlement/admission boundary; the
+fixture's independent Gazebo pose check establishes displacement only. Normal
+requires two actual goals, A released, B native closed with fresh quiet motion,
+B still pending and a third admission blocked. Every fault requires A pending,
+no B admission and one native send. Runtime loss and movement-time cancellation
+remain a later increment. A separate `withhold-feedback` regression must reach native success, reject the
+missing pose observation and exit 1 with `incomplete`, without a promise exception
+or B admission. Local final behavior checks used the callback-error fix:
+
+| Scenario | Recorded result |
+|---|---|
+| Normal A-to-B (`owner-handoff-normal-05`) | Gazebo displacement A 2.495 m, B 1.859 m; actual Core A settlement/B admission; three quiet observations each 31 samples/1.02 s; B native closed but unsettled; third admission blocked |
+| Withheld planner/drive ACK (`owner-handoff-withhold-planner-ack-06`, `owner-handoff-withhold-drive-ack-06`) | Native-closure evidence incomplete; A pending, one send, no B admission or generation-2 open |
+| Withheld odometry (`owner-handoff-withhold-odometry-06`) | Native closure observed; fresh motion unavailable; A pending, one send, no B |
+| Missing B map/controller (`owner-handoff-missing-map-05`, `owner-handoff-missing-controller-05`) | B readiness unavailable; A pending, one send, no B generation open or goal |
+| Default observation regression (`owner-handoff-default-regression-01`) | Standard Nav2/Gazebo displacement 2.476 m; one send, protected output, finite quiet window, pending settlement and second admission blocked |
+| Missing result feedback (`owner-handoff-withhold-feedback-05`) | Native success; missing pose observation rejected; exit 1 with incomplete status, no promise abort or B handoff |
+
+Raw Owner/native observations, independent Gazebo checks and build logs are
+retained under the research workspace's `experiments/ros2_navigation/results/`.
+The final callback build passed all three Nav2 CTests. A final rebuild also covers
+later comment/invalid-argument help edits, which do not change accepted-mode behavior.
+Failed runs remain recorded: B lifecycle response timeout kept A unresolved;
+an external Gazebo query timeout did not count as PASS; an A native abort exposed
+an exception escaping the ROS result callback. The latter was fixed and exercised
+by the missing-feedback case above. This is bounded functional evidence, not
+reliability, timing or real-hardware qualification.
+
+The unchanged Core passed 57/57 on native ARM64 Ubuntu 22.04 in this slice.
+The amd64 emulated container passed 56/57: its invalid-executable `posix_spawn`
+returned a child exiting 127 instead of an immediate spawn error, which violates
+the existing `compute_prelaunch` test premise. A standalone spawn probe confirmed
+that behavior; the test was not weakened. Native GitHub Ubuntu checks remain a
+merge requirement. Local macOS configuration was unavailable because its installed
+SDK/linker pair could not link even CMake's empty compiler test.
 
 ## What each environment establishes
 
@@ -959,7 +1005,7 @@ are introduced here.
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a operation replacement, M3b live-host rebinding and the two-step caller are merged; see [rebind checks](#m3b-focused-acceptance-mapping) and [task checks](#finite-task-caller-checks). M3c has the private Linux [prototype checks](#m3c-prototype-checks); the two-step caller uses its private bridge; stable public recovery APIs remain pending |
-| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | First normal Nav2 observation plus startup/pre-dispatch denial validated locally; see the optional Humble section. Native settlement, motion-time cancellation, replacement and loss remain pending |
+| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | First normal Nav2 observation plus startup/pre-dispatch denial validated locally; see the optional Humble section. Bounded sequential settlement is covered separately above; motion-time cancellation, replacement and loss remain pending |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 
 Behavior changes involving authority, security/authorization, core public APIs,

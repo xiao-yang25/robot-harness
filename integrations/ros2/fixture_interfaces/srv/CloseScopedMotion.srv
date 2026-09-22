@@ -1,0 +1,4 @@
+uint64 generation
+string scope_id
+---
+bool accepted

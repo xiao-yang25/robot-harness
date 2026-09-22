@@ -7,17 +7,17 @@ summary; update this short copy when that summary changes.
 
 ## Description
 
-Experimental C++17 execution runtime for robot applications: authority, cancellation, guarded results and settlement, with local compute and optional ROS 2 navigation examples.
+A harness for embodied intelligence — connecting agents, robot skills and the physical world through execution, feedback and recovery.
 
 ## Topics
 
-`robotics`, `cpp`, `cpp17`, `robot-runtime`, `harness`, `task-execution`, `ros2`, `nav2`
+`robotics`, `embodied-ai`, `physical-ai`, `agents`, `harness`, `robot-runtime`, `cpp`, `ros2`
 
 ## Homepage
 
-Leave the external homepage unset until a documentation site is published.
-Use the repository's [documentation entry](../docs/README.md) for navigation today.
-The README displays actual workflow badges; there is no selected license,
-formal release or physical-robot support badge. The
-[kingfisher](../docs/assets/brand/README.md) is the current preview identity and
-may change; it appears in the README.
+https://xiao-yang25.github.io/robot-harness/
+
+The website introduces the project and plays the recorded simulation. Detailed
+contracts and guides remain in the repository. About expresses the project
+direction; README separates implemented behavior from future work. The kingfisher
+is a preview identity, subject to revision.

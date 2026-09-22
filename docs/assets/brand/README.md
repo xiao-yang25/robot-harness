@@ -11,10 +11,14 @@ The long beak and swept wing and tail suggest **observe, act, return**: carry an
 intent into the world and bring back what happened. This is a visual metaphor,
 not a safety or performance claim.
 
-The README uses the mark at 112 pixels with the project name as text. The interior
+The README uses the mark at 128 pixels with the project name as text. The interior
 details are delicate at 16 pixels; a dedicated small icon and favicon remain
 future refinements. No custom wordmark or full brand system is implied.
 
 The SVG geometry was created for this project; no third-party logo assets or
 fonts are bundled. The project's [licensing status](../../../CONTRIBUTING.md#licensing-status)
 remains unchanged. Preview publication does not establish separate reuse terms.
+
+The [social preview](social-preview.png) pairs the mark with the project name and
+positioning for link sharing. This is separate from the repository owner's
+GitHub account avatar.

@@ -1,7 +1,8 @@
 # GitHub About copy
 
-Repository metadata draft for maintainers. Committing this file does not update
-GitHub repository settings. The [README](../README.md) remains the capability
+Repository metadata used for the current public preview. Committing this file
+alone does not update GitHub repository settings; maintainers synchronize them
+when this copy changes. The [README](../README.md) remains the capability
 summary; update this short copy when that summary changes.
 
 ## Description
@@ -17,5 +18,6 @@ Experimental C++17 execution runtime for robot applications: authority, cancella
 Leave the external homepage unset until a documentation site is published.
 Use the repository's [documentation entry](../docs/README.md) for navigation today.
 The README displays actual workflow badges; there is no selected license,
-formal release or physical-robot support badge. Brand assets will follow the
-separate identity decision.
+formal release or physical-robot support badge. The
+[kingfisher](../docs/assets/brand/README.md) is the current preview identity and
+may change; it appears in the README.

@@ -6,17 +6,25 @@ their relevant target environments.
 
 ## Current validation baseline
 
-M3c merged as `dabad9b` through [PR #7](https://github.com/xiao-yang25/robot-harness/pull/7).
-Its [main-branch CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35453807474)
-passed all 57 Linux tests in both Debug and ASan/UBSan. The sections below retain
-dated results from earlier increments; their smaller counts are historical, not
-the expected size of the current suite.
+The latest functional baseline is M4's sequential navigation slice, merged as
+`e2e1ebe` through [PR #10](https://github.com/xiao-yang25/robot-harness/pull/10).
+Its [Core CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35768798923)
+passed all 57 Linux tests in Debug and ASan/UBSan; its
+[Humble CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35768798949)
+compiled both optional binaries and passed three local checks. That job does not
+run a simulator. Actual navigation observations are recorded in the
+[sequential verification section](#optional-sequential-nav2-settlement).
+
+The sections below retain older dated evidence, including M3c at `dabad9b`
+([PR #7](https://github.com/xiao-yang25/robot-harness/pull/7)). Historical counts
+and results do not replace checks for the revision being changed.
 
 | Environment | Current coverage | Limits |
 |---|---|---|
 | GitHub-hosted Ubuntu 22.04 x86_64, GCC | All 57 CTests in Debug and ASan/UBSan | No ROS, hardware or deployment-timing validation |
-| Ubuntu 22.04 ARM64 in local Docker, GCC | Local process and recovery coverage; final launcher fix passed all 10 affected recovery tests in both configurations, following the prior full 56-test runs | Runs in a Linux VM; not a target-device performance result |
+| Ubuntu 22.04 ARM64 in local Docker, GCC | All 57 Core CTests in Debug for the M4 second slice; earlier recovery-specific sanitizer results retained below | Runs in a Linux VM; not a target-device performance result |
 | macOS ARM64, AppleClang | All 47 portable CTests in Debug and ASan/UBSan before the Linux-only launcher correction | Linux recovery targets are not built; macOS is not currently a hosted CI job |
+| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and three observation/deployment checks; separate local Gazebo evidence below | CI compiles/tests predicates only; external-user simulator packaging remains pending |
 | Other platforms/toolchains | No verified support claim | CMake platform branches alone are not platform validation |
 
 For a first run use [Build](../README.md#build) and the

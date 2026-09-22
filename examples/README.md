@@ -1,5 +1,8 @@
 # Runnable examples
 
+For an architecture or backend-integration reading path, use the
+[documentation entry](../docs/README.md).
+
 First follow the [build instructions](../README.md#build). All commands below run
 from the repository root and assume the build directory is `build`. Substitute
 your directory in both the executable and worker paths if different. Examples

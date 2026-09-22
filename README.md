@@ -1,51 +1,47 @@
 # Robot Harness
 
-A C++17 runtime for execution authority, interruption, handoff, and recovery.
+**Execution authority and feedback for robot applications.**
 
-Robot Harness is a Physical AI Harness/Runtime project for agents, behavior trees,
-and ordinary applications. It separates permission to execute from what actually
-happened: native acceptance, completion, result delivery, and resource cleanup.
-The current implementation runs deterministic examples and bounded local compute
-processes. M4 now includes experimental Nav2 observation and bounded sequential
-A-to-B settlement in simulation; physical robot integration remains unimplemented.
+[![Core on Ubuntu](https://github.com/xiao-yang25/robot-harness/actions/workflows/core.yml/badge.svg?branch=master)](https://github.com/xiao-yang25/robot-harness/actions/workflows/core.yml)
+[![Optional Nav2 on Humble](https://github.com/xiao-yang25/robot-harness/actions/workflows/ros2.yml/badge.svg?branch=master)](https://github.com/xiao-yang25/robot-harness/actions/workflows/ros2.yml)
 
-[Build and run](#build) · [Examples](examples/README.md) ·
-[Design](docs/DESIGN.md) · [Testing](docs/TESTING.md) ·
+Robot Harness is an experimental C++17 Physical AI Harness/Runtime. It tracks
+when work may run, when a result may be used, and when another operation may
+begin. Applications, behavior trees and agents choose goals; the Core and its
+adapters keep execution permission separate from native outcomes and cleanup.
+
+[Build and run](#build) · [Documentation](docs/README.md) ·
+[Examples](examples/README.md) · [ROS integration](docs/ROS2_INTEGRATION.md) ·
 [Contributing](CONTRIBUTING.md)
 
-The optional ROS integration also provides a bounded same-Owner sequential
-A-to-B settlement profile. Its required native fixture and remaining limitations
-are documented in [ROS integration](docs/ROS2_INTEGRATION.md#sequential-settlement-boundary).
+The source tree includes software execution examples, a local process adapter
+and optional Ubuntu 22.04 / ROS 2 Humble navigation examples. The sequential
+Nav2 experiment now settles A through Core before admitting and executing B.
+It requires a separate native simulation fixture; an end-to-end simulator package
+and physical robot integration are not available yet.
 
-## Current scope
+## One task, two steps
 
-| Available now | What it demonstrates |
-|---|---|
-| Host-driven Core and deterministic sample adapter | Normal execution, failures, cancellation and deadlines with separate receipt facts |
-| Local compute adapter | Bounded work in a child process, cancellation, exit collection and channel cleanup |
-| Operation replacement and live-Host provider rebinding | Conflicting new work waits for old-work settlement; stale results do not acquire new authority |
-| Two-step task example | Dependent work, goal changes and uncertain results using the same task controller |
-| [Optional Humble/Nav2 observation](integrations/ros2/nav2_observation/README.md) | One Core-admitted simulated navigation goal, correlated feedback/result, protected output and finite post-result motion observation; settlement stays pending and a second goal is refused |
-| [Optional sequential Nav2 settlement](docs/ROS2_INTEGRATION.md#sequential-settlement-boundary) | Same Owner verifies native closure and a fresh B context, settles A through Core, admits and executes B; B closes but remains unsettled without a C context |
-| Private Linux recovery prototype | A surviving Owner retains native work across Host/Core restart; fresh activation permits explicit new work without replaying the interrupted goal |
+The runnable local-compute example asks a worker to sum three squared terms,
+accepts `5`, and derives a second request of six terms, producing `55`:
 
-M3c is merged through [PR #7](https://github.com/xiao-yang25/robot-harness/pull/7).
-Its [main-branch Ubuntu CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35453807474)
-passed all 57 tests in Debug and ASan/UBSan. Current platforms and evidence are
-summarized in [Testing](docs/TESTING.md#current-validation-baseline).
+```text
+Request 3 terms → accept result 5 → observe native work settled
+                                         ↓
+                              Request 6 terms → result 55
+```
 
-Cancellation acknowledgement does not mean the work has stopped. Completion does
-not mean its result was accepted or its resources were released. The recovery
-prototype requires the Owner to survive and continue polling; it does not recover
-persistent tasks or survive Owner/machine restart. These examples do not establish
-physical stopping, hard stop deadlines, or production safety.
+The next operation waits for both the result and settlement. If work is cancelled,
+its acknowledgement does not prove it stopped; even eventual native success
+cannot authorize a result whose permission was revoked. The
+[examples](examples/README.md) make these distinctions observable without a
+model, ROS installation or robot.
 
 ## Build
 
-Start with Git, CMake 3.16 or newer, a C++17 compiler, and a build tool such as Make
-or Ninja. On macOS, install the Xcode Command Line Tools; on Ubuntu, use a working
-C++ development toolchain. ROS, a model, and robot hardware are not required.
-The current [licensing status](#license) applies to this source checkout.
+Use Git, CMake 3.16 or newer, a working C++17 compiler and Make or Ninja.
+On macOS, use a compatible Xcode Command Line Tools/SDK pair; on Ubuntu, use a
+C++ development toolchain. The [licensing status](#license) applies to this checkout.
 
 ```sh
 git clone https://github.com/xiao-yang25/robot-harness.git
@@ -56,85 +52,91 @@ cmake --build build --parallel 2
 ./build/robot_harness_normal_execution
 ```
 
-The final command runs two samples in each of two completion modes. Look for sums
-`29` and `61`, with native success, accepted output and completed settlement. The
-application/domain verdict remains unassessed. The program exits nonzero if its
-checks fail. This is a deterministic software example, not a robot command.
+The final command reports sums `29` and `61` in two completion modes, with native
+success, accepted output and settlement. Its application/domain verdict remains
+unassessed. This deterministic example exits nonzero if its checks fail.
 
-Linux currently registers 57 tests; macOS registers 47 because the recovery
-prototype is Linux-only. Use the [Ubuntu container recipe](docs/TESTING.md#ubuntu-development-container)
-for Linux checks on a Mac. If a local compiler and SDK do not match, see
-[macOS SDK selection](docs/TESTING.md#macos-sdk-selection).
+To run the two-step story with real child processes on macOS or Linux:
 
-## Choose an example
+```sh
+./build/robot_harness_two_step_compute normal "$(pwd)/build/robot_harness_compute_worker"
+```
 
-Run commands from the repository root after building. The
-[example guide](examples/README.md) provides commands, expected observations and
-source links for each path.
+Expect first result `5`, second request `6` and final result `55`.
+See the [example guide](examples/README.md#local-compute-and-two-step-tasks) for
+output interpretation and goal revision/recovery variants.
 
-| Start here | Next question to explore |
+Linux registers 57 tests; macOS registers 47 because the recovery prototype is
+Linux-only. Use the [Ubuntu container recipe](docs/TESTING.md#ubuntu-development-container)
+for Linux checks on a Mac. For compiler errors, see
+[macOS SDK selection](docs/TESTING.md#macos-sdk-selection) and
+[example troubleshooting](examples/README.md#if-a-command-fails).
+
+## Current scope
+
+| Path | Available behavior | Boundary |
+|---|---|---|
+| Core and deterministic adapter | Normal execution, failure, cancellation, deadlines and replacement | Controlled software scenarios; no stop-time guarantee |
+| Local process adapter and task examples | Real child execution/cleanup, provider rebinding and dependent tasks | macOS/Linux; caller supplies goals and retry policy |
+| Linux Host recovery prototype | A surviving Owner retains native work across Host restart | Owner must stay alive and be polled; no durable task or Owner/machine restart recovery |
+| Optional Nav2 observation | One admitted goal, correlated feedback, guarded result and finite motion observation | Receipt stays pending; second admission refused |
+| Optional sequential Nav2 settlement | Same Owner closes A, verifies B readiness, settles A and admits/navigates B | Trusted exclusive simulation fixture; B remains pending without a C context |
+
+The [validation guide](docs/TESTING.md#current-validation-baseline) links tested
+revisions and environments. Core CI covers software behavior; the Humble job
+compiles the optional examples and checks local predicates. Neither workflow
+runs Gazebo or establishes physical safety. Actual simulation evidence and its
+limits are recorded [separately](docs/TESTING.md#optional-sequential-nav2-settlement).
+
+## Where it fits
+
+| Component | Responsibility |
 |---|---|
-| [Normal execution](examples/README.md#normal-execution) | How do submission, result delivery and cleanup differ? |
-| [Failure, cancellation and deadlines](examples/README.md#failure-cancellation-and-deadlines) | Why can a stopped or expired request still have unfinished native work? |
-| [Replacement and rebinding](examples/README.md#replacement-and-rebinding) | When can another operation or provider take over? |
-| [Local compute and two-step tasks](examples/README.md#local-compute-and-two-step-tasks) | How does a real child process feed a dependent task? |
-| [Host recovery on Linux](examples/README.md#host-recovery-on-linux) | What survives a Host crash, and why is a new goal explicit? |
+| Application, behavior tree or Agent | Goals, sequencing, interpretation and retry policy |
+| Robot Harness Core + adapter | Execution authority, native observations, guarded results and declared settlement |
+| ROS, controller or device runtime | Communication, scheduling, native execution and device protection |
+
+Core is host-driven and ROS-independent. Adapters check authority at their
+submission and result boundaries. Packaged Agent integrations and reusable
+behavior-tree/ROS Host interfaces remain future work. See the accepted
+[product boundary](docs/DESIGN.md#product-boundary).
 
 ## Interfaces and compatibility
 
-This is an experimental source-tree project. Headers under
-`include/robot_harness/` are its current caller interfaces, with no stable API or
-ABI promise. The CMake project version `0.1.0` is not a declaration of a published
-release. There is no installed SDK, package export or supported `find_package`
-workflow yet.
+This is a source-tree project with no stable API/ABI commitment, installed SDK,
+package export or supported `find_package` workflow. CMake version `0.1.0` does
+not designate a published release. Current caller headers live under
+[include/robot_harness](include/robot_harness); private protocol and adapter
+headers are implementation details.
 
-Within this build, `robot_harness_core` supplies the payload-independent Core;
-`robot_harness_sample_fixture` adds the deterministic host; `robot_harness_compute`
-adds the local process adapter on macOS/Linux. The task controller and recovery
-bridge are example support. Headers under `src/compute/`, including the Linux
-recovery protocol, are private implementation details.
-
-Core is host-driven. Adapters enforce authority at their submission boundaries;
-applications choose goals and recovery strategy. Existing robot runtimes retain
-communication, scheduling, device control and native safety protection. See
-[product boundaries](docs/DESIGN.md#product-boundary).
-
-## Repository guide
-
-| Location | Purpose |
-|---|---|
-| [include/robot_harness](include/robot_harness) | Current caller-facing headers |
-| [src/core](src/core), [src/compute](src/compute), [src/sample](src/sample) | Module implementations and private process/protocol details |
-| [examples](examples/README.md) | Runnable callers and the example task controller |
-| [tests](tests) | Core, adapter and task regressions registered with CTest |
-| [Design](docs/DESIGN.md) | Accepted behavior, ownership, module boundaries and milestone scope |
-| [Testing](docs/TESTING.md) | Platform evidence, Docker/sanitizer commands, manual checks and review requirements |
-| [Coding style](docs/CODING_STYLE.md) | Naming, headers and formatting |
-| [Contributing](CONTRIBUTING.md) | Reporting issues, preparing changes and review workflow |
-| [AGENTS.md](AGENTS.md) | Agent-specific project constraints and knowledge entry points |
+Within this build, `robot_harness_core` provides the payload-independent Core,
+`robot_harness_sample_fixture` the deterministic host, and `robot_harness_compute`
+the local process adapter. Task-controller and recovery-bridge code supports the
+examples. Follow the [architecture reading path](docs/README.md#understand-the-architecture)
+before extending these boundaries.
 
 ## Next steps
 
-M1/M2 provide normal and failure/cancel/deadline paths. M3 adds replacement,
-provider rebinding and the limited Linux recovery path above. **M4 is in progress**
-on Ubuntu 22.04 / ROS 2 Humble. The original observation binary retains pending
-settlement and a refused second goal. A separate optional sequential profile
-connects native work/drive closure and a fresh B context to actual Core A settlement
-and B admission. See the [bounded contract](docs/ROS2_INTEGRATION.md#sequential-settlement-boundary)
-and [validation scope](docs/TESTING.md#optional-sequential-nav2-settlement).
+M4 ROS integration is in progress. The next functional increment covers
+movement-time cancellation, replacement and loss/unknown behavior in simulation.
+Reproducible external-user simulation packaging, a complete demonstration and
+integration tutorials follow the validated behavior. See the
+[delivery increments](docs/ROS2_INTEGRATION.md#delivery-increments).
 
-Next come motion-time cancellation, revised goals and loss cases. The existing
-Core build stays ROS-independent. A reproducible external-user simulator package,
-integration tutorial and final demonstration remain follow-ups. The optional
-C++ example alone does not supply the required native fixture.
+Documentation and project presentation ship in separate increments alongside
+functional work. Formal releases, compatibility policies and ecosystem projects
+will grow from actual integration experience.
 
-Adapter integration instructions and packaging will grow from actual integration
-feedback. Stable API/version policies and release tooling belong to a later
-release-readiness step; there is no release-date commitment.
+## Contributing
+
+[Report a bug](https://github.com/xiao-yang25/robot-harness/issues/new?template=bug_report.md),
+[discuss an integration](https://github.com/xiao-yang25/robot-harness/issues/new?template=proposal.md),
+or start with the [contribution guide](CONTRIBUTING.md). Include the revision,
+environment and a minimal reproduction. License and patch contribution terms
+remain pending; confirm them with the maintainer before submitting patches.
 
 ## License
 
-A project license has not yet been selected, and this repository does not include
-a `LICENSE` file. Do not treat source visibility or the CMake version as an
-open-source licensing grant. Contribution terms remain pending; see
-[Contributing](CONTRIBUTING.md#licensing-status).
+A project license has not yet been selected, and the repository has no `LICENSE`
+file. Source visibility and the CMake version do not grant an open-source license.
+See [licensing status](CONTRIBUTING.md#licensing-status).

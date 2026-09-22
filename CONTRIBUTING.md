@@ -10,18 +10,24 @@ the [current licensing status](README.md#license).
 
 ## Where to start
 
-Robot Harness is at an early development stage. See the [README](README.md) for
-implemented behavior and the [design](docs/DESIGN.md) for scope and boundaries.
-Start with a reproducible bug report, a documentation issue, or a concrete
-integration question. Once contribution terms are settled, focused tests, clearer
-examples and documentation are useful small patches.
+Use the [documentation entry](docs/README.md) to run an example or locate the
+relevant contract before proposing a change. Start with the path that fits:
 
-Use [issues](https://github.com/xiao-yang25/robot-harness/issues) to report a bug
-or discuss a proposal; the repository provides bug and proposal templates.
-For a bug, include the revision, environment, reproduction
-steps, expected behavior and actual result. Discuss significant API or architecture
-changes before investing in an implementation. Keep discussions respectful and
-focused on the technical issue.
+| I want to… | Start here |
+|---|---|
+| Report a build, runtime or documentation problem | [Bug report](https://github.com/xiao-yang25/robot-harness/issues/new?template=bug_report.md) |
+| Discuss a robot/backend integration or design change | [Proposal or integration question](https://github.com/xiao-yang25/robot-harness/issues/new?template=proposal.md) |
+| Prepare a patch after contribution terms are agreed | [Build and test](#build-and-test), then [pull requests and review](#pull-requests-and-review) |
+
+For a bug, include the revision, environment, minimal reproduction, expected
+behavior and actual result. For a documentation issue, identify the page and the
+step that was unclear. For an integration proposal, describe the native interface
+and how completion, stopping and resource cleanup can be observed. Discuss
+significant API or architecture changes before implementing them.
+
+Keep discussion respectful and focused on the technical issue. The project has
+no response-time commitment. Once contribution terms are settled, focused tests,
+clearer examples and documentation are useful small patches.
 
 ## Build and test
 
@@ -40,8 +46,12 @@ Run the normal example before changing behavior so you can compare observations.
 For code changes, build with `BUILD_TESTING=ON` and run CTest from the build
 directory. Linux-only recovery changes need Linux validation; the documented
 Docker environment is sufficient for the current software-process checks. You do
-not need a robot or an AI account. CI supplies Ubuntu Debug and ASan/UBSan checks;
-record which checks you ran locally and which are still pending.
+not need a robot or an AI account. Core CI supplies Ubuntu Debug and ASan/UBSan
+checks. The separate Humble job
+compiles optional navigation examples and checks observation predicates; it does
+not run Gazebo. ROS integration changes also need the applicable native evidence
+from [ROS testing](docs/TESTING.md#optional-sequential-nav2-settlement). Record
+which checks you ran locally and which remain pending.
 
 For documentation-only changes, check relative links and headings, keep commands
 consistent with the actual build, and execute new or changed runnable examples.

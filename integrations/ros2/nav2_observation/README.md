@@ -94,3 +94,49 @@ and a second explicit goal.
 Motion-time cancellation, goal replacement, native settlement evidence, provider
 loss/rebinding and restart recovery remain outside this increment. Next, integrate goal-specific native closure, safe rearming and old-command
 isolation before allowing a conflicting goal. Keep the normal scenario as the reference comparison.
+
+## Optional sequential settlement example
+
+The separately named `robot_harness_nav2_settlement` binary extends the same Owner
+with the [bounded A-to-B contract](../../../docs/ROS2_INTEGRATION.md#sequential-settlement-boundary).
+The default observation binary keeps its pending receipt and refused second goal.
+Build the optional profile on Ubuntu 22.04/Humble with `nlohmann-json3-dev` and
+`ros-humble-std-srvs` / `ros-humble-rosidl-default-generators` in addition to the dependencies above:
+
+```sh
+source /opt/ros/humble/setup.bash
+cmake -S integrations/ros2/fixture_interfaces -B build-nav2-interfaces -DCMAKE_INSTALL_PREFIX="$PWD/install-nav2-interfaces"
+cmake --build build-nav2-interfaces --parallel 2
+cmake --install build-nav2-interfaces
+source install-nav2-interfaces/share/m4_drive_probe/local_setup.bash
+cmake -S integrations/ros2/nav2_observation -B build-nav2 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DROBOT_HARNESS_NAV2_SETTLEMENT=ON -DCMAKE_PREFIX_PATH="$PWD/install-nav2-interfaces"
+cmake --build build-nav2 --parallel 2
+ctest --test-dir build-nav2 -R '^nav2_' --output-on-failure --no-tests=error
+```
+
+The message-only `m4_drive_probe` package allows a clean compile without Gazebo.
+It supplies no native server, driver, simulator or settlement guarantees; do not
+install it alongside a different package of the same name. Licensing remains
+undecided for the project. These experimental fixture interfaces are not a stable
+public robot API. The isolated research deployment supplies matching service
+implementations, fixed producer bindings and one-use native task contexts.
+
+At runtime the launcher supplies `/output/producer-context.json` with distinct
+32-character lowercase hexadecimal `a_scope` and `b_scope`, task-bound bridges,
+and `/prepare_next_context`. B uses namespace `/m4_task/s_<b_scope>`; creating it
+must not send a goal or open the drive. The Owner independently verifies readiness
+and owns every Core admission, drive open and native goal send. Supported cases
+are `normal`, `withhold-planner-ack`, `withhold-drive-ack`, `withhold-odometry`,
+`missing-map` and `missing-controller`. The last two require the launcher to omit
+the corresponding B dependency. Normal must emit `owner_handoff_result` with
+A settled, B admitted/native closed, B unsettled and third admission blocked.
+Expected closure/readiness fault cases emit `owner_handoff_blocked` with one
+native send. `withhold-feedback` additionally exercises a result-observation
+failure: it exits 1 with `incomplete`, without A settlement or B admission. The
+Owner reports the error outside ROS callbacks instead of throwing through an
+already fulfilled Action promise.
+
+CI compiles both binaries and checks the deployment guard, motion window and
+native evidence matcher. Actual navigation and closure require the separate
+simulation evidence described in [Testing](../../../docs/TESTING.md#optional-sequential-nav2-settlement).
+The public repository does not yet provide an end-to-end simulator launcher.

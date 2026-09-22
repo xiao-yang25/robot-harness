@@ -1,6 +1,11 @@
 // One normal navigation observation in an exclusively owned, fresh simulator.
 // This is not a reusable ROS Host or a physical-motion settlement profile.
 #include "motion_window.hpp"
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+#include "native_closure.hpp"
+#include <fstream>
+#include <std_srvs/srv/trigger.hpp>
+#endif
 #include "robot_harness/authority_gate.hpp"
 
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
@@ -16,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <future>
 #include <iomanip>
@@ -36,7 +42,11 @@ using Action = nav2_msgs::action::NavigateToPose;
 using GoalHandle = rclcpp_action::ClientGoalHandle<Action>;
 using SteadyClock = std::chrono::steady_clock;
 using namespace std::chrono_literals;
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+constexpr auto kProfile = "nav2-fixed-context-sequence-v1";
+#else
 constexpr auto kProfile = "nav2-normal-observation-only-v1";
+#endif
 
 rh::MonotonicTime now() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -72,6 +82,10 @@ rh::AuthorityGateConfig config(const std::string& session) {
   result.native_evidence_source = "correlated-nav2-action";
   result.settlement_evidence_source = "unimplemented-navigation-settlement";
   result.settlement_scope = "unimplemented-navigation-settlement";
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+  result.settlement_evidence_source = "owner-native-closure";
+  result.settlement_scope = "fresh-context-generation-drive-v1";
+#endif
   result.execution_capability_observer = "fixed-navigation-example";
   result.started_at = now();
   return result;
@@ -133,6 +147,15 @@ public:
         node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 10);
     client_ = rclcpp_action::create_client<Action>(node_, "navigate_to_pose");
     executor_.add_node(node_);
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    std::ifstream input("/output/producer-context.json");
+    const auto contexts = nlohmann::json::parse(input);
+    a_scope_ = contexts.at("a_scope").get<std::string>();
+    b_scope_ = contexts.at("b_scope").get<std::string>();
+    require(a_scope_ != b_scope_, "task scopes must differ");
+    closure_ =
+        std::make_unique<rh::nav2_example::NativeClosure>(node_, executor_, mode_, a_scope_, 1);
+#endif
   }
 
   ~NavigationObservation() {
@@ -141,10 +164,16 @@ public:
     gate_.close_admission();
     executor_.remove_node(node_);
     client_.reset();
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    closure_.reset();
+#endif
   }
 
   int run() {
     prepare_navigation();
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    closure_->prepare();
+#endif
     const auto start = now();
     // The launcher supplies a fresh, exclusive deployment premise. Discovery is
     // only readiness; it is never presented as proof that an existing server is idle.
@@ -196,86 +225,13 @@ public:
       return 0;
     }
 
-    Action::Goal goal;
-    goal.pose.header.frame_id = "map";
-    goal.pose.header.stamp = node_->now();
-    goal.pose.pose.position.x = 0.7;
-    goal.pose.pose.position.y = -0.5;
-    goal.pose.pose.orientation.w = 1.0;
-    rclcpp_action::Client<Action>::SendGoalOptions options;
-    options.goal_response_callback = [this](GoalHandle::SharedPtr handle) {
-      handle_ = handle;
-      if (!handle) {
-        native(rh::NativeEventKind::kRejected);
-        throw std::runtime_error("Nav2 rejected goal");
-      }
-      native(rh::NativeEventKind::kAccepted);
-      std::cout << "{\"event\":\"accepted\",\"goal_uuid\":\"" << uuid_text(handle->get_goal_id())
-                << "\",\"operation_id\":" << authority_.operation_id << "}" << std::endl;
-    };
-    options.feedback_callback = [this](GoalHandle::SharedPtr handle,
-                                       std::shared_ptr<const Action::Feedback> feedback) {
-      require(handle_ && handle->get_goal_id() == handle_->get_goal_id(), "feedback UUID mismatch");
-      if (feedback_count_++ == 0) {
-        native(rh::NativeEventKind::kStarted);
-      }
-      feedback_ = *feedback;
-      feedback_seen_ = now();
-      const auto& point = feedback->current_pose.pose.position;
-      require(std::isfinite(point.x) && std::isfinite(point.y) &&
-                  std::isfinite(feedback->distance_remaining),
-              "non-finite navigation feedback");
-      std::cout << "{\"event\":\"feedback\",\"operation_id\":" << authority_.operation_id
-                << ",\"goal_uuid\":\"" << uuid_text(handle->get_goal_id()) << "\",\"x\":" << point.x
-                << ",\"y\":" << point.y
-                << ",\"distance_remaining\":" << feedback->distance_remaining << "}" << std::endl;
-    };
-    options.result_callback = [this](const GoalHandle::WrappedResult& result) {
-      require(handle_ && result.goal_id == handle_->get_goal_id(), "result UUID mismatch");
-      std::cout << "{\"event\":\"native_result\",\"result_code\":" << static_cast<int>(result.code)
-                << ",\"operation_id\":" << authority_.operation_id << ",\"goal_uuid\":\""
-                << uuid_text(result.goal_id) << "\"}" << std::endl;
-      switch (result.code) {
-      case rclcpp_action::ResultCode::SUCCEEDED:
-        native(rh::NativeEventKind::kTerminalSucceeded);
-        break;
-      case rclcpp_action::ResultCode::ABORTED:
-        native(rh::NativeEventKind::kTerminalFailed);
-        throw std::runtime_error("navigation aborted");
-      case rclcpp_action::ResultCode::CANCELED:
-        native(rh::NativeEventKind::kTerminalCancelled);
-        throw std::runtime_error("navigation canceled");
-      default:
-        throw std::runtime_error("unknown navigation outcome");
-      }
-      require(feedback_.has_value(), "result without pose feedback");
-      const auto& pose = feedback_->current_pose;
-      const auto stamp = rclcpp::Time(pose.header.stamp).nanoseconds();
-      const auto error = std::hypot(pose.pose.position.x - 0.7, pose.pose.position.y + 0.5);
-      require(pose.header.frame_id == "map" && stamp > submitted_sim_ns_ &&
-                  std::abs(clock_ns_ - stamp) < 2000000000 && now() - feedback_seen_ < 2000 &&
-                  now() - clock_seen_ < 2000 && now() - odometry_seen_ < 2000 && error < 0.35,
-              "terminal pose is missing, stale or outside target tolerance");
-      // Stage a POD result before checking the actual sink. No callback spin or
-      // re-entrant user code is allowed between permission and this local commit.
-      const Result staged{result.goal_id, pose.pose.position.x, pose.pose.position.y};
-      const auto delivery_time = now();
-      gate_.observe_time(authority_, delivery_time);
-      require(gate_.can_deliver_result(authority_), "result authority denied");
-      result_slot_ = staged;
-      accepted(gate_.observe_output_accepted({authority_,
-                                              "local-navigation-result",
-                                              {config_.result_sink_observer, delivery_time, 1}}));
-      done_ = true;
-    };
-    submitted_sim_ns_ = clock_ns_;
-    require(client_->action_server_is_ready(), "navigation server lost before dispatch");
-    require(gate_.claim_dispatch(authority_, now()), "Core dispatch claim denied");
-    // No callbacks run between the authority claim and the native submission.
-    ++native_send_count_;
-    const auto pending_goal = client_->async_send_goal(goal, options);
-    (void)pending_goal;
-    wait([this] { return done_; }, 100s, "navigation result timed out; settlement unresolved");
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    closure_->open_drive();
+#endif
+    run_goal(0.7);
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    return handoff();
+#else
     const auto after_motion_stamp = std::max(clock_ns_, odometry_stamp_ns_);
     std::cout << "{\"event\":\"motion_observation_started\",\"operation_id\":"
               << authority_.operation_id << ",\"goal_uuid\":\"" << uuid_text(handle_->get_goal_id())
@@ -291,6 +247,8 @@ public:
       executor_.spin_some(10ms);
       std::this_thread::sleep_for(5ms);
     }
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
     const bool motion_observed = motion_window_->status() == MotionStatus::kObserved;
     std::cout << "{\"event\":\"motion_observation\",\"observed\":"
               << (motion_observed ? "true" : "false")
@@ -320,9 +278,284 @@ public:
               << ",\"motion_observed\":" << (motion_observed ? "true" : "false") << ",\"case\":\""
               << mode_ << "\"}" << std::endl;
     return 0;
+#endif
   }
 
 private:
+  template <typename Callback> void capture_callback(Callback callback) noexcept {
+    if (callback_error_)
+      return;
+    try {
+      callback();
+    } catch (...) {
+      // ROS may have fulfilled its promise before invoking our callback. Never
+      // throw through that promise machinery; report from the owning run loop.
+      callback_error_ = std::current_exception();
+    }
+  }
+  void run_goal(double target_x) {
+    motion_window_.reset();
+    feedback_.reset();
+    result_slot_.reset();
+    handle_.reset();
+    feedback_count_ = 0;
+    done_ = false;
+    callback_error_ = nullptr;
+    const auto operation = authority_.operation_id;
+    Action::Goal goal;
+    goal.pose.header.frame_id = "map";
+    goal.pose.header.stamp = node_->now();
+    goal.pose.pose.position.x = target_x;
+    goal.pose.pose.position.y = -0.5;
+    goal.pose.pose.orientation.w = 1.0;
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    goal.behavior_tree = closure_->goal_tree();
+#endif
+    rclcpp_action::Client<Action>::SendGoalOptions options;
+    options.goal_response_callback = [this, operation](GoalHandle::SharedPtr handle) {
+      if (authority_.operation_id != operation)
+        return;
+      capture_callback([&] {
+        handle_ = handle;
+        if (!handle) {
+          native(rh::NativeEventKind::kRejected);
+          throw std::runtime_error("Nav2 rejected goal");
+        }
+        native(rh::NativeEventKind::kAccepted);
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+        closure_->bind_parent(uuid_text(handle->get_goal_id()));
+#endif
+        std::cout << "{\"event\":\"accepted\",\"goal_uuid\":\"" << uuid_text(handle->get_goal_id())
+                  << "\",\"operation_id\":" << authority_.operation_id << "}" << std::endl;
+      });
+    };
+    options.feedback_callback = [this,
+                                 operation](GoalHandle::SharedPtr handle,
+                                            std::shared_ptr<const Action::Feedback> feedback) {
+      if (authority_.operation_id != operation)
+        return;
+      capture_callback([&] {
+        if (mode_ == "withhold-feedback")
+          return;
+        require(handle_ && handle->get_goal_id() == handle_->get_goal_id(),
+                "feedback UUID mismatch");
+        if (feedback_count_++ == 0) {
+          native(rh::NativeEventKind::kStarted);
+        }
+        feedback_ = *feedback;
+        feedback_seen_ = now();
+        const auto& point = feedback->current_pose.pose.position;
+        require(std::isfinite(point.x) && std::isfinite(point.y) &&
+                    std::isfinite(feedback->distance_remaining),
+                "non-finite navigation feedback");
+        std::cout << "{\"event\":\"feedback\",\"operation_id\":" << authority_.operation_id
+                  << ",\"goal_uuid\":\"" << uuid_text(handle->get_goal_id())
+                  << "\",\"x\":" << point.x << ",\"y\":" << point.y
+                  << ",\"distance_remaining\":" << feedback->distance_remaining << "}" << std::endl;
+      });
+    };
+    options.result_callback = [this, operation, target_x](const GoalHandle::WrappedResult& result) {
+      if (authority_.operation_id != operation)
+        return;
+      capture_callback([&] {
+        require(handle_ && result.goal_id == handle_->get_goal_id(), "result UUID mismatch");
+        std::cout << "{\"event\":\"native_result\",\"result_code\":"
+                  << static_cast<int>(result.code)
+                  << ",\"operation_id\":" << authority_.operation_id << ",\"goal_uuid\":\""
+                  << uuid_text(result.goal_id) << "\"}" << std::endl;
+        switch (result.code) {
+        case rclcpp_action::ResultCode::SUCCEEDED:
+          native(rh::NativeEventKind::kTerminalSucceeded);
+          break;
+        case rclcpp_action::ResultCode::ABORTED:
+          native(rh::NativeEventKind::kTerminalFailed);
+          throw std::runtime_error("navigation aborted");
+        case rclcpp_action::ResultCode::CANCELED:
+          native(rh::NativeEventKind::kTerminalCancelled);
+          throw std::runtime_error("navigation canceled");
+        default:
+          throw std::runtime_error("unknown navigation outcome");
+        }
+        require(feedback_.has_value(), "result without pose feedback");
+        const auto& pose = feedback_->current_pose;
+        const auto stamp = rclcpp::Time(pose.header.stamp).nanoseconds();
+        const auto error = std::hypot(pose.pose.position.x - target_x, pose.pose.position.y + 0.5);
+        require(pose.header.frame_id == "map" && stamp > submitted_sim_ns_ &&
+                    std::abs(clock_ns_ - stamp) < 2000000000 && now() - feedback_seen_ < 2000 &&
+                    now() - clock_seen_ < 2000 && now() - odometry_seen_ < 2000 && error < 0.35,
+                "terminal pose is missing, stale or outside target tolerance");
+        // Stage a POD result before checking the actual sink. No callback spin or
+        // re-entrant user code is allowed between permission and this local commit.
+        const Result staged{result.goal_id, pose.pose.position.x, pose.pose.position.y};
+        const auto delivery_time = now();
+        gate_.observe_time(authority_, delivery_time);
+        require(gate_.can_deliver_result(authority_), "result authority denied");
+        result_slot_ = staged;
+        accepted(gate_.observe_output_accepted(
+            {authority_,
+             "local-navigation-result",
+             {config_.result_sink_observer, delivery_time, ++output_sequence_}}));
+        done_ = true;
+      });
+    };
+    submitted_sim_ns_ = clock_ns_;
+    require(client_->action_server_is_ready(), "navigation server lost before dispatch");
+    require(gate_.claim_dispatch(authority_, now()), "Core dispatch claim denied");
+    // No callbacks run between the authority claim and the native submission.
+    ++native_send_count_;
+    const auto pending_goal = client_->async_send_goal(goal, options);
+    (void)pending_goal;
+    wait([this] { return done_ || callback_error_; }, 100s,
+         "navigation result timed out; settlement unresolved");
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
+  }
+
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+  bool quiet() {
+    motion_window_.emplace(std::max({clock_ns_, odometry_stamp_ns_, closure_->drive_stamp_ns()}));
+    const auto until = SteadyClock::now() + 8s;
+    while (motion_window_->status() == MotionStatus::kPending && rclcpp::ok() &&
+           SteadyClock::now() < until) {
+      executor_.spin_some(10ms);
+      std::this_thread::sleep_for(5ms);
+    }
+    const bool observed = !callback_error_ && motion_window_->status() == MotionStatus::kObserved &&
+                          now() - clock_seen_ < 1000 && now() - odometry_seen_ < 1000;
+    std::cout << nlohmann::json{{"event", "owner_quiet_observation"},
+                                {"observed", observed},
+                                {"operation_id", authority_.operation_id},
+                                {"samples", motion_window_->sample_count()},
+                                {"duration_ns", motion_window_->duration_ns()},
+                                {"x", odometry_.x},
+                                {"y", odometry_.y}}
+                     .dump()
+              << std::endl;
+    return observed;
+  }
+
+  int blocked(const char* boundary) {
+    const auto receipt = gate_.receipt(authority_);
+    const auto decision = gate_.admit(request());
+    require(receipt && receipt->settlement == rh::SettlementStatus::kPending &&
+                receipt->authority_disposition != rh::AuthorityDisposition::kReleased &&
+                decision.status == rh::AdmissionStatus::kDomainOccupied && !decision.authority &&
+                native_send_count_ == 1,
+            "missing handoff evidence released authority");
+    std::cout << nlohmann::json{{"event", "owner_handoff_blocked"},
+                                {"boundary", boundary},
+                                {"a_settled", false},
+                                {"b_admitted", false},
+                                {"native_send_count", native_send_count_}}
+                     .dump()
+              << std::endl;
+    require(mode_ != "normal", "normal handoff incomplete");
+    gate_.close_admission();
+    return 0;
+  }
+
+  int handoff() {
+    if (!closure_->close())
+      return blocked("native-closure");
+    if (mode_ == "withhold-odometry")
+      odometry_subscription_.reset();
+    if (!quiet())
+      return blocked("fresh-motion");
+    std::cout << "{\"event\":\"owner_a_closed\"}" << std::endl;
+    // The fixture creates processes only. Owner independently probes the new
+    // namespace's services, native readiness and command producers before Core.
+    auto prepare = node_->create_client<std_srvs::srv::Trigger>("/prepare_next_context");
+    const std::string context = "/m4_task/s_" + b_scope_;
+    std::unique_ptr<rh::nav2_example::NativeClosure> next;
+    rclcpp_action::Client<Action>::SharedPtr next_client;
+    try {
+      wait([&] { return prepare->service_is_ready(); }, 5s, "context launcher absent");
+      auto pending =
+          prepare->async_send_request(std::make_shared<std_srvs::srv::Trigger::Request>());
+      wait([&] { return pending.wait_for(0s) == std::future_status::ready; }, 5s,
+           "context launcher response absent");
+      require(pending.get()->success, "context creation refused");
+      next = std::make_unique<rh::nav2_example::NativeClosure>(node_, executor_, "normal", b_scope_,
+                                                               2, context);
+      next_client = rclcpp_action::create_client<Action>(node_, context + "/navigate_to_pose");
+      active(context + "/bt_navigator");
+      next->prepare();
+      wait([&] { return next_client->action_server_is_ready(); }, 5s, "B action unavailable");
+      require(quiet(), "motion stale after B preparation");
+      // Recheck native readiness after the quiet window. No ROS callback is
+      // dispatched between the final local checks and settlement/admission.
+      next->prepare();
+      require(next_client->action_server_is_ready() && now() - clock_seen_ < 1000 &&
+                  now() - odometry_seen_ < 1000,
+              "B readiness lost before settlement");
+    } catch (const std::exception& error) {
+      std::cerr << "Next context unavailable: " << error.what() << std::endl;
+      return blocked("next-context");
+    }
+    require(mode_ == "normal", "fault case unexpectedly reached settlement");
+    require(!callback_error_ && closure_->closed(), "A closure invalidated before settlement");
+    accepted(gate_.observe_settlement({authority_,
+                                       config_.settlement_scope,
+                                       true,
+                                       {config_.settlement_evidence_source, now(), 1}}));
+    const auto a_receipt = gate_.receipt(authority_);
+    require(a_receipt && a_receipt->settlement == rh::SettlementStatus::kSettled &&
+                a_receipt->authority_disposition == rh::AuthorityDisposition::kReleased,
+            "A settlement not released");
+    const auto ready_at = now();
+    accepted(
+        gate_.observe_execution_capabilities({config_.binding,
+                                              config_.capability_id,
+                                              kProfile,
+                                              1,
+                                              true,
+                                              {config_.execution_capability_observer, ready_at, 2},
+                                              ready_at + 2000}));
+    const auto b = gate_.admit(request());
+    require(b.status == rh::AdmissionStatus::kAdmitted && b.authority,
+            "B admission denied after A settlement");
+    const auto a_operation = authority_.operation_id;
+    authority_ = *b.authority;
+    require(authority_.operation_id != a_operation, "B reused A operation identity");
+    std::cout << nlohmann::json{{"event", "owner_core_handoff"},
+                                {"a_operation", a_operation},
+                                {"b_operation", authority_.operation_id},
+                                {"a_settled", true},
+                                {"b_admitted", true}}
+                     .dump()
+              << std::endl;
+    client_ = std::move(next_client);
+    closure_ = std::move(next);
+    // Opening is after admission; actual native submission still requires the
+    // immediately adjacent Core dispatch claim in run_goal().
+    closure_->open_drive();
+    run_goal(-1.5);
+    require(closure_->close() && quiet(), "B closure or motion incomplete");
+    const auto receipt = gate_.receipt(authority_);
+    const auto third = gate_.admit(request());
+    require(receipt && receipt->native_outcome == rh::NativeOutcome::kSucceeded &&
+                receipt->output == rh::OutputDisposition::kAccepted &&
+                receipt->settlement == rh::SettlementStatus::kPending &&
+                third.status == rh::AdmissionStatus::kDomainOccupied && !third.authority &&
+                native_send_count_ == 2,
+            "B final boundary inconsistent");
+    gate_.close_admission();
+    std::cout << nlohmann::json{{"event", "owner_handoff_result"},
+                                {"passed", true},
+                                {"a_settled", true},
+                                {"b_admitted", true},
+                                {"b_native_closed", true},
+                                {"b_settled", false},
+                                {"third_admission_blocked", true},
+                                {"native_send_count", native_send_count_}}
+                     .dump()
+              << std::endl;
+    return 0;
+  }
+  std::string a_scope_, b_scope_;
+  std::unique_ptr<rh::nav2_example::NativeClosure> closure_;
+#endif
+
   template <typename Predicate>
   void wait(Predicate predicate, std::chrono::seconds limit, const char* error) {
     const auto deadline = std::min(SteadyClock::now() + limit, deadline_);
@@ -391,7 +624,7 @@ private:
 
   void native(rh::NativeEventKind kind) {
     accepted(gate_.observe_native({authority_,
-                                   "session-navigation-1",
+                                   "session-navigation-" + std::to_string(authority_.operation_id),
                                    kind,
                                    {config_.native_evidence_source, now(), ++native_sequence_}}));
   }
@@ -405,15 +638,17 @@ private:
   rh::AuthorityGate gate_;
   std::string mode_;
   rh::OperationAuthority authority_;
-  SteadyClock::time_point deadline_ = SteadyClock::now() + 180s;
+  SteadyClock::time_point deadline_ = SteadyClock::now() + 300s;
   std::int64_t clock_ns_ = 0, submitted_sim_ns_ = 0, odometry_stamp_ns_ = 0;
   std::optional<MotionWindow> motion_window_;
   rh::MonotonicTime clock_seen_ = 0, odometry_seen_ = 0, pose_seen_ = 0, feedback_seen_ = 0;
   geometry_msgs::msg::Point odometry_, pose_;
   std::optional<Action::Feedback> feedback_;
   std::optional<Result> result_slot_;
+  std::uint64_t output_sequence_ = 0;
   std::uint64_t native_sequence_ = 0, feedback_count_ = 0, native_send_count_ = 0;
   bool done_ = false;
+  std::exception_ptr callback_error_;
   rclcpp::Node::SharedPtr node_;
   rclcpp::Subscription<rosgraph_msgs::msg::Clock>::SharedPtr clock_subscription_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscription_;
@@ -427,9 +662,20 @@ private:
 
 int main(int argc, char** argv) {
   const std::string mode = argc == 2 ? argv[1] : "normal";
-  if (argc > 2 || (mode != "normal" && mode != "deny-startup" && mode != "cancel-before-dispatch" &&
-                   mode != "withhold-odometry")) {
-    std::cerr << "Expected normal, deny-startup, cancel-before-dispatch or withhold-odometry\n";
+  if (argc > 2 ||
+      (mode != "normal" && mode != "deny-startup" && mode != "cancel-before-dispatch" &&
+       mode != "withhold-odometry"
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+       && mode != "withhold-planner-ack" && mode != "withhold-drive-ack" && mode != "missing-map" &&
+       mode != "missing-controller" && mode != "withhold-feedback"
+#endif
+       )) {
+    std::cerr << "Expected normal, deny-startup, cancel-before-dispatch or withhold-odometry"
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+              << ", withhold-planner-ack, withhold-drive-ack, missing-map, missing-controller"
+                 " or withhold-feedback"
+#endif
+              << '\n';
     return 2;
   }
   const char* isolated = std::getenv("M4_ISOLATED_SIMULATION");
@@ -449,7 +695,11 @@ int main(int argc, char** argv) {
     result = observation.run();
   } catch (const std::exception& error) {
     std::cerr << "Navigation observation incomplete: " << error.what() << '\n';
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    std::cout << "{\"event\":\"incomplete\",\"passed\":false}" << std::endl;
+#else
     std::cout << "{\"event\":\"incomplete\",\"passed\":false,\"settled\":false}" << std::endl;
+#endif
   }
   rclcpp::shutdown();
   return result;

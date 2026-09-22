@@ -8,7 +8,7 @@ and merged. M2a implements failure closure; M2b/M2c add cancellation and expiry
 with macOS and Ubuntu validation. M3a adds replacement within one live host/binding;
 M3b adds provider rebinding within a live Host and a finite task caller.
 M3c adds a private Linux Host-recovery prototype with the same task caller;
-M4 remains planned. See README and Testing for tested status
+M4 is in progress with an optional normal Nav2 observation increment. See README and Testing for tested status
 and validation limits.
 
 ## Source roles
@@ -530,6 +530,22 @@ its own focused regression immediately.
 | **M2 — failure and cancellation** | Extend the same action with native rejection/failure, cancel request/ACK, delayed settlement and deadline expiry | No implicit retry; cancel ACK and timeout do not imply stopped/settled; conflicting action stays blocked until required evidence; missing or partial-effect evidence stays unknown |
 | **M3 — replacement and recovery** | Caller changes A to B; hold old output, restart provider or Core, re-observe and commit fresh authority; support declared conflict sets/composite availability as required by these cases | Stale output cannot commit at the actual simulated sink; unsettled conflicts remain blocked; invalid/expired/conflicting recovery evidence cannot reopen; fresh binding/revision/generation replaces old authority |
 | **M4 — ROS integration and reuse** | ROS 2 Humble lifecycle/action-facing adapter reuses the same Core; map the applicable M1–M3 scenarios to actual ROS boundaries | Ubuntu native events and effects agree with receipts; shared admission/fencing/recovery logic is not reimplemented in ROS adapter; capability limits are explicit |
+
+The [ROS integration status](ROS2_INTEGRATION.md) selects robot navigation and a
+reproducible simulation demonstration as M4's user-facing outcome. The optional
+[normal Nav2 observation](../integrations/ros2/nav2_observation/README.md) now uses
+Core admission and dispatch at the actual Action submission boundary, correlates
+the accepted UUID and checks delivery permission immediately before a local
+result commit. The same owner then remains alive for a bounded, finite motion
+observation: it waits for a first low-speed sample and one continuous quiet
+window, within eight wall seconds total. Missing/invalid evidence cannot confirm
+that window. This is not persistent supervision or native work-closure evidence.
+Startup relies on a trusted fresh/exclusive isolated deployment.
+No settlement evidence is supplied: the receipt remains pending and a second
+admission is refused. This is an observation increment, not a completed normal
+execution/settlement loop or reusable ROS Host. Native closure, motion-time
+cancellation, replacement and loss/rebinding remain M4 work. The bounded sum
+probe is retained only for questions that navigation cannot answer directly.
 
 M1 is deliberately a restricted usable slice, not an assertion that all P1 safety
 and recovery behavior exists. Identity and initial binding/generation are present

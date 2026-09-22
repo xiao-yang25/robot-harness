@@ -1,5 +1,12 @@
 # Robot Harness
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/kingfisher-dark.svg">
+  <img src="docs/assets/brand/kingfisher-light.svg" width="112" height="112" alt="Robot Harness kingfisher preview mark">
+</picture>
+
+[Kingfisher preview identity](docs/assets/brand/README.md) · In trial use; may change.
+
 **Execution authority and feedback for robot applications.**
 
 [![Core on Ubuntu](https://github.com/xiao-yang25/robot-harness/actions/workflows/core.yml/badge.svg?branch=master)](https://github.com/xiao-yang25/robot-harness/actions/workflows/core.yml)

@@ -31,11 +31,11 @@ jobs:
           cmake --install build-nav2-interfaces
           source install-nav2-interfaces/share/m4_drive_probe/local_setup.bash
           cmake -S integrations/ros2/nav2_observation -B build-nav2 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DROBOT_HARNESS_NAV2_SETTLEMENT=ON -DCMAKE_PREFIX_PATH="$PWD/install-nav2-interfaces"
-          cmake --build build-nav2 --target robot_harness_nav2_observation robot_harness_nav2_settlement nav2_motion_window_test nav2_closure_observations_test --parallel 2
-      - name: Check deployment guard and motion observations
+          cmake --build build-nav2 --target robot_harness_nav2_observation robot_harness_nav2_settlement nav2_motion_window_test nav2_closure_observations_test nav2_cancel_response_test nav2_runtime_observation_watch_test --parallel 2
+      - name: Check deployment guard, observations cancellation and runtime freshness
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
           source install-nav2-interfaces/share/m4_drive_probe/local_setup.bash
-          ctest --test-dir build-nav2 -R '^nav2_(requires_fresh_deployment|motion_window|closure_observations)$' --output-on-failure --no-tests=error
+          ctest --test-dir build-nav2 -R '^nav2_(requires_fresh_deployment|motion_window|closure_observations|cancel_response|runtime_observation_watch)$' --output-on-failure --no-tests=error
       # Gazebo movement and native goal checks are separate simulation evidence.

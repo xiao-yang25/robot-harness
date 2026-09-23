@@ -59,9 +59,9 @@ Continue with [two-step tasks](examples/README.md#local-compute-and-two-step-tas
 
 | Available today | Next |
 |---|---|
-| Execution authority, guarded results, cancellation and deadlines | Movement-time cancellation, replacement and loss in simulation |
-| Local workers, dependent tasks, replacement and provider rebinding | Reproducible simulation packaging and integration tutorials |
-| Limited Linux Host recovery; experimental sequential Nav2 navigation | Broader robot skills and learning-based backends |
+| Execution authority, guarded results, cancellation and deadlines | Reproducible simulation packaging and integration tutorials |
+| Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
+| Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
 
 **Early-stage software and simulation.** No physical-robot integration or hard stop
 guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation

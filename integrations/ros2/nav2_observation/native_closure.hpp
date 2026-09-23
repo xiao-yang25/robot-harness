@@ -3,6 +3,7 @@
 
 #include "closure_observations.hpp"
 #include <chrono>
+#include <m4_drive_probe/srv/close_scoped_motion.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <string>
@@ -21,6 +22,11 @@ public:
   void open_drive();
   std::string goal_tree();
   void bind_parent(const std::string& uuid);
+  // May run in an Owner callback: submit only, never spin or wait here.
+  void request_drive_close();
+  bool drive_isolated() const {
+    return drive_response_accepted_ && facts_.drive_closed();
+  }
   bool close();
   bool closed() const {
     return facts_.closed();
@@ -51,6 +57,8 @@ private:
   std::uint64_t generation_;
   ClosureObservations facts_;
   std::int64_t drive_requested_ns_ = 0;
+  bool drive_response_accepted_ = false, drive_request_failed_ = false;
+  rclcpp::Client<m4_drive_probe::srv::CloseScopedMotion>::SharedPtr drive_client_;
   std::vector<rclcpp::Subscription<std_msgs::msg::String>::SharedPtr> subscriptions_;
 };
 }  // namespace robot_harness::nav2_example

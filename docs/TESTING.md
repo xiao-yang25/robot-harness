@@ -15,6 +15,12 @@ compiled both optional binaries and passed three local checks. That job does not
 run a simulator. Actual navigation observations are recorded in the
 [sequential verification section](#optional-sequential-nav2-settlement).
 
+The moving-cancellation increment adds a fourth local Humble check and the
+[bounded simulation cases](#optional-movement-time-nav2-cancellation) below.
+The [replacement scenarios](#optional-movement-time-nav2-replacement) reuse
+those checks and add separate simulation coverage. The linked hosted runs above
+predate those increments and the runtime observation-loss work below.
+
 The sections below retain older dated evidence, including M3c at `dabad9b`
 ([PR #7](https://github.com/xiao-yang25/robot-harness/pull/7)). Historical counts
 and results do not replace checks for the revision being changed.
@@ -24,7 +30,7 @@ and results do not replace checks for the revision being changed.
 | GitHub-hosted Ubuntu 22.04 x86_64, GCC | All 57 CTests in Debug and ASan/UBSan | No ROS, hardware or deployment-timing validation |
 | Ubuntu 22.04 ARM64 in local Docker, GCC | All 57 Core CTests in Debug for the M4 second slice; earlier recovery-specific sanitizer results retained below | Runs in a Linux VM; not a target-device performance result |
 | macOS ARM64, AppleClang | All 47 portable CTests in Debug and ASan/UBSan before the Linux-only launcher correction | Linux recovery targets are not built; macOS is not currently a hosted CI job |
-| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and three observation/deployment checks; separate local Gazebo evidence below | CI compiles/tests predicates only; external-user simulator packaging remains pending |
+| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and five local observation/deployment/cancel-response/freshness checks; separate Gazebo evidence below | CI compiles/tests predicates only; external-user simulator packaging remains pending |
 | Other platforms/toolchains | No verified support claim | CMake platform branches alone are not platform validation |
 
 For a first run use [Build](../README.md#build) and the
@@ -111,8 +117,9 @@ cases. The Owner must emit the actual Core settlement/admission boundary; the
 fixture's independent Gazebo pose check establishes displacement only. Normal
 requires two actual goals, A released, B native closed with fresh quiet motion,
 B still pending and a third admission blocked. Every fault requires A pending,
-no B admission and one native send. Runtime loss and movement-time cancellation
-remain a later increment. A separate `withhold-feedback` regression must reach native success, reject the
+no B admission and one native send. Movement-time cancellation/replacement are
+separate increments documented below, as is bounded clock/odometry loss;
+an unresponsive navigator with reachable drive control is covered separately below. A separate `withhold-feedback` regression must reach native success, reject the
 missing pose observation and exit 1 with `incomplete`, without a promise exception
 or B admission. Local final behavior checks used the callback-error fix:
 
@@ -142,6 +149,205 @@ the existing `compute_prelaunch` test premise. A standalone spawn probe confirme
 that behavior; the test was not weakened. Native GitHub Ubuntu checks remain a
 merge requirement. Local macOS configuration was unavailable because its installed
 SDK/linker pair could not link even CMake's empty compiler test.
+
+## Optional movement-time Nav2 cancellation
+
+The Humble workflow builds `nav2_cancel_response_test` and runs
+`nav2_cancel_response` with the existing three Nav2 checks. The new check uses
+real ROS cancellation response types: exact target UUID, empty response, wrong
+UUID, multiple entries, explicit refusal, unknown/terminated goal and unknown
+return code. A matching entry cannot override an error return. This checks
+response interpretation, not actual robot stopping. Core source is unchanged.
+
+Real simulation acceptance requires all of the following in the same run:
+
+- Actual movement before cancellation, one native goal and one targeted cancel;
+  a corresponding cancellation response and a Cancelled native terminal result.
+- No delivered output and no second admission at cancellation, terminal arrival
+  or after the closure attempt. The receipt remains pending without B readiness.
+- Normal cancellation: matching native work/drive closure, fresh quiet window,
+  independent Gazebo position short of the original destination. Injected late
+  generation-1 commands must be rejected by the actual drive and cause no
+  significant displacement.
+- Missing planner/drive acknowledgement: incomplete native closure, no release.
+  Missing odometry: native closure can be observed but quiet motion cannot.
+- Existing normal A-to-B behavior still passes with the updated native leaf.
+
+Use the source-tree build commands from the example README and select all
+`^nav2_` CTests. Actual cancellation simulation and same-run recording require
+the research launcher; they are separate from hosted compile/unit CI. A cancelled
+Action result does not prove its worker has ended. Timing records are sample
+observations in an emulated simulator, not worst-case stopping guarantees.
+
+Final local cancellation build passed 4/4 Nav2 CTests. The pinned native fixture
+also passed its focused control-root lifecycle regression: root-only halt leaves
+the interrupted root RUNNING; full `BT::Tree::haltTree` closes/resets it without
+repeating already-ended asynchronous work. Real Ubuntu 22.04/Humble amd64 runs
+on Apple Silicon recorded the following (research results prefix `owner-cancel-`):
+
+| Scenario | Recorded result |
+|---|---|
+| `normal-04` | Cancellation after 0.50 m; final Gazebo displacement 0.540 m, short of A; native closure and fresh quiet window observed; 10 injected late generation-1 commands rejected without significant movement |
+| `planner-04` | Final displacement 0.556 m; withheld planner ACK prevented full native-closure confirmation; second admission refused |
+| `drive-04` | Final displacement 0.544 m; withheld applied-drive ACK prevented full native-closure confirmation; second admission refused |
+| `odometry-04` | Final displacement 0.555 m; native closure observed, fresh quiet motion unavailable; second admission refused |
+| `normal-regression-04` | Normal A-to-B preserved: Gazebo displacement A 2.497 m/B 1.785 m; A settled, B admitted/native closed, B pending and third admission refused |
+
+All four leave settlement pending and deliver no output. In the normal run,
+Cancelled terminal arrived 19 ms after the request and acknowledgement 25 ms
+later than the request: the terminal-before-response ordering was exercised.
+The successful quiet observation was recorded at 3677 ms after the request;
+this includes a deliberately held 2500 ms native worker tail and a one-second
+quiet window. It is **not** a measured physical-stop time or an upper bound.
+The same-run 1600×900 RViz recording is retained with the raw observations.
+
+Earlier failed runs are retained: `normal-01` exposed success-only child identity
+publication; `normal-02`/`normal-03` exposed the interrupted control-root lifecycle.
+The fixture now publishes accepted child identity while running and completes
+the actual full tree halt only after the native worker has joined. No matching
+or motion threshold was weakened to pass these runs. The cancellation Owner
+also rethrows captured callback errors after closure/quiet, so an expected
+missing-observation result cannot mask such errors as a successful fault test.
+
+## Optional movement-time Nav2 replacement
+
+`replace-moving` must record A cancellation/no delivered output, native closure
+and fresh quiet, then B readiness, actual Core settlement/admission and B native
+execution to the distinct goal (0.0, -0.5). A must move 0.45–1.5 m from spawn
+before closure; B must move more than 1.0 m from that point and finish within
+0.35 m of its target, measured independently in Gazebo.
+
+The research fixture publishes forty late nonzero commands on A's raw input
+while B executes. During this interval both A and B smoother bridges must forward
+nonzero commands with their original identities; drive records must reject A's
+generation-1 commands while generation 2 is open. B must still reach its target.
+The checker correlates injection with B's execution interval, not a post-run
+injection against an already sealed drive.
+
+Five fault cases remove planner ACK, applied-drive ACK, fresh odometry, B map or
+B controller. All must preserve A pending and block B admission/open/send.
+Cancel-only and normal arrival-then-B remain regressions. These simulation cases
+use the existing research launcher; their initial Humble revision ran four
+local checks. The runtime observation increment below adds a fifth check;
+Humble CI does not run Gazebo. No new Core test or dependency is needed for the
+fixed replacement scenario. Hosted results are tracked by the delivery PR
+separately from these local records.
+
+The final local build passed 4/4 Nav2 checks. In `owner-replace-normal-04`,
+Gazebo measured A displacement 0.551 m and B displacement 1.204 m. B reached
+within 0.35 m of its new target; the drive rejected 41 old-generation commands
+while B executed. The Owner recorded one cancel, two sends, A settled/no output,
+B admitted/successful/native closed, and B pending/third admission denied.
+
+The five final fault runs (`owner-replace-planner-03`, `drive-03`,
+`odometry-03`, `map-03`, `controller-03`, all with the same `owner-replace-`
+prefix) passed their expected refusals: missing planner/drive ACK prevented
+native closure, missing odometry prevented fresh quiet, and missing map/controller
+prevented B readiness. Every case retained A pending, one send and generation 1
+only. `cancel-regression-03` retained cancellation-only behavior (0.553 m final
+displacement, ten late commands rejected, no B). `sequential-regression-03`
+retained normal A arrival then B (2.519 m/1.845 m). All eight final cases exited
+0; prior failures below remain failures.
+
+Earlier runs are retained: `normal-01` found the missing CLI mode whitelist;
+`normal-02` found a same-source evidence sequence collision between no-output
+and settlement observations. The Owner now advances a shared source counter;
+Core checks are unchanged. Recorded `normal-03` failed safely during B startup
+on a lifecycle response timeout, before settlement/admission. The headless
+`normal-04` uses the same final binary; a successful run does not erase that
+startup-availability limitation or prove its cause is recording load.
+
+The same final binary also passed recorded `owner-replace-recorded-05`: A
+0.548 m, B 1.207 m, 42 old-generation commands rejected during B execution.
+The uncut RViz video is 1600x900, 43.3 seconds, with 409 decoded frames; A's old
+path is green and B's new path orange. This is simulation footage, with no speed
+change or authored motion. Independent review covered final source and the raw
+successful/fault/regression records; it did not independently rerun Docker.
+
+## Optional runtime observation loss
+
+The local/CI `nav2_runtime_observation_watch` check adds expiry at the two-second
+boundary, initial grace, frozen/backward stamps, invalid samples and a restoring callback arriving before
+the next poll. Expired intervals remain latched until a new execution start. Humble CI now selects five `nav2_` checks. These do not prove
+native stopping, bounded scheduling or a complete runtime supervisor.
+
+Real simulation checks must start the observation-channel fault during actual
+motion, with native Nav2 still connected to the simulator. Missing odometry,
+repeated old odometry and missing clock must withdraw the Core binding, suppress
+output, request one exact-goal stop and deny another admission. Native closure
+may succeed while fresh quiet remains unknown. The restored-odometry case must
+observe fresh quiet without settling, rebinding or granting B. A normal sequence,
+cancel-only and moving-replacement run are required regressions with the same
+final binary. The external checker correlates the actual relay fault, native
+UUID/response/result, drive generation and Gazebo pose; it grants no authority.
+
+The four named scenarios, remapping and limitations are defined in the
+[runtime contract](ROS2_INTEGRATION.md#runtime-observation-loss-boundary).
+Missing terminal results remain pending in the implementation; terminal loss,
+native endpoint loss and Owner death are not injected by these four cases.
+
+Final local Ubuntu 22.04/Humble build passed all five Nav2 checks. Four real
+moving-fault cases passed: odometry loss, old-odometry replay, odometry restored
+after six wall seconds, and clock loss. Each retained withdrawn binding and
+pending settlement; only restoration established fresh quiet. Observed detection
+was 1.94–1.97 seconds after the injected cut, consistent with a two-second budget
+measured from the last progressing sample; this is not a stopping-time limit.
+
+An initial restored-odometry attempt failed before admission because the native
+controller lacked its map transform. A normal sequence also failed after B was
+accepted: stale native map-to-odom transforms led to an ABORTED result. Neither
+is a passing fault test. The latter did not expire clock/odometry progress,
+illustrating that this watch does not supervise every Nav2 health condition.
+A moving-replacement attempt completed the Owner flow but failed the independent
+Gazebo pose query timeout. Failed records remain retained; these failures are not
+claimed resolved.
+
+The final unchanged binary also passed normal A→B, cancel-only and moving
+replacement regressions. The replacement rejected 39 old A commands during B.
+Independent review approved the source and seven successful raw runs within the
+declared boundary, with non-blocking follow-ups for the failures above; the
+reviewer did not rerun Docker. These successes do not establish simulator
+reliability. These records establish local validation; hosted checks belong to
+the delivery PR.
+
+## Optional independent consumer isolation
+
+The existing `nav2_closure_observations` CTest now accepts a matching actual drive
+update before worker/BT closure without declaring full closure, and retains that
+separate fact after producer reconciliation fails. Wrong scope/generation,
+pre-request timestamps, service acceptance without an applying-update ACK and
+malformed observations remain insufficient. Humble CI already builds/runs this
+target; the selected count remains five.
+
+The two [unresponsive-navigator cases](ROS2_INTEGRATION.md#independent-consumer-isolation)
+require real movement before SIGSTOP of the actual navigator, no cancel response
+or top-level terminal, and a driver applying-update before restored odometry.
+The independent checker verifies the native process remains stopped and at least
+ten real nonzero producer commands continue after driver application, with at
+least ten subsequent consumer rejections. Only matching drive evidence plus a
+fresh quiet window may report isolation/quiet; withheld drive ACK must report
+both unconfirmed despite physical application. Both keep output/native outcome
+pending, the binding withdrawn, settlement pending and second admission refused.
+
+Two final local failure-injection cases have passed: the navigator remained
+unresponsive while 43 continued nonzero producer commands were rejected by the
+drive in each run. With the applying ACK, fresh quiet was observed; without it,
+isolation and quiet remained unconfirmed. Both retained native/output pending
+and denied B. This is one successful run per case, not a timing/reliability bound.
+
+Run the same final binary through all four observation-channel faults and normal,
+cancel-only and replacement regressions because they share closure handling.
+Keep startup/native/evaluator failures as failures even if a bounded repeat
+passes. These cases do not prove Owner-independent protection, a full network
+partition response, drive-channel loss handling or a hard stopping bound.
+
+The final binary passed all nine scenarios above and all five CTests. Independent
+review approved the code and raw evidence within that boundary; it did not rerun
+Docker. An initial injection attempt failed because emulated `/proc/PID/exe`
+identified the interpreter, not the native navigator. The fixture now identifies
+the exact launched argument and independently checks the actual stopped state.
+That failed attempt remains recorded and is not counted as endpoint-loss proof.
+Hosted checks for the committed revision are tracked by the delivery PR.
 
 ## What each environment establishes
 
@@ -1013,7 +1219,7 @@ are introduced here.
 | M1 normal action/events | Check fresh initialization, active host with not-ready worker, one complete sample operation, a sequential second operation, synchronous/deferred callbacks, rejected input, duplicate/wrong-operation evidence and clean fixture shutdown; compare actual worker submissions and sink results with layered receipts | Implemented: `tests/authority_gate_tests.cpp` and `tests/sample_execution_tests.cpp`; macOS and Ubuntu results passed within the coverage above |
 | M2 failure/cancel | Follow the M2 planned checks above: explicit failure closure, cancel ACK before settlement, expiry, missing/partial-effect evidence; no unearned success or conflicting redispatch | M2a/M2b/M2c implemented, including cancellation/deadline tests and examples; macOS and Ubuntu normal/sanitizer suites each passed nine entries |
 | M3 replacement/recovery | Actual sink rejects held old output; unsettled conflicts block; provider/Core restart requires fresh observations and authority; invalid recovery stays closed | M3a operation replacement, M3b live-host rebinding and the two-step caller are merged; see [rebind checks](#m3b-focused-acceptance-mapping) and [task checks](#finite-task-caller-checks). M3c has the private Linux [prototype checks](#m3c-prototype-checks); the two-step caller uses its private bridge; stable public recovery APIs remain pending |
-| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | First normal Nav2 observation plus startup/pre-dispatch denial validated locally; see the optional Humble section. Bounded sequential settlement is covered separately above; motion-time cancellation, replacement and loss remain pending |
+| M4 ROS and cross-path behavior | Map supported normal, cancellation, loss, late-output and recovery paths to Ubuntu native observations and receipts | First normal Nav2 observation plus startup/pre-dispatch denial validated locally; see the optional Humble section. Bounded sequential settlement is covered separately above; bounded moving cancellation, replacement and clock/odometry observation loss are covered above; independent consumer isolation is covered above; broader endpoint loss/recovery remain pending |
 | Markdown / project instructions | Inspect diff, local links and anchors, code fences, personal-path/credential leakage, and affected command syntax; review any changed normative scope under applicable shared rules | Use the host's available documentation checks or targeted inspection; retain results in the current task record |
 
 Behavior changes involving authority, security/authorization, core public APIs,

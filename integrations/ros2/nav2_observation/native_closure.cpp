@@ -24,6 +24,8 @@ NativeClosure::NativeClosure(rclcpp::Node::SharedPtr node,
                              std::string scope, std::uint64_t generation, std::string context)
     : node_(std::move(node)), executor_(executor), mode_(std::move(mode)),
       context_(std::move(context)), generation_(generation), facts_(std::move(scope), generation) {
+  drive_client_ =
+      node_->create_client<m4_drive_probe::srv::CloseScopedMotion>("/close_scoped_motion");
   const auto qos = rclcpp::QoS(1).reliable().transient_local();
   const std::array<std::string, 2> actions{"compute_path_to_pose", "follow_path"};
   const std::array<std::string, 2> links{"navigation_planner_link", "navigation_child_link"};
@@ -44,7 +46,7 @@ NativeClosure::NativeClosure(rclcpp::Node::SharedPtr node,
           facts_.observe_child(index, true, msg->data);
         }));
   }
-  if (mode_ != "withhold-drive-ack") {
+  if (mode_ != "withhold-drive-ack" && mode_ != "runtime-stop-unreachable-withhold-drive-ack") {
     subscriptions_.push_back(node_->create_subscription<std_msgs::msg::String>(
         "/motion_scope_ack", qos, [this](std_msgs::msg::String::ConstSharedPtr msg) {
           record("drive_ack", msg->data);
@@ -176,6 +178,39 @@ void NativeClosure::bind_parent(const std::string& uuid) {
             << std::endl;
 }
 
+void NativeClosure::request_drive_close() {
+  if (drive_requested_ns_ != 0)
+    return;
+  // This path is independent of native worker/BT completion and cancel response.
+  // The shared executor owns both callbacks; the object outlives the request.
+  drive_requested_ns_ = steady_ns();
+  try {
+    using Close = m4_drive_probe::srv::CloseScopedMotion;
+    auto request = std::make_shared<Close::Request>();
+    request->scope_id = scope();
+    request->generation = generation_;
+    record("drive_close_requested", nlohmann::json{{"scope_id", scope()},
+                                                   {"generation", generation_},
+                                                   {"steady_ns", drive_requested_ns_}}
+                                        .dump());
+    drive_client_->async_send_request(request, [this](rclcpp::Client<Close>::SharedFuture future) {
+      try {
+        const auto response = future.get();
+        drive_response_accepted_ = response && response->accepted;
+        drive_request_failed_ = !drive_response_accepted_;
+        record("drive_close_response",
+               nlohmann::json{{"accepted", drive_response_accepted_}}.dump());
+      } catch (const std::exception& error) {
+        drive_request_failed_ = true;
+        record("drive_close_error", error.what());
+      }
+    });
+  } catch (const std::exception& error) {
+    drive_request_failed_ = true;
+    record("drive_close_error", error.what());
+  }
+}
+
 bool NativeClosure::close() {
   try {
     wait([&] { return facts_.workers_closed(); }, 8s, "native worker identity/closure incomplete");
@@ -192,20 +227,11 @@ bool NativeClosure::close() {
     record("bt_close", response->message);
     facts_.observe_bt(response->message, bt_requested, steady_ns());
 
-    using Close = m4_drive_probe::srv::CloseScopedMotion;
-    auto drive = node_->create_client<Close>("/close_scoped_motion");
-    wait([&] { return drive->service_is_ready(); }, 5s, "drive closure service absent");
-    auto request = std::make_shared<Close::Request>();
-    request->scope_id = scope();
-    request->generation = generation_;
-    drive_requested_ns_ = steady_ns();
-    auto pending = drive->async_send_request(request);
-    wait([&] { return pending.wait_for(0s) == std::future_status::ready; }, 5s,
-         "drive seal response absent");
-    if (!pending.get()->accepted) {
-      throw std::runtime_error("drive seal refused");
-    }
-    wait([&] { return facts_.closed(); }, 5s, "drive applying-update acknowledgement absent");
+    request_drive_close();
+    wait([&] { return drive_isolated() || drive_request_failed_; }, 5s,
+         "drive applying-update acknowledgement absent");
+    if (!drive_isolated() || !facts_.closed())
+      throw std::runtime_error("drive seal refused or incomplete");
     return true;
   } catch (const std::exception& error) {
     facts_.reject();

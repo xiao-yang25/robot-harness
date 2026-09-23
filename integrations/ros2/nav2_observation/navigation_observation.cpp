@@ -2,7 +2,9 @@
 // This is not a reusable ROS Host or a physical-motion settlement profile.
 #include "motion_window.hpp"
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+#include "cancel_response.hpp"
 #include "native_closure.hpp"
+#include "runtime_observation_watch.hpp"
 #include <fstream>
 #include <std_srvs/srv/trigger.hpp>
 #endif
@@ -91,17 +93,31 @@ rh::AuthorityGateConfig config(const std::string& session) {
   return result;
 }
 
+rclcpp::NodeOptions observation_options(const std::string& mode) {
+  auto options =
+      rclcpp::NodeOptions().parameter_overrides({rclcpp::Parameter("use_sim_time", true)});
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+  if (mode.rfind("runtime-", 0) == 0)
+    options.arguments({"--ros-args", "-r", "odom:=/owner_odom", "-r", "clock:=/owner_clock"});
+#else
+  (void)mode;
+#endif
+  return options;
+}
+
 class NavigationObservation {
 public:
   NavigationObservation(const std::string& session, std::string mode)
       : config_(config(session)), gate_(config_), mode_(std::move(mode)),
-        node_(std::make_shared<rclcpp::Node>(
-            "harness_navigation_observation",
-            rclcpp::NodeOptions().parameter_overrides({rclcpp::Parameter("use_sim_time", true)}))) {
+        node_(std::make_shared<rclcpp::Node>("harness_navigation_observation",
+                                             observation_options(mode_))) {
     clock_subscription_ = node_->create_subscription<rosgraph_msgs::msg::Clock>(
         "clock", rclcpp::SensorDataQoS(),
         [this](rosgraph_msgs::msg::Clock::ConstSharedPtr message) {
           const auto stamp = rclcpp::Time(message->clock).nanoseconds();
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+          runtime_watch_.observe_clock(stamp, now());
+#endif
           if (stamp != clock_ns_) {
             clock_ns_ = stamp;
             clock_seen_ = now();
@@ -110,8 +126,23 @@ public:
     odometry_subscription_ = node_->create_subscription<nav_msgs::msg::Odometry>(
         "odom", rclcpp::SensorDataQoS(), [this](nav_msgs::msg::Odometry::ConstSharedPtr message) {
           odometry_ = message->pose.pose.position;
+          odometry_speed_ =
+              std::hypot(message->twist.twist.linear.x, message->twist.twist.linear.y);
+          odometry_frame_valid_ = message->header.frame_id == "odom";
           odometry_seen_ = now();
           odometry_stamp_ns_ = rclcpp::Time(message->header.stamp).nanoseconds();
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+          const auto& orientation = message->pose.pose.orientation;
+          const double norm = orientation.x * orientation.x + orientation.y * orientation.y +
+                              orientation.z * orientation.z + orientation.w * orientation.w;
+          runtime_watch_.observe_odometry(
+              odometry_stamp_ns_, now(),
+              odometry_frame_valid_ && std::isfinite(odometry_.x) && std::isfinite(odometry_.y) &&
+                  std::isfinite(odometry_.z) && std::isfinite(odometry_speed_) &&
+                  std::isfinite(message->twist.twist.angular.z) && std::isfinite(norm) &&
+                  std::abs(norm - 1.0) <= .01 &&
+                  std::abs(clock_ns_ - odometry_stamp_ns_) <= 250000000);
+#endif
           if (motion_window_) {
             const auto& q = message->pose.pose.orientation;
             const auto& v = message->twist.twist;
@@ -153,8 +184,8 @@ public:
     a_scope_ = contexts.at("a_scope").get<std::string>();
     b_scope_ = contexts.at("b_scope").get<std::string>();
     require(a_scope_ != b_scope_, "task scopes must differ");
-    closure_ =
-        std::make_unique<rh::nav2_example::NativeClosure>(node_, executor_, mode_, a_scope_, 1);
+    closure_ = std::make_unique<rh::nav2_example::NativeClosure>(node_, executor_, closure_mode(),
+                                                                 a_scope_, 1);
 #endif
   }
 
@@ -230,6 +261,14 @@ public:
 #endif
     run_goal(0.7);
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    if (runtime_loss_seen_)
+      return finish_runtime_loss();
+    require(!is_runtime_loss_case(), "runtime fault was not observed");
+    if (is_cancellation_case()) {
+      observe_cancelled_terminal();
+      if (!is_replacement_case())
+        return finish_cancellation();
+    }
     return handoff();
 #else
     const auto after_motion_stamp = std::max(clock_ns_, odometry_stamp_ns_);
@@ -300,6 +339,11 @@ private:
     handle_.reset();
     feedback_count_ = 0;
     done_ = false;
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    stop_requested_ = false;
+    native_stop_sent_ = false;
+    cancel_response_seen_ = false;
+#endif
     callback_error_ = nullptr;
     const auto operation = authority_.operation_id;
     Action::Goal goal;
@@ -324,6 +368,8 @@ private:
         native(rh::NativeEventKind::kAccepted);
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
         closure_->bind_parent(uuid_text(handle->get_goal_id()));
+        if (stop_requested_)
+          send_native_stop();
 #endif
         std::cout << "{\"event\":\"accepted\",\"goal_uuid\":\"" << uuid_text(handle->get_goal_id())
                   << "\",\"operation_id\":" << authority_.operation_id << "}" << std::endl;
@@ -360,7 +406,7 @@ private:
       capture_callback([&] {
         require(handle_ && result.goal_id == handle_->get_goal_id(), "result UUID mismatch");
         std::cout << "{\"event\":\"native_result\",\"result_code\":"
-                  << static_cast<int>(result.code)
+                  << static_cast<int>(result.code) << ",\"steady_ms\":" << now()
                   << ",\"operation_id\":" << authority_.operation_id << ",\"goal_uuid\":\""
                   << uuid_text(result.goal_id) << "\"}" << std::endl;
         switch (result.code) {
@@ -369,13 +415,31 @@ private:
           break;
         case rclcpp_action::ResultCode::ABORTED:
           native(rh::NativeEventKind::kTerminalFailed);
-          throw std::runtime_error("navigation aborted");
+          break;
         case rclcpp_action::ResultCode::CANCELED:
           native(rh::NativeEventKind::kTerminalCancelled);
-          throw std::runtime_error("navigation canceled");
+          break;
         default:
           throw std::runtime_error("unknown navigation outcome");
         }
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+        check_runtime_observations();
+        if (stop_requested_ || runtime_loss_seen_) {
+          require(!gate_.can_deliver_result(authority_) && !result_slot_,
+                  "cancelled operation retained result authority");
+          const bool produced = result.code == rclcpp_action::ResultCode::SUCCEEDED;
+          accepted(gate_.observe_output_not_delivered(
+              {authority_,
+               produced ? rh::OutputNonDeliveryReason::kAuthorityRevoked
+                        : rh::OutputNonDeliveryReason::kNoOutputProduced,
+               produced ? "local-navigation-result" : "",
+               {produced ? config_.result_sink_observer : config_.settlement_evidence_source, now(),
+                produced ? ++output_sequence_ : ++settlement_sequence_}}));
+          done_ = true;
+          return;
+        }
+#endif
+        require(result.code == rclcpp_action::ResultCode::SUCCEEDED, "navigation did not succeed");
         require(feedback_.has_value(), "result without pose feedback");
         const auto& pose = feedback_->current_pose;
         const auto stamp = rclcpp::Time(pose.header.stamp).nanoseconds();
@@ -402,16 +466,271 @@ private:
     require(client_->action_server_is_ready(), "navigation server lost before dispatch");
     require(gate_.claim_dispatch(authority_, now()), "Core dispatch claim denied");
     // No callbacks run between the authority claim and the native submission.
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    runtime_watch_.start(now());
+#endif
     ++native_send_count_;
     const auto pending_goal = client_->async_send_goal(goal, options);
     (void)pending_goal;
-    wait([this] { return done_ || callback_error_; }, 100s,
-         "navigation result timed out; settlement unresolved");
+    wait(
+        [this] {
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+          if (!done_ && !callback_error_)
+            check_runtime_observations();
+          if (!runtime_loss_seen_)
+            maybe_cancel_moving();
+          if (runtime_loss_seen_ && now() - runtime_loss_at_ >= 8000)
+            return true;
+#endif
+          return done_ || callback_error_;
+        },
+        100s, "navigation result timed out; settlement unresolved");
     if (callback_error_)
       std::rethrow_exception(callback_error_);
   }
 
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+  bool is_replacement_case() const {
+    return mode_ == "replace-moving" || mode_.rfind("replace-moving-", 0) == 0;
+  }
+
+  bool is_cancellation_case() const {
+    return is_replacement_case() || mode_ == "cancel-moving" ||
+           mode_ == "cancel-moving-withhold-planner-ack" ||
+           mode_ == "cancel-moving-withhold-drive-ack" ||
+           mode_ == "cancel-moving-withhold-odometry";
+  }
+
+  std::string closure_mode() const {
+    if (!is_cancellation_case())
+      return mode_;
+    const auto prefix =
+        is_replacement_case() ? std::string("replace-moving") : std::string("cancel-moving");
+    return mode_.size() == prefix.size() ? "normal" : mode_.substr(prefix.size() + 1);
+  }
+
+  void maybe_cancel_moving() {
+    if (!is_cancellation_case() || native_send_count_ != 1 || stop_requested_ || done_ ||
+        callback_error_ || !handle_ || !feedback_ || feedback_count_ == 0) {
+      return;
+    }
+    const auto displacement = std::hypot(odometry_.x + 2.0, odometry_.y + 0.5);
+    if (!odometry_frame_valid_ || !std::isfinite(displacement) ||
+        odometry_stamp_ns_ <= submitted_sim_ns_ ||
+        std::abs(clock_ns_ - odometry_stamp_ns_) > 250000000 || now() - odometry_seen_ >= 500 ||
+        now() - feedback_seen_ >= 500 || now() - clock_seen_ >= 500 ||
+        !std::isfinite(odometry_speed_) || odometry_speed_ < 0.05 || displacement < 0.5) {
+      return;
+    }
+    const auto decision = gate_.request_cancel(authority_, now());
+    require(decision.status == rh::ControlStatus::kApplied && decision.should_request_native_stop,
+            "moving cancellation did not issue native stop");
+    stop_requested_ = true;
+    require(!gate_.request_cancel(authority_, now()).should_request_native_stop &&
+                !gate_.can_deliver_result(authority_),
+            "cancel was not idempotent/revoked");
+    require(gate_.admit(request()).status == rh::AdmissionStatus::kDomainOccupied,
+            "cancel request released the domain");
+    std::cout << nlohmann::json{{"event", "owner_cancel_requested"},
+                                {"operation_id", authority_.operation_id},
+                                {"goal_uuid", uuid_text(handle_->get_goal_id())},
+                                {"steady_ms", now()},
+                                {"sim_ns", clock_ns_},
+                                {"x", odometry_.x},
+                                {"y", odometry_.y},
+                                {"speed_m_s", odometry_speed_},
+                                {"displacement_m", displacement}}
+                     .dump()
+              << std::endl;
+    send_native_stop();
+  }
+
+  void send_native_stop() {
+    if (!handle_ || native_stop_sent_)
+      return;
+    native_stop_sent_ = true;
+    const auto operation = authority_.operation_id;
+    const auto uuid = handle_->get_goal_id();
+    ++native_cancel_count_;
+    // Exact accepted goal only; never cancel every goal on the shared ROS service.
+    client_->async_cancel_goal(handle_, [this, operation, uuid](auto response) {
+      if (authority_.operation_id != operation)
+        return;
+      capture_callback([&] {
+        require(response && !cancel_response_seen_, "missing/duplicate cancel response");
+        const auto acknowledgement = rh::nav2_example::cancel_acknowledgement(*response, uuid);
+        accepted(gate_.observe_stop_acknowledgement(
+            {authority_, acknowledgement, {config_.stop_evidence_source, now(), 1}}));
+        cancel_response_seen_ = true;
+        const auto receipt = gate_.receipt(authority_);
+        require(receipt && receipt->settlement == rh::SettlementStatus::kPending &&
+                    receipt->authority_disposition != rh::AuthorityDisposition::kReleased,
+                "cancel response released authority");
+        std::cout << nlohmann::json{{"event", "owner_cancel_response"},
+                                    {"operation_id", operation},
+                                    {"goal_uuid", uuid_text(uuid)},
+                                    {"steady_ms", now()},
+                                    {"return_code", response->return_code},
+                                    {"acknowledged",
+                                     acknowledgement == rh::StopAcknowledgement::kAcknowledged},
+                                    {"settled", false}}
+                         .dump()
+                  << std::endl;
+      });
+    });
+  }
+
+  void observe_cancelled_terminal() {
+    require(stop_requested_, "navigation ended before moving cancellation trigger");
+    wait([this] { return cancel_response_seen_ || callback_error_; }, 5s,
+         "cancel response unavailable; settlement unresolved");
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
+    const auto terminal = gate_.receipt(authority_);
+    require(terminal && terminal->stop_acknowledgement == rh::StopAcknowledgement::kAcknowledged &&
+                terminal->native_outcome == rh::NativeOutcome::kCancelled &&
+                terminal->output == rh::OutputDisposition::kNotDelivered && !result_slot_,
+            "moving cancel did not produce expected distinct response/result");
+    require(gate_.admit(request()).status == rh::AdmissionStatus::kDomainOccupied,
+            "cancel terminal released the domain");
+  }
+
+  int finish_cancellation() {
+    const bool native_closed = closure_->close();
+    if (closure_mode() == "withhold-odometry")
+      odometry_subscription_.reset();
+    const bool motion_observed = native_closed && quiet();
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
+    const auto receipt = gate_.receipt(authority_);
+    const auto second = gate_.admit(request());
+    require(receipt && receipt->settlement == rh::SettlementStatus::kPending &&
+                receipt->authority_disposition == rh::AuthorityDisposition::kRevoked &&
+                second.status == rh::AdmissionStatus::kDomainOccupied && !second.authority &&
+                native_send_count_ == 1 && native_cancel_count_ == 1,
+            "cancelled task admitted conflicting work");
+    const bool expect_closure =
+        closure_mode() != "withhold-planner-ack" && closure_mode() != "withhold-drive-ack";
+    require(native_closed == expect_closure && motion_observed == (mode_ == "cancel-moving"),
+            "unexpected cancellation closure/motion observation");
+    gate_.close_admission();
+    // No prepared replacement context in this slice: quiet alone grants no settlement.
+    std::cout << nlohmann::json{{"event", "owner_cancellation_result"},
+                                {"passed", true},
+                                {"case", mode_},
+                                {"steady_ms", now()},
+                                {"native_closed", native_closed},
+                                {"motion_observed", motion_observed},
+                                {"native_cancel_count", native_cancel_count_},
+                                {"native_send_count", native_send_count_},
+                                {"output_delivered", false},
+                                {"settled", false},
+                                {"second_admission_blocked", true}}
+                     .dump()
+              << std::endl;
+    return 0;
+  }
+
+  bool is_runtime_loss_case() const {
+    return mode_.rfind("runtime-", 0) == 0;
+  }
+
+  void check_runtime_observations() {
+    if (runtime_loss_seen_ || callback_error_)
+      return;
+    const auto at = now();
+    const auto stale = runtime_watch_.stale(at);
+    if (!stale)
+      return;
+    const auto withdrawn = gate_.withdraw_binding(config_.binding, at);
+    require(withdrawn.status == rh::BindingControlStatus::kApplied,
+            "runtime loss failed to withdraw binding");
+    runtime_loss_seen_ = true;
+    runtime_loss_at_ = at;
+    require(!gate_.can_deliver_result(authority_) &&
+                gate_.admit(request()).status == rh::AdmissionStatus::kRecoveryRequired &&
+                !gate_.withdraw_binding(config_.binding, now()).native_stop_authority,
+            "runtime withdrawal retained authority or repeated stop");
+    std::cout << nlohmann::json{{"event", "owner_runtime_observation_lost"},
+                                {"operation_id", authority_.operation_id},
+                                {"steady_ms", at},
+                                {"observation", *stale == rh::nav2_example::StaleObservation::kClock
+                                                    ? "clock"
+                                                    : "odometry"},
+                                {"budget_ms", rh::nav2_example::RuntimeObservationWatch::kBudgetMs},
+                                {"binding_withdrawn", true},
+                                {"odometry_message_age_ms", at - odometry_seen_},
+                                {"output_authority", false}}
+                     .dump()
+              << std::endl;
+    closure_->request_drive_close();
+    if (withdrawn.native_stop_authority) {
+      require(withdrawn.native_stop_authority->operation_id == authority_.operation_id,
+              "runtime stop authority mismatch");
+      stop_requested_ = true;
+      send_native_stop();
+    }
+  }
+
+  int finish_runtime_loss() {
+    // Keep processing observations within a bound, even if the result/ACK is
+    // missing. A timeout never manufactures a terminal result or closure.
+    const auto until = SteadyClock::now() + 5s;
+    while (native_stop_sent_ && !cancel_response_seen_ && !callback_error_ && rclcpp::ok() &&
+           SteadyClock::now() < until) {
+      executor_.spin_some(10ms);
+      std::this_thread::sleep_for(5ms);
+    }
+    const bool native_closed = closure_->close();
+    const bool drive_isolated = closure_->drive_isolated();
+    const bool motion_observed = drive_isolated && quiet();
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
+    const auto receipt = gate_.receipt(authority_);
+    require(receipt && receipt->binding_withdrawn_at &&
+                gate_.binding_status(now()).phase == rh::BindingPhase::kWithdrawn &&
+                receipt->settlement == rh::SettlementStatus::kPending &&
+                receipt->authority_disposition == rh::AuthorityDisposition::kRevoked &&
+                receipt->output != rh::OutputDisposition::kAccepted && !result_slot_ &&
+                gate_.admit(request()).status == rh::AdmissionStatus::kRecoveryRequired &&
+                !gate_.can_deliver_result(authority_),
+            "observation restoration reauthorized withdrawn work");
+    std::cout << nlohmann::json{{"event", "owner_runtime_loss_result"},
+                                {"passed", is_runtime_loss_case()},
+                                {"case", mode_},
+                                {"steady_ms", now()},
+                                {"native_closed", native_closed},
+                                {"drive_isolated", drive_isolated},
+                                {"motion_observed", motion_observed},
+                                {"native_cancelled",
+                                 receipt->native_outcome == rh::NativeOutcome::kCancelled},
+                                {"native_pending",
+                                 receipt->native_outcome == rh::NativeOutcome::kPending},
+                                {"stop_acknowledged", receipt->stop_acknowledgement ==
+                                                          rh::StopAcknowledgement::kAcknowledged},
+                                {"output_pending",
+                                 receipt->output == rh::OutputDisposition::kPending},
+                                {"output_delivered", false},
+                                {"settled", false},
+                                {"binding_withdrawn", true},
+                                {"second_admission_blocked", true},
+                                {"native_send_count", native_send_count_},
+                                {"native_cancel_count", native_cancel_count_}}
+                     .dump()
+              << std::endl;
+    require(is_runtime_loss_case(), "unexpected runtime observation loss");
+    gate_.close_admission();
+    return 0;
+  }
+
+  rh::nav2_example::RuntimeObservationWatch runtime_watch_;
+  bool runtime_loss_seen_ = false;
+  rh::MonotonicTime runtime_loss_at_ = 0;
+  bool stop_requested_ = false, native_stop_sent_ = false, cancel_response_seen_ = false;
+  // No-output and settlement observations share this evidence source.
+  std::uint64_t settlement_sequence_ = 0;
+  std::uint64_t native_cancel_count_ = 0;
+
   bool quiet() {
     motion_window_.emplace(std::max({clock_ns_, odometry_stamp_ns_, closure_->drive_stamp_ns()}));
     const auto until = SteadyClock::now() + 8s;
@@ -423,6 +742,7 @@ private:
     const bool observed = !callback_error_ && motion_window_->status() == MotionStatus::kObserved &&
                           now() - clock_seen_ < 1000 && now() - odometry_seen_ < 1000;
     std::cout << nlohmann::json{{"event", "owner_quiet_observation"},
+                                {"steady_ms", now()},
                                 {"observed", observed},
                                 {"operation_id", authority_.operation_id},
                                 {"samples", motion_window_->sample_count()},
@@ -435,6 +755,8 @@ private:
   }
 
   int blocked(const char* boundary) {
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
     const auto receipt = gate_.receipt(authority_);
     const auto decision = gate_.admit(request());
     require(receipt && receipt->settlement == rh::SettlementStatus::kPending &&
@@ -449,7 +771,7 @@ private:
                                 {"native_send_count", native_send_count_}}
                      .dump()
               << std::endl;
-    require(mode_ != "normal", "normal handoff incomplete");
+    require(mode_ != "normal" && mode_ != "replace-moving", "normal handoff incomplete");
     gate_.close_admission();
     return 0;
   }
@@ -457,7 +779,7 @@ private:
   int handoff() {
     if (!closure_->close())
       return blocked("native-closure");
-    if (mode_ == "withhold-odometry")
+    if (closure_mode() == "withhold-odometry")
       odometry_subscription_.reset();
     if (!quiet())
       return blocked("fresh-motion");
@@ -492,12 +814,14 @@ private:
       std::cerr << "Next context unavailable: " << error.what() << std::endl;
       return blocked("next-context");
     }
-    require(mode_ == "normal", "fault case unexpectedly reached settlement");
+    require(mode_ == "normal" || mode_ == "replace-moving",
+            "fault case unexpectedly reached settlement");
     require(!callback_error_ && closure_->closed(), "A closure invalidated before settlement");
-    accepted(gate_.observe_settlement({authority_,
-                                       config_.settlement_scope,
-                                       true,
-                                       {config_.settlement_evidence_source, now(), 1}}));
+    accepted(gate_.observe_settlement(
+        {authority_,
+         config_.settlement_scope,
+         true,
+         {config_.settlement_evidence_source, now(), ++settlement_sequence_}}));
     const auto a_receipt = gate_.receipt(authority_);
     require(a_receipt && a_receipt->settlement == rh::SettlementStatus::kSettled &&
                 a_receipt->authority_disposition == rh::AuthorityDisposition::kReleased,
@@ -515,9 +839,20 @@ private:
     require(b.status == rh::AdmissionStatus::kAdmitted && b.authority,
             "B admission denied after A settlement");
     const auto a_operation = authority_.operation_id;
+    if (is_replacement_case()) {
+      require(a_receipt->native_outcome == rh::NativeOutcome::kCancelled &&
+                  a_receipt->output == rh::OutputDisposition::kNotDelivered && !result_slot_ &&
+                  native_cancel_count_ == 1,
+              "replacement lost A cancellation/output boundary");
+    }
     authority_ = *b.authority;
     require(authority_.operation_id != a_operation, "B reused A operation identity");
     std::cout << nlohmann::json{{"event", "owner_core_handoff"},
+                                {"steady_ms", now()},
+                                {"a_cancelled",
+                                 a_receipt->native_outcome == rh::NativeOutcome::kCancelled},
+                                {"a_output_delivered",
+                                 a_receipt->output == rh::OutputDisposition::kAccepted},
                                 {"a_operation", a_operation},
                                 {"b_operation", authority_.operation_id},
                                 {"a_settled", true},
@@ -529,7 +864,9 @@ private:
     // Opening is after admission; actual native submission still requires the
     // immediately adjacent Core dispatch claim in run_goal().
     closure_->open_drive();
-    run_goal(-1.5);
+    run_goal(is_replacement_case() ? 0.0 : -1.5);
+    if (runtime_loss_seen_)
+      return finish_runtime_loss();
     require(closure_->close() && quiet(), "B closure or motion incomplete");
     const auto receipt = gate_.receipt(authority_);
     const auto third = gate_.admit(request());
@@ -537,10 +874,13 @@ private:
                 receipt->output == rh::OutputDisposition::kAccepted &&
                 receipt->settlement == rh::SettlementStatus::kPending &&
                 third.status == rh::AdmissionStatus::kDomainOccupied && !third.authority &&
-                native_send_count_ == 2,
+                native_send_count_ == 2 &&
+                native_cancel_count_ == (is_replacement_case() ? 1u : 0u),
             "B final boundary inconsistent");
     gate_.close_admission();
     std::cout << nlohmann::json{{"event", "owner_handoff_result"},
+                                {"case", mode_},
+                                {"native_cancel_count", native_cancel_count_},
                                 {"passed", true},
                                 {"a_settled", true},
                                 {"b_admitted", true},
@@ -642,6 +982,8 @@ private:
   std::int64_t clock_ns_ = 0, submitted_sim_ns_ = 0, odometry_stamp_ns_ = 0;
   std::optional<MotionWindow> motion_window_;
   rh::MonotonicTime clock_seen_ = 0, odometry_seen_ = 0, pose_seen_ = 0, feedback_seen_ = 0;
+  bool odometry_frame_valid_ = false;
+  double odometry_speed_ = 0.0;
   geometry_msgs::msg::Point odometry_, pose_;
   std::optional<Action::Feedback> feedback_;
   std::optional<Result> result_slot_;
@@ -667,15 +1009,30 @@ int main(int argc, char** argv) {
        mode != "withhold-odometry"
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
        && mode != "withhold-planner-ack" && mode != "withhold-drive-ack" && mode != "missing-map" &&
-       mode != "missing-controller" && mode != "withhold-feedback"
+       mode != "missing-controller" && mode != "withhold-feedback" && mode != "cancel-moving" &&
+       mode != "cancel-moving-withhold-planner-ack" && mode != "cancel-moving-withhold-drive-ack" &&
+       mode != "cancel-moving-withhold-odometry" && mode != "replace-moving" &&
+       mode != "replace-moving-withhold-planner-ack" &&
+       mode != "replace-moving-withhold-drive-ack" && mode != "replace-moving-withhold-odometry" &&
+       mode != "replace-moving-missing-map" && mode != "replace-moving-missing-controller" &&
+       mode != "runtime-odometry-loss" && mode != "runtime-odometry-replay" &&
+       mode != "runtime-odometry-resume" && mode != "runtime-clock-loss" &&
+       mode != "runtime-stop-unreachable" && mode != "runtime-stop-unreachable-withhold-drive-ack"
 #endif
        )) {
-    std::cerr << "Expected normal, deny-startup, cancel-before-dispatch or withhold-odometry"
+    std::cerr
+        << "Expected normal, deny-startup, cancel-before-dispatch or withhold-odometry"
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
-              << ", withhold-planner-ack, withhold-drive-ack, missing-map, missing-controller"
-                 " or withhold-feedback"
+        << ", withhold-planner-ack, withhold-drive-ack, missing-map, missing-controller, "
+           "withhold-feedback, cancel-moving, cancel-moving-withhold-planner-ack, "
+           "cancel-moving-withhold-drive-ack, cancel-moving-withhold-odometry, replace-moving, "
+           "replace-moving-withhold-planner-ack, replace-moving-withhold-drive-ack, "
+           "replace-moving-withhold-odometry, replace-moving-missing-map or "
+           "replace-moving-missing-controller, runtime-odometry-loss, runtime-odometry-replay, "
+           "runtime-odometry-resume, runtime-clock-loss, runtime-stop-unreachable or "
+           "runtime-stop-unreachable-withhold-drive-ack"
 #endif
-              << '\n';
+        << '\n';
     return 2;
   }
   const char* isolated = std::getenv("M4_ISOLATED_SIMULATION");

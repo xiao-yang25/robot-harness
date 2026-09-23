@@ -547,8 +547,18 @@ The `robot_harness_nav2_observation` binary supplies no settlement evidence: its
 receipt remains pending and a second admission is refused. The separate optional
 [sequential profile](ROS2_INTEGRATION.md#sequential-settlement-boundary) adds native
 closure and Core A settlement/B admission under a fixed two-context contract.
-Neither is a reusable ROS Host. Motion-time cancellation, replacement and
-loss/rebinding remain M4 work. The bounded sum
+Neither is a reusable ROS Host. The optional executable also has a bounded
+[moving cancellation scenario](ROS2_INTEGRATION.md#movement-time-cancellation-boundary),
+which leaves settlement pending without a prepared replacement context. Its
+[moving replacement scenario](ROS2_INTEGRATION.md#movement-time-replacement-boundary)
+continues with B after A cancellation/closure, fresh quiet and B readiness,
+through the same Core settlement/admission boundary. The bounded
+[runtime observation-loss path](ROS2_INTEGRATION.md#runtime-observation-loss-boundary)
+withdraws the binding on stale clock/odometry and retains pending settlement,
+even after data resumes. Its [independent consumer isolation](ROS2_INTEGRATION.md#independent-consumer-isolation)
+can request a generation-bound drive seal before producer completion, while
+keeping native outcome and settlement unresolved. Owner and drive-path loss,
+broader endpoint failures and rebinding remain outside this bounded profile. The bounded sum
 probe is retained only for questions that navigation cannot answer directly.
 
 M1 is deliberately a restricted usable slice, not an assertion that all P1 safety

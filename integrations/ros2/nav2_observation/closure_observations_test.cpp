@@ -126,6 +126,34 @@ int main() try {
   ClosureObservations missing_generation(scope, 2);
   rejected(missing_generation, [&] { missing_generation.observe_drive(drive().dump(), 450, 550); });
 
+  // Consumer evidence can precede every producer completion observation.
+  ClosureObservations isolated(scope, 1);
+  auto isolated_drive = drive();
+  isolated_drive["generation"] = 1;
+  isolated.observe_drive(isolated_drive.dump(), 450, 550);
+  require(isolated.drive_closed() && !isolated.workers_closed() && !isolated.closed());
+  workers(isolated);
+  require(isolated.drive_closed() && !isolated.closed());
+  auto later_bt = bt();
+  later_bt["steady_ns"] = 700;
+  isolated.observe_bt(later_bt.dump(), 650, 750);
+  require(isolated.closed());
+
+  // Missing producer evidence never erases a valid, separate consumer fact.
+  ClosureObservations missing_native(scope, 1);
+  missing_native.reject();
+  missing_native.observe_drive(isolated_drive.dump(), 450, 550);
+  require(missing_native.drive_closed() && !missing_native.closed());
+  missing_native.observe_drive(isolated_drive.dump(), 450, 800);
+  require(missing_native.drive_closed() && !missing_native.closed());
+
+  ClosureObservations wrong_scope(scope, 1);
+  isolated_drive["scope_id"] = parent;
+  rejected(wrong_scope, [&] { wrong_scope.observe_drive(isolated_drive.dump(), 450, 550); });
+  require(!wrong_scope.drive_closed());
+  require(!early.drive_closed() && !admission.drive_closed() && !malformed.drive_closed());
+  require(!wrong_generation.drive_closed() && !missing_generation.drive_closed());
+
   std::cout << "closure identity, missing evidence, ordering and malformed observations passed\n";
   return 0;
 } catch (const std::exception& error) {

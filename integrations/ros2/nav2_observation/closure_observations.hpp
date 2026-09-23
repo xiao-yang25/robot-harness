@@ -96,9 +96,8 @@ public:
         return;
       check(generation == generation_, "unexpected drive generation");
     }
-    check(bt_closed_ && event.at("event") == "motion_scope_applied" &&
-              event.at("scope_id") == scope_ && event.at("sealed") == true &&
-              event.at("wheel_targets_zero") == true,
+    check(event.at("event") == "motion_scope_applied" && event.at("scope_id") == scope_ &&
+              event.at("sealed") == true && event.at("wheel_targets_zero") == true,
           "drive closure mismatch");
     ordered(event, requested_ns, received_ns);
     check(event.at("update_sequence").is_number_unsigned() &&
@@ -110,12 +109,17 @@ public:
     check(stamp > 0 && (drive_stamp_ns_ == 0 || drive_stamp_ns_ == stamp), "drive update changed");
     drive_stamp_ns_ = stamp;
   } catch (...) {
+    drive_rejected_ = true;
     rejected_ = true;
     throw;
   }
 
+  // Consumer isolation is independent of producer completion. It never grants settlement.
+  bool drive_closed() const {
+    return !drive_rejected_ && drive_stamp_ns_ > 0;
+  }
   bool closed() const {
-    return workers_closed() && bt_closed_ && drive_stamp_ns_ > 0;
+    return workers_closed() && bt_closed_ && drive_closed();
   }
 
   // Transport/parser exceptions also invalidate this one observation permanently.
@@ -159,7 +163,7 @@ private:
   std::string scope_, parent_;
   std::uint64_t generation_;
   std::array<Child, 2> children_;
-  bool bt_closed_ = false, rejected_ = false;
+  bool bt_closed_ = false, rejected_ = false, drive_rejected_ = false;
   std::int64_t drive_stamp_ns_ = 0;
 };
 }  // namespace robot_harness::nav2_example

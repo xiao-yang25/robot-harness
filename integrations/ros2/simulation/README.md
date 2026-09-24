@@ -136,5 +136,10 @@ adds close observations to the real Nav2 nodes/BT actions. `native_drive/` check
 scope/generation before applying motion; both drive and Owner use the existing
 [`fixture_interfaces`](../fixture_interfaces/CMakeLists.txt) definitions.
 The checks use Gazebo pose and runtime observations in addition to Owner output.
+Before replacing Nav2's fresh inactive action servers, the wrappers require an
+unknown-UUID result response from each server's own executor. This prevents
+immediate replacement from cancelling a thread before its spin loop starts;
+service discovery alone is insufficient. The bounded query submits no goal and
+does not provide task completion or settlement evidence.
 See [third-party notices](THIRD_PARTY_NOTICES.md) for the derived drive source;
 the project's licensing decision remains pending.

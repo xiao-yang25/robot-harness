@@ -1,4 +1,5 @@
 // Research-only ComputePathToPose worker boundary, Nav2 1.1.20.
+#include "action_server_startup.hpp"
 #include "native_log.hpp"
 #include <nav2_planner/planner_server.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -44,6 +45,11 @@ protected:
     const auto result = PlannerServer::on_configure(state);
     if (result != nav2_util::CallbackReturn::SUCCESS) {
       return result;
+    }
+    if (!await_inactive_action_server(shared_from_this(), "compute_path_to_pose",
+                                      *action_server_pose_)) {
+      RCLCPP_ERROR(get_logger(), "Inactive planner action executor did not respond");
+      return nav2_util::CallbackReturn::FAILURE;
     }
     action_server_pose_.reset();
     action_server_pose_ = std::make_unique<ActionServerToPose>(

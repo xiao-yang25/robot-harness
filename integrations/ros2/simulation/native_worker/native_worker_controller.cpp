@@ -1,4 +1,5 @@
 // Research-only one-shot native FollowPath completion observation, Nav2 1.1.20.
+#include "action_server_startup.hpp"
 #include "native_log.hpp"
 #include <nav2_controller/controller_server.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -49,6 +50,10 @@ protected:
     const auto result = ControllerServer::on_configure(state);
     if (result != nav2_util::CallbackReturn::SUCCESS) {
       return result;
+    }
+    if (!await_inactive_action_server(shared_from_this(), "follow_path", *action_server_)) {
+      RCLCPP_ERROR(get_logger(), "Inactive controller action executor did not respond");
+      return nav2_util::CallbackReturn::FAILURE;
     }
     // Replace before activation. Use the ordinary base type, not deletion through
     // a non-virtual SimpleActionServer destructor. All its ROS callbacks now share

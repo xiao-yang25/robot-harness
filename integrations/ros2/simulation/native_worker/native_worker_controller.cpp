@@ -4,8 +4,11 @@
 #include <nav2_controller/controller_server.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
+#include <tf2/exceptions.h>
+#include <tf2/time.h>
 
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -112,7 +115,55 @@ private:
     // Returning here is not enough: SimpleActionServer::work still has its tail.
   }
 
+  // Sample this controller's actual plugin buffer, without waiting for TF or
+  // influencing readiness/authority. The raw observer has a different buffer.
+  void observe_transforms() {
+    const auto steady = std::chrono::steady_clock::now();
+    if (steady < next_tf_sample_) {
+      return;
+    }
+    next_tf_sample_ = steady + 1s;
+    auto buffer = costmap_ros_ ? costmap_ros_->getTfBuffer() : nullptr;
+    if (!buffer) {
+      return;
+    }
+    const auto query_time = costmap_ros_->now();
+    const auto& local_frame = costmap_ros_->getGlobalFrameID();
+    bool latest_available = false;
+    int64_t latest_stamp = 0;
+    try {
+      const auto latest = buffer->lookupTransform("map", local_frame, tf2::TimePointZero);
+      latest_stamp = rclcpp::Time(latest.header.stamp).nanoseconds();
+      latest_available = true;
+    } catch (const tf2::TransformException&) {
+      // Missing/connectivity failures remain unknown, never a zero-age sample.
+    }
+    const auto no_wait = rclcpp::Duration::from_seconds(0);
+    const bool map_at_query = buffer->canTransform("map", local_frame, query_time, no_wait);
+    const bool base_at_query =
+        buffer->canTransform(local_frame, costmap_ros_->getBaseFrameID(), query_time, no_wait);
+    const auto steady_ns =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(steady.time_since_epoch()).count();
+    std::lock_guard<std::mutex> lock(log_mutex_);
+    log_ << "{\"event\":\"controller_tf_sample\",\"steady_ns\":" << steady_ns
+         << ",\"controller_clock_ns\":" << now().nanoseconds()
+         << ",\"costmap_clock_ns\":" << query_time.nanoseconds()
+         << ",\"map_odom_available\":" << (latest_available ? "true" : "false")
+         << ",\"map_odom_stamp_ns\":";
+    if (latest_available) {
+      log_ << latest_stamp;
+    } else {
+      log_ << "null";
+    }
+    log_ << ",\"map_odom_at_costmap_time\":" << (map_at_query ? "true" : "false")
+         << ",\"odom_base_at_costmap_time\":" << (base_at_query ? "true" : "false") << "}"
+         << std::endl;
+  }
+
+  std::chrono::steady_clock::time_point next_tf_sample_{};
+
   void observe_worker() {
+    observe_transforms();
     std::string uuid;
     bool in_tail;
     unsigned calls;

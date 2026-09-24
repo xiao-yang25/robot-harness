@@ -1274,6 +1274,17 @@ checks both controller/planner action types in a task namespace, and rejects an
 active server. It submits no goal. CTest limits this check to 20 seconds. The
 default Core build and its ROS independence are unchanged.
 
+Controller TF diagnostics are compiled by the simulation image build, not the
+lighter Owner-only Humble job. They read the actual plugin buffer once per second
+with zero-wait lookups. Runtime validation must compare raw observations with
+`controller_tf_sample` in both task contexts; a separate stationary fault probe
+can withhold only the controller's map transform, restore it, disable/restore
+AMCL broadcasting, and verify the unchanged readiness response. Include an
+initially missing transform and controller deactivate/cleanup. These controlled
+faults validate diagnostic distinctions, not the cause of earlier intermittent
+failures. Normal navigation remains a separate regression; no diagnostic field
+is used as authority or settlement evidence.
+
 Local package validation on 2026-09-24 used Ubuntu 22.04/Humble in an amd64
 Docker container. The image build passed the native BT test and all five Owner
 tests; all nine tutorial scenarios passed and each owned container was removed.

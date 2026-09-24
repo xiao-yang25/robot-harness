@@ -45,10 +45,10 @@ than assuming native completion alone permits another task.
 
 For ROS 2, read the [navigation integration scope](ROS2_INTEGRATION.md), then the
 [optional Humble example](../integrations/ros2/nav2_observation/README.md).
-Its two binaries have different settlement contracts. Compilation is available
-from this repository; full simulation execution still needs the research native
-fixture. No general ROS adapter SDK or physical-robot integration guide is
-available yet. Discuss a concrete backend through an
+Its two binaries have different settlement contracts. Use the
+[container simulation tutorial](../integrations/ros2/simulation/README.md) to build
+and run the settlement scenarios from source. No general ROS adapter SDK or
+physical-robot integration guide is available yet. Discuss a concrete backend through an
 [integration proposal](https://github.com/xiao-yang25/robot-harness/issues/new?template=proposal.md).
 
 ## Verify or contribute a change

@@ -1,0 +1,51 @@
+name: Humble navigation simulation
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Isolated navigation scenario
+        type: choice
+        default: normal
+        options:
+          - normal
+          - cancel-moving
+          - replace-moving
+          - runtime-odometry-loss
+          - runtime-odometry-replay
+          - runtime-odometry-resume
+          - runtime-clock-loss
+          - runtime-stop-unreachable
+          - runtime-stop-unreachable-withhold-drive-ack
+
+permissions:
+  contents: read
+
+jobs:
+  simulation:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check launcher result and cleanup boundaries
+        run: python3 -m unittest discover -s integrations/ros2/simulation -p test_launcher.py
+      - name: Build source and check native and Owner predicates
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 integrations/ros2/simulation/simulate.py build 2>&1 | tee simulation-build.log
+      - name: Run isolated scenario
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: python3 integrations/ros2/simulation/simulate.py run "$SCENARIO" --output simulation-results/run
+      - name: Retain diagnostics including failed runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-${{ inputs.scenario }}
+          path: |
+            simulation-build.log
+            simulation-results/run
+          retention-days: 14

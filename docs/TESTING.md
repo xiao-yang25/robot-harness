@@ -1244,16 +1244,20 @@ for the nine listed settlement/cancellation/loss scenarios. Earlier observations
 in this document remain tied to their original fixtures and revisions.
 
 The automatic [Humble workflow](../.github/workflows/ros2.yml) retains its five
-Owner predicate checks and adds eleven Python launcher and mirror-configuration checks.
+Owner predicate checks, eleven Python launcher/mirror checks and seven diagnostic
+checks. The latter use real child processes to verify query success, malformed
+pose/nonzero-exit rejection, timeout evidence and process reaping, plus diagnostic-collection/logging
+failure and receipt-versus-progress semantics. These do not reproduce the
+historical intermittent Gazebo or TF failures.
 A separate [manual simulation workflow](../.github/workflows/simulation.yml)
 builds the complete image, runs one selected motion scenario and uploads logs
 even on failure. Its timeout is 45 minutes, including dependency downloads; it
 is not a required check or evidence of a run until executed.
 
-Run launcher checks without Docker:
+Run launcher and diagnostic checks without Docker:
 
 ```sh
-python3 -m unittest discover -s integrations/ros2/simulation -p test_launcher.py
+python3 -m unittest discover -s integrations/ros2/simulation -p 'test_*.py'
 ```
 
 These use a fake Docker process to distinguish natural completion, detached

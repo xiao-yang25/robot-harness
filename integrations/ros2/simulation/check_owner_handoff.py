@@ -3,17 +3,14 @@ import json
 import math
 import os
 from pathlib import Path
-import subprocess
+from gazebo_pose import query_pose
 
 mode = os.environ['M4_CONTEXT_CASE']
 replacement = mode.startswith('replace-moving')
 fault = mode.removeprefix('replace-moving-') if replacement else mode
 rows = [json.loads(line) for line in Path('/output/owner.jsonl').read_text().splitlines()
         if line.startswith('{')]
-result = subprocess.run(['gz', 'model', '-m', 'turtlebot3_waffle', '-p'],
-                        capture_output=True, text=True, timeout=5, check=True)
-pose = [float(value) for value in result.stdout.split()]
-assert len(pose) == 6 and all(math.isfinite(value) for value in pose)
+pose = query_pose('final')
 last = rows[-1]
 if mode in ('normal', 'replace-moving'):
     assert last['event'] == 'owner_handoff_result' and last['passed']

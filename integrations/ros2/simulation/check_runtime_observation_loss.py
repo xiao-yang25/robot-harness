@@ -3,7 +3,7 @@ import json
 import math
 import os
 from pathlib import Path
-import subprocess
+from gazebo_pose import query_pose
 
 
 def rows(name):
@@ -88,10 +88,7 @@ if mode == 'runtime-odometry-resume':
     restored = [row for row in faults if row['event'] == 'observation_flow_restored']
     assert len(restored) == 1
     assert lost[0]['steady_ms'] * 10**6 < restored[0]['steady_ns'] < last['steady_ms'] * 10**6
-pose = subprocess.run(['gz', 'model', '-m', 'turtlebot3_waffle', '-p'],
-                      capture_output=True, text=True, timeout=5, check=True)
-values = [float(value) for value in pose.stdout.split()]
-assert len(values) == 6 and all(math.isfinite(value) for value in values)
+values = query_pose('runtime_final')
 distance = math.hypot(values[0] + 2, values[1] + .5)
 assert .5 < distance < 2 and math.hypot(values[0] - .7, values[1] + .5) > .5
 print(json.dumps(dict(passed=True, case=mode, gazebo_final=values, displacement_m=distance,

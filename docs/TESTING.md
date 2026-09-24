@@ -1294,3 +1294,22 @@ and removed its container. Actual container settings were checked for no
 network, dropped capabilities and the documented resource limits. Eleven host
 tests passed separately. These are local package observations, not a completed
 remote workflow or a resolution of the earlier TF/query failures.
+
+
+### Optional simulation viewer
+
+The [local viewer](../integrations/ros2/simulation/README.md#watch-a-live-run)
+executes the existing scenario launcher. Python discovery in Humble and manual
+simulation CI includes viewer HTTP Host/Origin/token/path/session rejection,
+output symlink/FIFO handling, stale/completed frame classification, conservative
+result/cleanup handling, duplicate launch and real child shutdown tests. These
+host tests do not prove Docker cleanup or robot motion.
+
+For changes to the visual execution path, build `--visual` and run normal,
+cancel-moving and replace-moving with real frames and the existing scenario
+checks. Inspect the browser's live/final-frame distinction and Owner event
+presentation, plus raw output and actual container removal. Check one mid-run
+viewer interruption separately; its outcome must be interrupted, not passed or
+settled. Preserve failed attempts. A successful headless run does not prove the
+optional display tools work, and viewer integration does not establish unfamiliar
+contributor usability or physical-robot safety.

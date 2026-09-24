@@ -54,13 +54,15 @@ Continue with [two-step tasks](examples/README.md#local-compute-and-two-step-tas
 [cancellation](examples/README.md#failure-cancellation-and-deadlines), or the
 [Ubuntu container](docs/TESTING.md#ubuntu-development-container).
 [Build troubleshooting](examples/README.md#if-a-command-fails).
-For robot motion, follow the [Humble/Gazebo simulation tutorial](integrations/ros2/simulation/README.md).
+For robot motion, follow the [Humble/Gazebo simulation tutorial](integrations/ros2/simulation/README.md),
+or use the [local live viewer](integrations/ros2/simulation/README.md#watch-a-live-run)
+to watch navigation, cancellation and replacement.
 
 ## Current scope
 
 | Available today | Next |
 |---|---|
-| Execution authority, guarded results, cancellation and deadlines | Interactive simulation and backend tutorials |
+| Execution authority, guarded results, cancellation and deadlines | Contributor reproduction and further backend tutorials |
 | Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
 | Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
 

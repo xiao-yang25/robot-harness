@@ -7,9 +7,10 @@ Owner, launch support and independent scenario checks. No research workspace,
 prebuilt project image or host ROS installation is required.
 
 It is an isolated experimental simulator, not a general ROS adapter or robot
-controller. The first package runs without a graphical window. See the
-[recorded demonstration](https://xiao-yang25.github.io/robot-harness/) for the
-visual introduction; the recording is a separate earlier normal-navigation run.
+controller. The default package runs without a graphical window; the optional
+[local viewer](#watch-a-live-run) captures RViz from the same scenario.
+The [recorded introduction](https://xiao-yang25.github.io/robot-harness/) remains
+a separate earlier normal-navigation run.
 
 ## First run
 
@@ -34,6 +35,55 @@ The launcher prints the output location and final status. It returns nonzero on
 failed assertions, startup failure, timeout, interruption or failed container
 cleanup. Allow up to about five minutes per case; startup and emulation affect
 elapsed time. There is no automatic retry.
+
+## Watch a live run
+
+Build the optional display layer, then open the loopback viewer:
+
+```sh
+python3 integrations/ros2/simulation/simulate.py build --visual
+python3 integrations/ros2/simulation/viewer.py --open
+```
+
+Open `http://127.0.0.1:8765` if the browser does not open automatically. The
+Chinese-language page offers normal A→B, moving cancellation, and moving
+replacement. Each button starts one existing scenario through `simulate.py`,
+with a fresh output directory and the same Owner, native nodes and checker.
+Cancellation occurs automatically after about 0.5 m of observed motion; this is
+not an interactive remote-control or manual cancellation API.
+
+Frames come from RViz at 1600×900, captured up to five times per second. The
+page shows Owner events and the launcher's final result separately. Frames older
+than three seconds are not marked live; after the process exits the last frame
+is explicitly static. Missing frames or disconnected HTTP do not prove the robot
+stopped. The viewer does not synthesize a trajectory or substitute old recordings.
+
+The **interrupt** button asks the launcher to terminate and remove this run's
+container. It is whole-simulator teardown, not native cancellation or settlement.
+The page waits for the cleanup record before permitting another run. Closing a
+browser tab does not stop the scenario; the existing container/host limits still
+apply. Exiting the viewer normally requests cleanup. Host SIGKILL/power loss
+cannot guarantee host cleanup; use the recorded container identity to reconcile.
+
+Results default to `simulation-results/viewer/viewer-<id>/run`; the sibling
+`launcher.log` records host failures. Use `--output`, `--image`, or `--port` on
+`viewer.py` to select another local result root, visual image or loopback port.
+The optional image contains Xvfb, ffmpeg and RViz; it needs no research files,
+mounted host binary, host X server, robot device or additional host Python library.
+RViz limits Mesa software-rendering workers to one. It adds display work within
+the same 2 CPU / 4 GB limits; this is demonstration
+evidence, not a performance or timing guarantee.
+
+For a visible run without the web server:
+
+```sh
+python3 integrations/ros2/simulation/simulate.py run replace-moving --visual --output simulation-results/visual-replace-01
+```
+
+The manual GitHub simulation workflow also accepts `visual: true`, retaining
+`live.jpg`, RViz/capture logs and the usual evidence. Default headless builds
+select the `simulation` Docker target; visual builds select `visual`. Direct
+Docker builds should select the intended target explicitly.
 
 ## Try cancellation, replacement and loss
 

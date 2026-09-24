@@ -3,6 +3,10 @@ name: Humble navigation simulation
 on:
   workflow_dispatch:
     inputs:
+      visual:
+        description: Include RViz capture in the isolated run
+        type: boolean
+        default: false
       scenario:
         description: Isolated navigation scenario
         type: choice
@@ -32,14 +36,23 @@ jobs:
       - name: Check launcher and diagnostics
         run: python3 -m unittest discover -s integrations/ros2/simulation -p 'test_*.py'
       - name: Build source and check native and Owner predicates
+        env:
+          VISUAL: ${{ inputs.visual }}
         shell: bash
         run: |
           set -o pipefail
-          python3 integrations/ros2/simulation/simulate.py build 2>&1 | tee simulation-build.log
+          flags=()
+          if [[ "$VISUAL" == true ]]; then flags+=(--visual); fi
+          python3 integrations/ros2/simulation/simulate.py build "${flags[@]}" 2>&1 | tee simulation-build.log
       - name: Run isolated scenario
         env:
           SCENARIO: ${{ inputs.scenario }}
-        run: python3 integrations/ros2/simulation/simulate.py run "$SCENARIO" --output simulation-results/run
+          VISUAL: ${{ inputs.visual }}
+        shell: bash
+        run: |
+          flags=()
+          if [[ "$VISUAL" == true ]]; then flags+=(--visual); fi
+          python3 integrations/ros2/simulation/simulate.py run "$SCENARIO" "${flags[@]}" --output simulation-results/run
       - name: Retain diagnostics including failed runs
         if: always()
         uses: actions/upload-artifact@v4

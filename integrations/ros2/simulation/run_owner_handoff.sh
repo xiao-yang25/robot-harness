@@ -6,9 +6,11 @@ case ${M4_CONTEXT_CASE:-} in normal|missing-controller|missing-map|withhold-feed
 # Supervise long-lived helpers while the Owner and checker run; early helper
 # termination, even exit 0, is a failed fixture rather than a valid scenario.
 helpers=()
+diagnostic_pid=''
 cleanup() {
   local status=$?
   trap - EXIT
+  if [[ -n $diagnostic_pid ]]; then kill -TERM "$diagnostic_pid" 2>/dev/null || true; fi
   for pid in "${helpers[@]}"; do kill -TERM "$pid" 2>/dev/null || true; done
   exit "$status"
 }
@@ -39,6 +41,9 @@ source /drive/share/m4_drive_probe/local_setup.bash
 export GAZEBO_PLUGIN_PATH="/drive/lib:${GAZEBO_PLUGIN_PATH:-}"
 export LD_LIBRARY_PATH="/drive/lib:${LD_LIBRARY_PATH:-}"
 export TURTLEBOT3_MODEL=waffle
+# Best-effort read-only observer; never affects the Owner or scenario verdict.
+python3 /simulation/simulation_diagnostics.py > /output/diagnostics.log 2>&1 &
+diagnostic_pid=$!
 export GAZEBO_MODEL_PATH="/opt/ros/humble/share/turtlebot3_gazebo/models:/usr/share/gazebo-11/models:${GAZEBO_MODEL_PATH:-}"
 export GAZEBO_MODEL_DATABASE_URI=''
 export M4_NATIVE_TAIL_MS=2500

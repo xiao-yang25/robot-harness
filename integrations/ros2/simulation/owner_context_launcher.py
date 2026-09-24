@@ -1,13 +1,13 @@
 """Creates the B fixture on request; never admits, sends goals or opens drive."""
 import os
 import json
-import math
 import time
 import subprocess
 from pathlib import Path
 import rclpy
 from rclpy.node import Node
 from std_srvs.srv import Trigger
+from gazebo_pose import query_pose
 
 
 class ContextLauncher(Node):
@@ -22,11 +22,7 @@ class ContextLauncher(Node):
             response.success = False
             response.message = 'single-use context already requested'
             return response
-        result = subprocess.run(['gz', 'model', '-m', 'turtlebot3_waffle', '-p'],
-                                capture_output=True, text=True, timeout=3, check=True)
-        pose = [float(value) for value in result.stdout.split()]
-        if len(pose) != 6 or not all(math.isfinite(value) for value in pose):
-            raise RuntimeError('invalid Gazebo pose')
+        pose = query_pose('A_closed', timeout=3)
         print(json.dumps(dict(event='gazebo_pose', phase='A_closed', xyz_rpy=pose,
                               steady_ns=time.monotonic_ns())), flush=True)
         Path('/output/b').mkdir(exist_ok=False)

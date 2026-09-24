@@ -78,6 +78,24 @@ source/build procedure, **not a byte-identical or permanently archived image**.
 If a required upstream version leaves the repository, the build fails and needs
 an explicit compatibility update. Do not silently relax the version checks.
 
+The read-only `simulation-diagnostics.jsonl` samples raw `/clock`, `/scan`,
+`/odom` and the map/odom transforms about once per wall-clock second, alongside
+Gazebo process states and cgroup CPU counters where available. Each stream records
+its last/highest timestamp, receipt age and the age since its highest timestamp
+advanced; repeated or older timestamps do not reset that age. Absent streams are
+omitted. A clock reset requires interpreting a new timeline; the diagnostic
+high-water mark does not reset automatically. These are observations at a separate subscriber, not proof that a
+controller received the same data. Raw odometry is upstream of fault injection.
+`diagnostics.log` records observer failures; missing diagnostics do not grant or
+revoke authority and do not override the scenario's existing verdict.
+
+`gazebo-queries.jsonl` records each actual pose query's phase, elapsed time,
+return code and bounded output. On timeout it samples the still-existing query
+and Gazebo processes before killing/reaping the query. The A-closed query retains
+its three-second wait, and checkers retain five seconds; there is no retry or
+fallback to Owner/odometry coordinates. Diagnostic collection and cleanup can
+add time after a timeout, within the outer container limit.
+
 ## Isolation and cleanup
 
 The launcher creates one container with no network, no host devices, no added
@@ -116,10 +134,14 @@ Do not use a global Docker prune: other tasks may need their images and volumes.
   come from the configured ROS repository. The default uses the official archives.
 - Version mismatch: report the missing version and `packages.txt` if available;
   the native wrappers depend on the stated Humble APIs.
-- Admission/TF failure: inspect `owner.jsonl`, `launch.log` and the B launch log.
+- Admission/TF failure: inspect `owner.jsonl`, `launch.log`, the B launch log
+  and `simulation-diagnostics.jsonl`. Compare raw clock/scan/TF progress, while
+  retaining the distinction between observer reception and local controller TF.
   Earlier research runs observed missing/stale map-to-odom transforms. This
   package does not claim those stability problems have been resolved.
-- External pose-query timeout: the checker retains its five-second query limit;
+- External pose-query timeout: inspect `gazebo-queries.jsonl` for phase, child
+  state and server state, then correlate with the timing samples. The checker
+  retains its five-second query limit;
   an earlier emulated run exceeded it. A later pass does not explain that failure.
 - OOM or timeout: retain `run.json` and all logs. Do not count a partial run as
   success or retry over the same directory.

@@ -7,8 +7,8 @@ import json
 import math
 import os
 from pathlib import Path
-import subprocess
 import time
+from gazebo_pose import query_pose
 
 
 def rows(path):
@@ -17,11 +17,7 @@ def rows(path):
 
 
 def position():
-    result = subprocess.run(['gz', 'model', '-m', 'turtlebot3_waffle', '-p'],
-                            capture_output=True, text=True, timeout=5, check=True)
-    pose = [float(value) for value in result.stdout.split()]
-    assert len(pose) == 6 and all(math.isfinite(value) for value in pose)
-    return pose
+    return query_pose('cancellation_check')
 
 
 mode = os.environ['M4_CONTEXT_CASE']

@@ -38,6 +38,6 @@ jobs:
           source /opt/ros/humble/setup.bash
           source install-nav2-interfaces/share/m4_drive_probe/local_setup.bash
           ctest --test-dir build-nav2 -R '^nav2_(requires_fresh_deployment|motion_window|closure_observations|cancel_response|runtime_observation_watch)$' --output-on-failure --no-tests=error
-      - name: Check simulation launcher result and cleanup boundaries
-        run: python3 -m unittest discover -s integrations/ros2/simulation -p test_launcher.py
+      - name: Check simulation launcher and diagnostics
+        run: python3 -m unittest discover -s integrations/ros2/simulation -p 'test_*.py'
       # Gazebo movement runs use the separate manual simulation workflow.

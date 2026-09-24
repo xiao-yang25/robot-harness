@@ -29,8 +29,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Check launcher result and cleanup boundaries
-        run: python3 -m unittest discover -s integrations/ros2/simulation -p test_launcher.py
+      - name: Check launcher and diagnostics
+        run: python3 -m unittest discover -s integrations/ros2/simulation -p 'test_*.py'
       - name: Build source and check native and Owner predicates
         shell: bash
         run: |

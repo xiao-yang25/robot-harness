@@ -89,6 +89,17 @@ controller received the same data. Raw odometry is upstream of fault injection.
 `diagnostics.log` records observer failures; missing diagnostics do not grant or
 revoke authority and do not override the scenario's existing verdict.
 
+The controller's `worker-native.jsonl` (and `b/worker-native.jsonl`) also records
+`controller_tf_sample` about once per second from the same TF buffer used by its
+plugins. It includes controller/costmap clocks, the latest map-to-odom stamp
+(`null` when unavailable), and zero-wait transform checks at the costmap clock.
+Compare it with the raw observer using monotonic `steady_ns`: advancing raw TF
+with a stale local stamp points to the receiver path; both stopping suggests an
+upstream issue. Neither pattern alone proves a root cause. Samples are not atomic
+across the two buffers. The exact-time base-transform check can be false between
+odometry updates and is not the existing readiness/tolerance decision. These
+observations never settle a task, clear an error or reopen authority.
+
 `gazebo-queries.jsonl` records each actual pose query's phase, elapsed time,
 return code and bounded output. On timeout it samples the still-existing query
 and Gazebo processes before killing/reaping the query. The A-closed query retains

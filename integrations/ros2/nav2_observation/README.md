@@ -8,9 +8,10 @@ navigation Host, or a completed M4 adapter.
 The single fixed simulation goal is (-2.0, -0.5) → (0.7, -0.5). A trusted launcher
 must create a fresh, exclusively owned, network-isolated simulator, supply its
 session identity and writable `/output`, and mount the binary under `/harness`.
-The development workspace currently owns that simulator/recording launcher;
-this product directory supplies the optional C++ build and execution contract.
-External-user simulation packaging remains to be delivered.
+The [simulation package](../simulation/README.md) builds the settlement Owner and
+its exclusive fixture from this repository. This directory also supports the
+standalone optional C++ build below. The earlier observation-only binary retains
+its narrower contract.
 
 ## Build
 

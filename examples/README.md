@@ -9,6 +9,8 @@ your directory in both the executable and worker paths if different. Examples
 return nonzero when their checks fail; a successful run establishes only the
 stated software scenario.
 
+For robot motion, use the separate [Humble/Gazebo simulation tutorial](../integrations/ros2/simulation/README.md). It builds its own isolated environment.
+
 ## Normal execution
 
 ```sh

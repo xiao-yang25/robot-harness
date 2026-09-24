@@ -1,7 +1,8 @@
 # Robot Harness engineering entry
 
-This is the product repository. Keep research fixtures, sealed evidence, personal
-environment details, and unrelated reference sources outside it.
+This is the product repository. Supported, isolated simulation support belongs in
+`integrations/ros2/simulation`. Keep exploratory research fixtures, sealed evidence,
+personal environment details, and unrelated reference sources outside it.
 
 ## Rules and knowledge entry points
 

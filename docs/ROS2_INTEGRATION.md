@@ -7,9 +7,10 @@ accepted-goal movement-time cancellation, replacement, observation-loss
 withdrawal and independent consumer-isolation experiments.
 The [example README](../integrations/ros2/nav2_observation/README.md) defines
 build commands and the trusted fresh/exclusive deployment premise.
-The optional profile is experimental and requires the research native fixture;
-public simulator packaging remains pending. The bounded observation-loss and
-unresponsive-navigator behavior is defined below; Owner-independent protection
+The optional profile is experimental. The [simulation package](../integrations/ros2/simulation/README.md)
+contains the native fixture and a source build/run tutorial for its isolated
+settlement scenarios. The bounded observation-loss and unresponsive-navigator
+behavior is defined below; Owner-independent protection
 and drive-channel loss remain outside the validated scope.
 Core and its public API remain ROS-independent.
 

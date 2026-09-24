@@ -54,18 +54,20 @@ Continue with [two-step tasks](examples/README.md#local-compute-and-two-step-tas
 [cancellation](examples/README.md#failure-cancellation-and-deadlines), or the
 [Ubuntu container](docs/TESTING.md#ubuntu-development-container).
 [Build troubleshooting](examples/README.md#if-a-command-fails).
+For robot motion, follow the [Humble/Gazebo simulation tutorial](integrations/ros2/simulation/README.md).
 
 ## Current scope
 
 | Available today | Next |
 |---|---|
-| Execution authority, guarded results, cancellation and deadlines | Reproducible simulation packaging and integration tutorials |
+| Execution authority, guarded results, cancellation and deadlines | Interactive simulation and backend tutorials |
 | Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
 | Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
 
 **Early-stage software and simulation.** No physical-robot integration or hard stop
 guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation
-uses an exclusive research fixture. See [tested behavior and limits](docs/TESTING.md#current-validation-baseline)
+uses an exclusive simulator. The source-built [simulation package](integrations/ros2/simulation/README.md)
+provides the matching native fixture. See [tested behavior and limits](docs/TESTING.md#current-validation-baseline)
 and the [architecture](docs/DESIGN.md#product-boundary). Learning and self-improvement
 are future directions, not current product capabilities.
 

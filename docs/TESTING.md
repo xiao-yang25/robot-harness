@@ -30,7 +30,7 @@ and results do not replace checks for the revision being changed.
 | GitHub-hosted Ubuntu 22.04 x86_64, GCC | All 57 CTests in Debug and ASan/UBSan | No ROS, hardware or deployment-timing validation |
 | Ubuntu 22.04 ARM64 in local Docker, GCC | All 57 Core CTests in Debug for the M4 second slice; earlier recovery-specific sanitizer results retained below | Runs in a Linux VM; not a target-device performance result |
 | macOS ARM64, AppleClang | All 47 portable CTests in Debug and ASan/UBSan before the Linux-only launcher correction | Linux recovery targets are not built; macOS is not currently a hosted CI job |
-| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and five local observation/deployment/cancel-response/freshness checks; separate Gazebo evidence below | CI compiles/tests predicates only; external-user simulator packaging remains pending |
+| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and five local observation/deployment/cancel-response/freshness checks; separate Gazebo evidence below | Automatic CI compiles/tests predicates and launcher boundaries; full movement uses the separate manual simulation workflow |
 | Other platforms/toolchains | No verified support claim | CMake platform branches alone are not platform validation |
 
 For a first run use [Build](../README.md#build) and the
@@ -1234,3 +1234,44 @@ No robot target or credential is configured by these instructions. Missing Linux
 or hardware evidence remains explicit; writing a test plan does not satisfy it.
 Build output is local and ignored by Git. Do not add log archives, private host
 details, or a second status registry merely to record a check.
+
+## Repository simulation package
+
+The [Humble/Gazebo tutorial](../integrations/ros2/simulation/README.md) builds the
+Owner, native worker extensions and drive directly from repository source. The
+source package removes the external research launcher/build-mount prerequisite
+for the nine listed settlement/cancellation/loss scenarios. Earlier observations
+in this document remain tied to their original fixtures and revisions.
+
+The automatic [Humble workflow](../.github/workflows/ros2.yml) retains its five
+Owner predicate checks and adds eleven Python launcher and mirror-configuration checks.
+A separate [manual simulation workflow](../.github/workflows/simulation.yml)
+builds the complete image, runs one selected motion scenario and uploads logs
+even on failure. Its timeout is 45 minutes, including dependency downloads; it
+is not a required check or evidence of a run until executed.
+
+Run launcher checks without Docker:
+
+```sh
+python3 -m unittest discover -s integrations/ros2/simulation -p test_launcher.py
+```
+
+These use a fake Docker process to distinguish natural completion, detached
+clients, missing verification, nonzero container exit and failed cleanup, and
+to reject reused output and prevent output links from redirecting host writes.
+Diagnostic write failure must not prevent container cleanup; a create timeout
+without a returned ID must retain an uncertain cleanup state and a unique name. They do not establish
+actual Docker cleanup or robot
+motion. Full simulation and interrupted-container observations must be recorded
+separately. The image build runs five Nav2 predicate tests plus the native BT
+halt test. The default Core build and its ROS independence are unchanged.
+
+Local package validation on 2026-09-24 used Ubuntu 22.04/Humble in an amd64
+Docker container. The image build passed the native BT test and all five Owner
+tests; all nine tutorial scenarios passed and each owned container was removed.
+The normal sequence moved A about 2.516 m and B about 1.827 m. A wrong-image
+run with no verifier was rejected, and interrupting an active run returned 130
+and removed its container. Actual container settings were checked for no
+network, dropped capabilities and the documented resource limits. Eleven host
+tests passed separately. These are local package observations, not a completed
+remote workflow or a resolution of the earlier TF/query failures.

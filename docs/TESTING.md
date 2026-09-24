@@ -6,20 +6,23 @@ their relevant target environments.
 
 ## Current validation baseline
 
-The latest functional baseline is M4's sequential navigation slice, merged as
-`e2e1ebe` through [PR #10](https://github.com/xiao-yang25/robot-harness/pull/10).
-Its [Core CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35768798923)
-passed all 57 Linux tests in Debug and ASan/UBSan; its
-[Humble CI](https://github.com/xiao-yang25/robot-harness/actions/runs/35768798949)
-compiled both optional binaries and passed three local checks. That job does not
-run a simulator. Actual navigation observations are recorded in the
-[sequential verification section](#optional-sequential-nav2-settlement).
+The latest functional baseline is `56dd7ef`, merged through
+[PR #19](https://github.com/xiao-yang25/robot-harness/pull/19). Its
+[Core CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36027030969)
+passed all 57 Linux tests in Debug and ASan/UBSan. Its
+[Humble CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36027030570)
+compiled both optional binaries and passed five Owner checks and 26 Python
+launcher, diagnostics and viewer tests. Automatic Humble CI does not run Gazebo.
+The separate [hosted visual simulation](https://github.com/xiao-yang25/robot-harness/actions/runs/36024898474)
+validated normal A-to-B navigation for the reviewed feature revision `13ad3b7`:
+A moved about 2.511 m and B 1.870 m, with successful verification and container
+removal. That run does not cover every fault scenario or unfamiliar contributors.
 
-The moving-cancellation increment adds a fourth local Humble check and the
-[bounded simulation cases](#optional-movement-time-nav2-cancellation) below.
-The [replacement scenarios](#optional-movement-time-nav2-replacement) reuse
-those checks and add separate simulation coverage. The linked hosted runs above
-predate those increments and the runtime observation-loss work below.
+The [simulation package](#repository-simulation-package) now includes the
+optional live viewer. Local normal, moving-cancel, replacement and interruption
+observations supplement the hosted run. Two local B-context response failures
+remain unexplained; successful later runs and a renderer thread limit do not
+establish their root cause or sustained reliability. M4 remains in progress.
 
 The sections below retain older dated evidence, including M3c at `dabad9b`
 ([PR #7](https://github.com/xiao-yang25/robot-harness/pull/7)). Historical counts
@@ -29,7 +32,7 @@ and results do not replace checks for the revision being changed.
 |---|---|---|
 | GitHub-hosted Ubuntu 22.04 x86_64, GCC | All 57 CTests in Debug and ASan/UBSan | No ROS, hardware or deployment-timing validation |
 | Ubuntu 22.04 ARM64 in local Docker, GCC | All 57 Core CTests in Debug for the M4 second slice; earlier recovery-specific sanitizer results retained below | Runs in a Linux VM; not a target-device performance result |
-| macOS ARM64, AppleClang | All 47 portable CTests in Debug and ASan/UBSan before the Linux-only launcher correction | Linux recovery targets are not built; macOS is not currently a hosted CI job |
+| macOS ARM64, AppleClang | All 47 portable Debug CTests on `56dd7ef`; earlier ASan/UBSan results predate the Linux-only launcher correction | Compatible SDK selected explicitly; Linux recovery targets are not built; no hosted macOS CI job |
 | Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and five local observation/deployment/cancel-response/freshness checks; separate Gazebo evidence below | Automatic CI compiles/tests predicates and launcher boundaries; full movement uses the separate manual simulation workflow |
 | Other platforms/toolchains | No verified support claim | CMake platform branches alone are not platform validation |
 
@@ -37,6 +40,42 @@ For a first run use [Build](../README.md#build) and the
 [example guide](../examples/README.md). The normal CTest command discovers all
 tests built for that platform. Later revisions must carry their own CI results;
 the links here establish only the recorded revision.
+
+## M1-M3 applicability to the ROS profile
+
+This maps existing semantics to `nav2-fixed-context-sequence-v1`; it does not
+transfer every local-worker guarantee to ROS. Simulation evidence assumes an
+exclusive fresh deployment, a surviving and polled Owner, and a reachable drive
+channel. The historical sections below retain the revision and scope of each
+observation. Unit tests, simulation runs and hardware evidence are distinct.
+
+| Concern | Applicable ROS evidence | Remaining limit |
+|---|---|---|
+| M1 admission, dispatch and usable results | [Observation](#optional-humble-nav2-observation): absent binding and pre-dispatch cancellation prevent send; accepted UUID, feedback and result flow through the Owner/Core boundary | The original observation binary leaves settlement pending and blocks a second admission |
+| M1 settlement before the next action | [Sequential run](#optional-sequential-nav2-settlement): matching worker/BT closure, drive generation, fresh quiet motion and B readiness precede Core settlement, admission and dispatch | B remains pending without a C candidate; no reusable arbitrary-length ROS Host |
+| M2 failure and unusable evidence | Sequential and [cancellation](#optional-movement-time-nav2-cancellation) negatives withhold planner/drive/odometry facts; missing evidence blocks continuation | Native failure, cancel acknowledgement, native terminal and settlement remain separate |
+| M2 moving cancellation and late output | ROS simulation observes exact-goal cancellation and separate closure; Core tests cover rejecting success after revocation | The finite ROS test requires a Cancelled result and does not itself force a late-success race; no hard physical stop deadline |
+| M2 operation deadlines | Core deadline tests remain in the Core suite; simulation launcher deadlines bound the whole experiment | An outer process timeout is not a demonstrated ROS operation-deadline/settlement contract |
+| M3 replacement and stale work | [Replacement](#optional-movement-time-nav2-replacement) closes A, checks fresh B context, settles A and opens generation 2 before sending B; retained old producer probes test isolation | Fixed A/B scenario, not an arbitrary-goal/preemption API |
+| M3 observation loss and independent stopping | [Runtime loss](#optional-runtime-observation-loss) withdraws authority; [consumer isolation](#optional-independent-consumer-isolation) tests the declared stop path with an unresponsive navigator | Full network/drive loss, Owner death and hard stop bounds are not validated |
+| M3 provider rebinding and recovery | Core/Linux Host checks cover their documented local execution domains | Generic ROS rebinding, Owner restart and durable task recovery are unsupported by this profile |
+| Environment-driven task revision | Existing cancel/replace trigger is roughly 0.5 m of movement | Actual obstruction, fresh perception and deterministic wait/revision remain the next functional increment; fixed-distance triggers do not cover it |
+
+For an unfamiliar checkout, follow [Build](../README.md#build), then the
+[simulation tutorial](../integrations/ros2/simulation/README.md). Check the
+scenario verdict, Owner events and container removal separately. A picture of a
+stationary robot, native terminal result or container teardown alone cannot
+establish settlement. Independent reproduction is useful evidence; only an
+actual new user's attempt establishes contributor feedback.
+
+On 2026-09-25, an independent public checkout of `56dd7ef` on macOS ARM64
+passed 47 portable Debug CTests, produced the documented 29/61 example results,
+and passed all 26 Python simulation tests. The default SDK failed the compiler
+probe before project compilation; the documented [SDK selection](#macos-sdk-selection)
+path succeeded with a compatible installed SDK. The HTTP test required loopback
+binding permission. This was an internal tutorial audit, not outside feedback,
+a new sanitizer run, or a new full simulation build. Linux movement evidence
+remains the separately linked hosted run.
 
 ## Optional Humble Nav2 observation
 
@@ -79,8 +118,9 @@ still pending, no JavaScript errors and owned-container cleanup checked.
 Independent review found no remaining blockers for this increment; it does not
 accept native closure or a persistent Host. These observations concern the
 uncommitted worktree based on `b0929ab`, not a released revision. The
-research launcher/recorder and browser viewer are not yet packaged here for
-external users. Earlier startup-query failures are retained as incomplete runs;
+research launcher/recorder and browser viewer were not packaged at that revision;
+the current [repository package](#repository-simulation-package) supplies a
+public source build/run path. Earlier startup-query failures are retained as incomplete runs;
 waiting for actual clock/odometry publications precedes the successful runs.
 
 This demonstrates normal submission and observation under a fresh/exclusive

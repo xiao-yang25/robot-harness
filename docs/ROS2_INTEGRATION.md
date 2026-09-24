@@ -14,6 +14,14 @@ behavior is defined below; Owner-independent protection
 and drive-channel loss remain outside the validated scope.
 Core and its public API remain ROS-independent.
 
+The [M1-M3 applicability mapping](TESTING.md#m1-m3-applicability-to-the-ros-profile)
+distinguishes validated ROS behavior from local-only guarantees and missing
+evidence. The next functional increment is an actual obstructed-path task:
+fresh sensor/costmap observations drive a deterministic caller to wait or revise,
+using the existing cancellation/settlement/handoff path. Missing or frozen
+perception must remain unknown. The current fixed-distance cancellation trigger
+does not demonstrate that task. A model is not required for this baseline.
+
 ## Sequential settlement boundary
 
 Execution profile `nav2-fixed-context-sequence-v1` has the normal scenario with two fixed goals:

@@ -19,5 +19,8 @@ movement-time cancellation, durable recovery or physical-robot safety. The
 observation-only path kept settlement pending and denied a second admission.
 Current behavior and validation are documented in
 [Testing](../../TESTING.md#current-validation-baseline) and
-[ROS integration](../../ROS2_INTEGRATION.md). A portable end-to-end simulation
-package remains in progress; the clip is not a claim that it is already available.
+[ROS integration](../../ROS2_INTEGRATION.md). The current
+[simulation tutorial](../../../integrations/ros2/simulation/README.md)
+provides a source build, nine bounded scenarios and an optional live viewer.
+This historical recording does not demonstrate those later capabilities;
+public cancellation and handoff recordings remain to be added.

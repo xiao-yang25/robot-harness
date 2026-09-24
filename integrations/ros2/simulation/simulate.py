@@ -15,6 +15,7 @@ from configure_mirror import validate_mirror_url
 
 ROOT = Path(__file__).resolve().parents[3]
 IMAGE = 'robot-harness-simulation:humble'
+VISUAL_IMAGE = 'robot-harness-simulation:humble-visual'
 CASES = ('normal', 'cancel-moving', 'replace-moving',
          'runtime-odometry-loss', 'runtime-odometry-replay',
          'runtime-odometry-resume', 'runtime-clock-loss',
@@ -52,7 +53,8 @@ def run_case(args):
     previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     status = {'case': args.case, 'run_id': run_id, 'image': args.image,
               'container_name': container_name,
-              'platform': 'linux/amd64', 'result': 'incomplete'}
+              'platform': 'linux/amd64', 'visual': bool(getattr(args, 'visual', False)),
+              'result': 'incomplete'}
     exit_code = 1
     attached = None
     print(f'Logs and result: {output}', flush=True)
@@ -70,7 +72,8 @@ def run_case(args):
                    '--user', f'{os.getuid()}:{os.getgid()}',
                    '--mount', f'type=bind,source={output},target=/output',
                    '-e', 'M4_ISOLATED_SIMULATION=1', '-e', f'M4_FRESH_NAV2_RUN={run_id}',
-                   '-e', f'M4_CONTEXT_CASE={args.case}', image]
+                   '-e', f'M4_CONTEXT_CASE={args.case}',
+                   '-e', f'M4_VISUAL={int(getattr(args, "visual", False))}', image]
         create_attempted = True
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, timeout=60)
         container = cidfile.read_text().strip()
@@ -158,16 +161,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     build = commands.add_parser('build', help='build the image and run native/Owner unit checks')
-    build.add_argument('--image', default=IMAGE)
+    build.add_argument('--image')
+    build.add_argument('--visual', action='store_true', help='include optional live display tools')
     build.add_argument('--ubuntu-mirror', help='optional HTTPS Ubuntu archive mirror')
     run = commands.add_parser('run', help='run one case in a fresh container')
     run.add_argument('case', choices=CASES)
-    run.add_argument('--image', default=IMAGE)
+    run.add_argument('--image')
+    run.add_argument('--visual', action='store_true', help='capture actual RViz frames')
     run.add_argument('--output', required=True, help='new directory; existing paths are rejected')
     args = parser.parse_args()
+    args.image = args.image or (VISUAL_IMAGE if args.visual else IMAGE)
     if args.command == 'build':
         command = ['docker', 'build', '--platform', 'linux/amd64',
-                   '--progress=plain', '-t', args.image, '-f',
+                   '--progress=plain', '--target', 'visual' if args.visual else 'simulation',
+                   '-t', args.image, '-f',
                    str(ROOT / 'integrations/ros2/simulation/Dockerfile')]
         if args.ubuntu_mirror:
             try:

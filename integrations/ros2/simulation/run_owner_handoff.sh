@@ -41,6 +41,7 @@ source /drive/share/m4_drive_probe/local_setup.bash
 export GAZEBO_PLUGIN_PATH="/drive/lib:${GAZEBO_PLUGIN_PATH:-}"
 export LD_LIBRARY_PATH="/drive/lib:${LD_LIBRARY_PATH:-}"
 export TURTLEBOT3_MODEL=waffle
+
 # Best-effort read-only observer; never affects the Owner or scenario verdict.
 python3 /simulation/simulation_diagnostics.py > /output/diagnostics.log 2>&1 &
 diagnostic_pid=$!
@@ -71,6 +72,16 @@ plugins[0].set('filename', 'libscoped_diff_drive.so')
 ET.SubElement(plugins[0], 'generation_mode').text = 'true'
 model.write('/output/scoped-waffle.model', encoding='unicode')
 PY
+if [[ ${M4_VISUAL:-0} == 1 ]]; then
+  python3 /simulation/configure_view.py
+  LP_NUM_THREADS=1 rviz2 -d /output/live-view.rviz --ros-args -p use_sim_time:=true > /output/rviz.log 2>&1 &
+  helpers+=($!)
+  ffmpeg -nostdin -y -loglevel error -f x11grab -video_size 1600x900 \
+    -framerate 5 -i "$DISPLAY" -threads 1 -pix_fmt yuvj444p \
+    -q:v 2 -f image2 -update 1 -atomic_writing 1 /output/live.jpg \
+    > /output/capture.log 2>&1 &
+  helpers+=($!)
+fi
 python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
 helpers+=($!)
 ros2 launch /simulation/native_worker/producer_scope.launch.py headless:=True use_rviz:=False \

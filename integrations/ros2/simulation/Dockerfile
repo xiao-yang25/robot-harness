@@ -1,4 +1,4 @@
-FROM ros:humble-ros-base-jammy
+FROM ros:humble-ros-base-jammy AS simulation
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ARG UBUNTU_MIRROR
@@ -30,3 +30,10 @@ ENV LIBGL_ALWAYS_SOFTWARE=1 QT_X11_NO_MITSHM=1 ROS_LOCALHOST_ONLY=1 ROS_DOMAIN_I
 ENV HOME=/tmp/simulation-home PYTHONUNBUFFERED=1
 WORKDIR /simulation
 ENTRYPOINT ["bash", "/simulation/entrypoint.sh"]
+
+# Optional display tools stay out of the default headless target.
+FROM simulation AS visual
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb xauth ffmpeg ros-humble-rviz2 \
+    && rm -rf /var/lib/apt/lists/*
+RUN dpkg-query -W > /simulation/packages.txt

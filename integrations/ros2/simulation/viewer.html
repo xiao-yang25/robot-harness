@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Robot Harness · 仿真观察台</title>
+<style>
+:root{color-scheme:light;--paper:#f4f3ed;--ink:#18251f;--muted:#647369;--line:#d8ded5;--green:#275d49}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button{font:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.wrap{max-width:1450px;margin:auto;padding:28px 36px}header{display:flex;justify-content:space-between;align-items:center;padding-bottom:22px;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:700;letter-spacing:-.5px}.brand img{width:40px;height:40px;padding:6px;background:#17271f;border-radius:10px}.eyebrow{font-size:11px;color:var(--muted);letter-spacing:1.6px}h1{font-size:clamp(28px,4vw,42px);line-height:1.25;letter-spacing:-1.2px;margin:30px 0 12px}.intro{color:var(--muted);max-width:750px;margin:0 0 26px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px}.screen{overflow:hidden;background:#202722;color:#eff4ec;border-radius:14px}.screenhead,.screenfoot{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;font-size:12px;gap:10px}.screenfoot{color:#a5b5a7;font-size:11px}.dot{display:inline-block;width:7px;height:7px;background:#8b9689;border-radius:50%;margin-right:8px}.dot.live{background:#dceb8a;box-shadow:0 0 0 4px #dceb8a15}.screen button{border:1px solid #5a695d;border-radius:6px;background:transparent;color:inherit;padding:4px 10px}.stage{aspect-ratio:16/9;position:relative;display:grid;place-items:center}.stage img{width:100%;height:100%;object-fit:contain;display:block}.stage [hidden]{display:none}.placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:25px;gap:10px}.placeholder strong{font-size:22px;font-weight:500}.placeholder span{color:#a5b5a7;max-width:380px}.screen:fullscreen{display:flex;flex-direction:column}.screen:fullscreen .stage{flex:1;min-height:0;aspect-ratio:auto}aside{border:1px solid var(--line);border-radius:14px;padding:22px;background:#fbfcf7;height:fit-content}h2{font-size:16px;margin:0 0 17px}.cases{display:grid;gap:10px}.case{text-align:left;border:1px solid var(--line);border-radius:9px;padding:12px 14px;background:white;color:var(--ink)}.case strong,.case span{display:block}.case span{font-size:11px;color:var(--muted);margin-top:3px}.case:hover:not(:disabled){border-color:var(--green);background:#f0f5e9}.case.selected{border-color:var(--green);background:#eaf1e3}.stop{margin-top:14px;width:100%;border:1px solid var(--line);background:transparent;border-radius:8px;padding:9px;color:var(--muted)}.notice{font-size:12px;min-height:38px;color:var(--muted);margin:14px 0}.error{color:#a03d2b}.metrics{border-top:1px solid var(--line);padding-top:12px}.metric{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:12px}.metric span{color:var(--muted)}.metric strong{text-align:right;font-weight:600}.note{font-size:11px;color:var(--muted);margin:16px 0 0}.caption{font-size:12px;color:var(--muted);margin:14px 2px 22px}.events{border:1px solid var(--line);border-radius:12px;padding:18px 20px}.events h2{margin:0 0 10px}.events ol{list-style:none;margin:0;padding:0;max-height:230px;overflow:auto}.events li{padding:6px 0;font-size:12px;border-top:1px solid #e5e9e0}.events li:first-child{border:0}.events code{color:var(--muted);font-size:10px;margin-left:8px}.path{overflow-wrap:anywhere;font:11px/1.6 ui-monospace,monospace;color:var(--muted)}footer{margin:25px 0 0;color:var(--muted);font-size:11px;border-top:1px solid var(--line);padding-top:16px}@media(max-width:920px){.wrap{padding:20px 16px}.layout{grid-template-columns:1fr}.eyebrow{max-width:110px;text-align:right}.stage{min-height:180px}aside{padding:18px}h1{margin-top:23px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header><div class="brand"><img src="/mark.svg" alt="翠鸟标志候选">robot-harness</div><div class="eyebrow">LOCAL SIMULATION · M4</div></header>
+<h1>从执行，到停下，再到下一步。</h1>
+<p class="intro">观看真实仿真中的导航、取消和任务交接。每个演示使用独立环境，画面来自 RViz，事件来自正在执行的 Owner。</p>
+<div class="layout"><section>
+<div class="screen" id="screen"><div class="screenhead"><span><i class="dot" id="dot"></i><span id="screenStatus">尚未启动</span></span><button id="fullscreen">放大画面</button></div>
+<div class="stage"><img id="frame" alt="本次仿真的 RViz 画面" hidden><div class="placeholder" id="placeholder"><strong id="emptyTitle">选择一个演示，观察实际执行</strong><span id="emptyText">运行后自动导航。取消场景会在小车移动约 0.5 米时触发任务取消。</span></div></div>
+<div class="screenfoot"><span id="freshness">等待本次运行的画面</span><span>1600 × 900 · ROS 2 Humble</span></div></div>
+<p class="caption">黑色区域为地图障碍，绿色线为 A 的规划路径，蓝色线为 B 的规划路径。导航到达、原生执行关闭和任务结算分别展示；通过验证不代表所有任务均已结算。</p>
+<div class="events"><h2>执行过程</h2><ol id="timeline"><li>尚无本次运行事件</li></ol></div>
+</section><aside><h2>运行一个演示</h2><div class="cases">
+<button class="case" data-case="normal"><strong>01 · 正常导航 A → B</strong><span>A 完成并结算后，准入并执行 B。</span></button>
+<button class="case" data-case="cancel-moving"><strong>02 · 运动中取消</strong><span>A 移动约 0.5 米后自动取消，不下达 B。</span></button>
+<button class="case" data-case="replace-moving"><strong>03 · 取消后换目标</strong><span>取消 A，完成关闭与检查后交接给 B。</span></button>
+</div><button class="stop" id="stop" disabled>中止演示并回收容器</button>
+<p class="notice" id="notice" role="status" aria-live="polite">启动需要片刻。每次运行结束后可选择下一项。</p>
+<div class="metrics"><div class="metric"><span>场景验证</span><strong id="outcome">尚未运行</strong></div><div class="metric"><span>反馈位置 · 米</span><strong id="position">—</strong></div><div class="metric"><span>A 实际位移</span><strong id="distanceA">—</strong></div><div class="metric"><span>B 实际位移</span><strong id="distanceB">—</strong></div><div class="metric"><span>A 结算</span><strong id="settlementA">待观察</strong></div><div class="metric"><span>B 结算</span><strong id="settlementB">待观察</strong></div><div class="metric"><span>容器回收</span><strong id="cleanup">—</strong></div></div>
+<p class="note">取消按场景自动触发；中止按钮关闭整个仿真，不能用它证明任务已安全停止。关闭网页不会立即停止仿真。单次运行上限约 5 分钟。</p>
+</aside></div>
+<footer>仅连接本机隔离仿真，不连接真实机器人。运行结束后的画面明确标为最后一帧；画面中断不会用历史录像替代。<p class="path" id="output">原始记录将在运行后显示。</p></footer>
+</main>
+<script>
+const token='__TOKEN__';
+const $=id=>document.getElementById(id);
+let current=null,online=false,busy=false,shownSession=null,shownStamp=null,frameError=false;
+const labels={harness_admitted:'A 已准入',owner_cancel_requested:'已请求取消 A',owner_cancel_response:'取消响应已返回（不等于已结算）',native_result:'原生执行结果已返回',owner_quiet_observation:'静止观察',owner_a_closed:'A 原生执行已关闭',owner_core_handoff:'交接检查完成',owner_handoff_result:'交接场景观察结束',owner_cancellation_result:'取消场景观察结束'};
+const meters=v=>typeof v==='number'?v.toFixed(3)+' 米':'—';
+function paint(){const s=current||{},live=online&&!frameError&&s.running&&s.fresh&&shownSession===s.session&&shownStamp!==null&&Date.now()/1000-shownStamp<3,still=online&&!frameError&&s.started&&!s.running&&shownSession===s.session&&shownStamp!==null;
+ document.querySelectorAll('[data-case]').forEach(b=>{b.disabled=busy||!online||s.running;b.classList.toggle('selected',s.case===b.dataset.case)});$('stop').disabled=busy||!online||!s.running||s.stopping;
+ $('dot').classList.toggle('live',live);$('frame').hidden=!(live||still);$('placeholder').hidden=live||still;
+ $('screenStatus').textContent=!online?'本机连接中断':live?'实时画面':still?'本次运行最后画面':s.running?'等待新鲜画面':'尚无画面';
+ $('freshness').textContent=live?'画面年龄 '+Math.max(0,Date.now()/1000-shownStamp).toFixed(1)+' 秒':still?'运行已结束 · 此帧不是实时画面':'没有新鲜画面';
+ $('emptyTitle').textContent=!online?'本机服务未连接':s.running?'仿真启动中 / 等待画面':'选择一个演示，观察实际执行';
+ $('outcome').textContent=!online?'连接中断 · 状态未知':s.stopping?'正在中止与回收':s.running?'运行中':s.passed?'验证通过':s.started?(s.record?.result==='interrupted'?'已中止':'未通过 / 请检查记录'):'尚未运行';
+ $('position').textContent=s.feedback?Number(s.feedback.x).toFixed(2)+', '+Number(s.feedback.y).toFixed(2):'—';
+ $('distanceA').textContent=meters(s.verification?.a_displacement_m??s.verification?.displacement_m);$('distanceB').textContent=meters(s.verification?.b_displacement_m);
+ $('settlementA').textContent=(s.result?.a_settled===true||s.handoff?.a_settled===true)?'已结算':s.result?.a_settled===false?'仍未结算':s.result?.settled===false?'仍未结算':'待观察';
+ $('settlementB').textContent=s.result?.b_settled===false?'仍未结算':s.case==='cancel-moving'?'未下达':'待观察';
+ $('cleanup').textContent=s.record?.container_removed===true?'已回收':s.record?.container_removed===false?'未确认 · 检查记录':s.running?'运行中':s.started?'未确认 · 检查记录':'—';
+ $('output').textContent=s.output?'本次原始记录：'+s.output:'原始记录将在运行后显示。';
+ $('timeline').replaceChildren();for(const e of s.timeline||[]){const li=document.createElement('li');let text=labels[e.event]||e.event;if(e.event==='native_result')text+=(e.operation_id===2?' · B':' · A')+' · '+({4:'成功',5:'取消',6:'中止'}[e.result_code]||'未知');if(e.event==='owner_quiet_observation')text+=(e.operation_id===2?' · B':' · A')+(e.observed===true?' · 已观察':' · 未确认');if(e.event==='owner_core_handoff')text+=e.a_settled&&e.b_admitted?' · A 已结算，B 已准入':' · 未确认';li.textContent=text;$('timeline').append(li)}if(!$('timeline').children.length){const li=document.createElement('li');li.textContent='尚无本次运行事件';$('timeline').append(li)}
+}
+async function refresh(){
+ try{
+  const r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(3000)});
+  if(!r.ok)throw Error();current=await r.json();online=true;
+  if(current.session!==shownSession){shownStamp=null;$('frame').hidden=true}
+ }catch{online=false;paint();setTimeout(refresh,400);return}
+ // A failed image must not disable the still-reachable stop endpoint.
+ try{
+  if(current.frame_available&&(current.fresh||!current.running)&&(current.frame_time!==shownStamp||current.session!==shownSession||frameError)){
+   const session=current.session,stamp=current.frame_time;
+   const f=await fetch('/frame.jpg?session='+encodeURIComponent(session),{cache:'no-store',signal:AbortSignal.timeout(3000)});
+   if(!f.ok)throw Error();
+   const url=URL.createObjectURL(await f.blob()),img=new Image();img.src=url;
+   try{await img.decode();if(current.session===session){const old=$('frame').src;$('frame').src=url;shownSession=session;shownStamp=stamp;if(old.startsWith('blob:'))URL.revokeObjectURL(old)}else URL.revokeObjectURL(url)}catch(e){URL.revokeObjectURL(url);throw e}
+   frameError=false;
+  }
+ }catch{frameError=true}
+ paint();setTimeout(refresh,400)
+}
+async function act(path){busy=true;$('notice').classList.remove('error');$('notice').textContent=path==='stop'?'正在通知启动器回收本次容器…':'正在启动独立仿真…';paint();try{const r=await fetch('/api/'+path,{method:'POST',headers:{'X-Viewer-Token':token}}),data=await r.json();if(!r.ok)throw Error(data.error||'操作失败');current=data;$('notice').textContent=path==='stop'?'中止已请求；请等待下方回收结果。':'演示已启动，导航与取消按所选场景自动进行。'}catch(e){$('notice').textContent=e.message;$('notice').classList.add('error')}finally{busy=false;paint()}}
+document.querySelectorAll('[data-case]').forEach(b=>b.onclick=()=>act('run/'+b.dataset.case));$('stop').onclick=()=>act('stop');$('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('screen').requestFullscreen()}catch{$('notice').textContent='可放大浏览器窗口查看。'}};setInterval(paint,250);refresh();
+</script>
+</body></html>

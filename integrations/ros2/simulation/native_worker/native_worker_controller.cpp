@@ -1,4 +1,5 @@
 // Research-only one-shot native FollowPath completion observation, Nav2 1.1.20.
+#include "action_server_startup.hpp"
 #include "native_log.hpp"
 #include <nav2_controller/controller_server.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -50,15 +51,16 @@ protected:
     if (result != nav2_util::CallbackReturn::SUCCESS) {
       return result;
     }
-    RCLCPP_INFO(get_logger(), "Native controller configured; replacing inactive action server");
+    if (!await_inactive_action_server(shared_from_this(), "follow_path", *action_server_)) {
+      RCLCPP_ERROR(get_logger(), "Inactive controller action executor did not respond");
+      return nav2_util::CallbackReturn::FAILURE;
+    }
     // Replace before activation. Use the ordinary base type, not deletion through
     // a non-virtual SimpleActionServer destructor. All its ROS callbacks now share
     // this node's mutually-exclusive group and the single-threaded main executor.
     action_server_.reset();
-    RCLCPP_INFO(get_logger(), "Original controller action server destroyed");
     action_server_ = std::make_unique<ActionServer>(
         shared_from_this(), "follow_path", [this] { execute(); }, [] {}, 500ms, false);
-    RCLCPP_INFO(get_logger(), "Observed controller action server created");
     auto node = shared_from_this();
     ack_ = rclcpp::create_publisher<std_msgs::msg::String>(
         node, "follow_path_worker_ack", rclcpp::QoS(1).reliable().transient_local());

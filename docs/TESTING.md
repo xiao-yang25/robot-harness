@@ -1264,7 +1264,11 @@ without a returned ID must retain an uncertain cleanup state and a unique name. 
 actual Docker cleanup or robot
 motion. Full simulation and interrupted-container observations must be recorded
 separately. The image build runs five Nav2 predicate tests plus the native BT
-halt test. The default Core build and its ROS independence are unchanged.
+halt test and the inactive action-executor startup check. The latter checks the
+pinned pre-spin cancellation behavior, rejects discovery without a response,
+checks both controller/planner action types in a task namespace, and rejects an
+active server. It submits no goal. CTest limits this check to 20 seconds. The
+default Core build and its ROS independence are unchanged.
 
 Local package validation on 2026-09-24 used Ubuntu 22.04/Humble in an amd64
 Docker container. The image build passed the native BT test and all five Owner

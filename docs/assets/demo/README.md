@@ -21,6 +21,6 @@ Current behavior and validation are documented in
 [Testing](../../TESTING.md#current-validation-baseline) and
 [ROS integration](../../ROS2_INTEGRATION.md). The current
 [simulation tutorial](../../../integrations/ros2/simulation/README.md)
-provides a source build, nine bounded scenarios and an optional live viewer.
+provides a source build, eleven bounded scenarios and an optional live viewer.
 This historical recording does not demonstrate those later capabilities;
 public cancellation and handoff recordings remain to be added.

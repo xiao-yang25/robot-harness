@@ -4,8 +4,11 @@
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
 #include "cancel_response.hpp"
 #include "native_closure.hpp"
+#include "obstacle_watch.hpp"
 #include "runtime_observation_watch.hpp"
 #include <fstream>
+#include <nav_msgs/msg/occupancy_grid.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #endif
 #include "robot_harness/authority_gate.hpp"
@@ -179,6 +182,61 @@ public:
     client_ = rclcpp_action::create_client<Action>(node_, "navigate_to_pose");
     executor_.add_node(node_);
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    if (is_obstacle_case()) {
+      scan_subscription_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(
+          "/owner_scan", rclcpp::SensorDataQoS(),
+          [this](sensor_msgs::msg::LaserScan::ConstSharedPtr scan) {
+            double closest = scan->range_max;
+            bool valid = scan->header.frame_id == "base_scan" && std::isfinite(scan->angle_min) &&
+                         std::isfinite(scan->angle_increment) && scan->angle_increment > 0 &&
+                         std::isfinite(scan->range_max) && std::isfinite(scan->range_min) &&
+                         scan->range_min > 0 && scan->range_max > scan->range_min;
+            unsigned rays = 0;
+            for (std::size_t i = 0; i < scan->ranges.size(); ++i) {
+              const double angle =
+                  std::remainder(scan->angle_min + i * scan->angle_increment, 2 * std::acos(-1));
+              if (std::abs(angle) > .25)
+                continue;
+              ++rays;
+              const auto range = scan->ranges[i];
+              if (std::isinf(range) && range > 0)
+                continue;
+              if (!std::isfinite(range) || range < scan->range_min || range > scan->range_max)
+                valid = false;
+              else
+                closest = std::min(closest, static_cast<double>(range));
+            }
+            obstacle_watch_.observe_scan(rclcpp::Time(scan->header.stamp).nanoseconds(), now(),
+                                         closest, valid && rays >= 3);
+          });
+      costmap_subscription_ = node_->create_subscription<nav_msgs::msg::OccupancyGrid>(
+          "/global_costmap/costmap", rclcpp::QoS(1).transient_local(),
+          [this](nav_msgs::msg::OccupancyGrid::ConstSharedPtr map) {
+            const auto& info = map->info;
+            const auto& origin = info.origin;
+            bool valid = map->header.frame_id == "map" && std::isfinite(info.resolution) &&
+                         info.resolution > 0 && std::isfinite(origin.position.x) &&
+                         std::isfinite(origin.position.y) && origin.orientation.x == 0 &&
+                         origin.orientation.y == 0 && origin.orientation.z == 0 &&
+                         origin.orientation.w == 1 &&
+                         map->data.size() == static_cast<std::size_t>(info.width) * info.height;
+            bool occupied = false;
+            if (valid) {
+              // Known fixed-corridor task: inspect the planned obstacle center in map coordinates.
+              const double x = std::floor((-.5 - origin.position.x) / info.resolution);
+              const double y = std::floor((-.5 - origin.position.y) / info.resolution);
+              valid = x >= 0 && y >= 0 && x < info.width && y < info.height;
+              if (valid) {
+                const auto cell = map->data[static_cast<std::size_t>(y) * info.width +
+                                            static_cast<std::size_t>(x)];
+                valid = cell >= 0 && cell <= 100;
+                occupied = cell >= 65;
+              }
+            }
+            obstacle_watch_.observe_costmap(rclcpp::Time(map->header.stamp).nanoseconds(), now(),
+                                            occupied, valid);
+          });
+    }
     std::ifstream input("/output/producer-context.json");
     const auto contexts = nlohmann::json::parse(input);
     a_scope_ = contexts.at("a_scope").get<std::string>();
@@ -257,6 +315,15 @@ public:
     }
 
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    if (is_obstacle_case()) {
+      wait([this] { return obstacle_watch_.ready(now(), clock_ns_); }, 15s,
+           "no fresh clear-corridor perception before dispatch");
+      std::cout << nlohmann::json{{"event", "obstacle_baseline_clear"},
+                                  {"scan_stamp_ns", obstacle_watch_.scan_stamp()},
+                                  {"costmap_stamp_ns", obstacle_watch_.costmap_stamp()}}
+                       .dump()
+                << std::endl;
+    }
     closure_->open_drive();
 #endif
     run_goal(0.7);
@@ -490,18 +557,24 @@ private:
   }
 
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+  bool is_obstacle_case() const {
+    return mode_ == "obstacle-wait" || mode_ == "obstacle-wait-frozen-scan";
+  }
+
   bool is_replacement_case() const {
     return mode_ == "replace-moving" || mode_.rfind("replace-moving-", 0) == 0;
   }
 
   bool is_cancellation_case() const {
-    return is_replacement_case() || mode_ == "cancel-moving" ||
+    return is_obstacle_case() || is_replacement_case() || mode_ == "cancel-moving" ||
            mode_ == "cancel-moving-withhold-planner-ack" ||
            mode_ == "cancel-moving-withhold-drive-ack" ||
            mode_ == "cancel-moving-withhold-odometry";
   }
 
   std::string closure_mode() const {
+    if (is_obstacle_case())
+      return "normal";
     if (!is_cancellation_case())
       return mode_;
     const auto prefix =
@@ -515,11 +588,35 @@ private:
       return;
     }
     const auto displacement = std::hypot(odometry_.x + 2.0, odometry_.y + 0.5);
-    if (!odometry_frame_valid_ || !std::isfinite(displacement) ||
-        odometry_stamp_ns_ <= submitted_sim_ns_ ||
-        std::abs(clock_ns_ - odometry_stamp_ns_) > 250000000 || now() - odometry_seen_ >= 500 ||
-        now() - feedback_seen_ >= 500 || now() - clock_seen_ >= 500 ||
-        !std::isfinite(odometry_speed_) || odometry_speed_ < 0.05 || displacement < 0.5) {
+    if (is_obstacle_case()) {
+      const auto observed_at = now();
+      const auto perception = obstacle_watch_.decision(observed_at, clock_ns_);
+      if (perception == rh::nav2_example::ObstacleDecision::kContinue)
+        return;
+      obstacle_reason_ =
+          perception == rh::nav2_example::ObstacleDecision::kBlocked ? "blocked" : "unknown";
+      std::cout << nlohmann::json{{"event", "obstacle_wait_requested"},
+                                  {"reason", obstacle_reason_},
+                                  {"steady_ms", observed_at},
+                                  {"sim_ns", clock_ns_},
+                                  {"scan_progress_age_ms",
+                                   observed_at - obstacle_watch_.scan_progress_ms()},
+                                  {"scan_fresh",
+                                   obstacle_watch_.scan_fresh(observed_at, clock_ns_)},
+                                  {"costmap_fresh",
+                                   obstacle_watch_.costmap_fresh(observed_at, clock_ns_)},
+                                  {"scan_stamp_ns", obstacle_watch_.scan_stamp()},
+                                  {"costmap_stamp_ns", obstacle_watch_.costmap_stamp()},
+                                  {"clearance_m", obstacle_watch_.clearance()},
+                                  {"costmap_occupied", obstacle_watch_.occupied()}}
+                       .dump()
+                << std::endl;
+    } else if (!odometry_frame_valid_ || !std::isfinite(displacement) ||
+               odometry_stamp_ns_ <= submitted_sim_ns_ ||
+               std::abs(clock_ns_ - odometry_stamp_ns_) > 250000000 ||
+               now() - odometry_seen_ >= 500 || now() - feedback_seen_ >= 500 ||
+               now() - clock_seen_ >= 500 || !std::isfinite(odometry_speed_) ||
+               odometry_speed_ < 0.05 || displacement < 0.5) {
       return;
     }
     const auto decision = gate_.request_cancel(authority_, now());
@@ -611,8 +708,12 @@ private:
             "cancelled task admitted conflicting work");
     const bool expect_closure =
         closure_mode() != "withhold-planner-ack" && closure_mode() != "withhold-drive-ack";
-    require(native_closed == expect_closure && motion_observed == (mode_ == "cancel-moving"),
+    require(native_closed == expect_closure &&
+                motion_observed == (mode_ == "cancel-moving" || is_obstacle_case()),
             "unexpected cancellation closure/motion observation");
+    if (is_obstacle_case())
+      require(obstacle_reason_ == (mode_ == "obstacle-wait" ? "blocked" : "unknown"),
+              "unexpected obstacle decision");
     gate_.close_admission();
     // No prepared replacement context in this slice: quiet alone grants no settlement.
     std::cout << nlohmann::json{{"event", "owner_cancellation_result"},
@@ -974,6 +1075,12 @@ private:
     double x;
     double y;
   };
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+  rh::nav2_example::ObstacleWatch obstacle_watch_;
+  std::string obstacle_reason_;
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription_;
+  rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr costmap_subscription_;
+#endif
   rh::AuthorityGateConfig config_;
   rh::AuthorityGate gate_;
   std::string mode_;
@@ -1017,7 +1124,9 @@ int main(int argc, char** argv) {
        mode != "replace-moving-missing-map" && mode != "replace-moving-missing-controller" &&
        mode != "runtime-odometry-loss" && mode != "runtime-odometry-replay" &&
        mode != "runtime-odometry-resume" && mode != "runtime-clock-loss" &&
-       mode != "runtime-stop-unreachable" && mode != "runtime-stop-unreachable-withhold-drive-ack"
+       mode != "runtime-stop-unreachable" &&
+       mode != "runtime-stop-unreachable-withhold-drive-ack" && mode != "obstacle-wait" &&
+       mode != "obstacle-wait-frozen-scan"
 #endif
        )) {
     std::cerr
@@ -1030,7 +1139,7 @@ int main(int argc, char** argv) {
            "replace-moving-withhold-odometry, replace-moving-missing-map or "
            "replace-moving-missing-controller, runtime-odometry-loss, runtime-odometry-replay, "
            "runtime-odometry-resume, runtime-clock-loss, runtime-stop-unreachable or "
-           "runtime-stop-unreachable-withhold-drive-ack"
+           "runtime-stop-unreachable-withhold-drive-ack, obstacle-wait or obstacle-wait-frozen-scan"
 #endif
         << '\n';
     return 2;

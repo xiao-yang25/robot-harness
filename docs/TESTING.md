@@ -59,7 +59,7 @@ observation. Unit tests, simulation runs and hardware evidence are distinct.
 | M3 replacement and stale work | [Replacement](#optional-movement-time-nav2-replacement) closes A, checks fresh B context, settles A and opens generation 2 before sending B; retained old producer probes test isolation | Fixed A/B scenario, not an arbitrary-goal/preemption API |
 | M3 observation loss and independent stopping | [Runtime loss](#optional-runtime-observation-loss) withdraws authority; [consumer isolation](#optional-independent-consumer-isolation) tests the declared stop path with an unresponsive navigator | Full network/drive loss, Owner death and hard stop bounds are not validated |
 | M3 provider rebinding and recovery | Core/Linux Host checks cover their documented local execution domains | Generic ROS rebinding, Owner restart and durable task recovery are unsupported by this profile |
-| Environment-driven task revision | Existing cancel/replace trigger is roughly 0.5 m of movement | Actual obstruction, fresh perception and deterministic wait/revision remain the next functional increment; fixed-distance triggers do not cover it |
+| Environment-driven waiting | [Obstacle waiting](ROS2_INTEGRATION.md#obstacle-driven-waiting) uses a real Gazebo box, fresh laser/costmap evidence and the existing cancel/closure path; frozen scan must yield unknown | Finite fixed-corridor scenario; resumption, goal revision and general obstacle avoidance remain unimplemented |
 
 For an unfamiliar checkout, follow [Build](../README.md#build), then the
 [simulation tutorial](../integrations/ros2/simulation/README.md). Check the
@@ -1277,15 +1277,27 @@ details, or a second status registry merely to record a check.
 
 ## Repository simulation package
 
+The obstacle-wait increment adds `nav2_obstacle_watch` to automatic Humble CI
+and the image build, for six Owner checks total. Its focused cases cover missing
+inputs, clear baseline, repeated close observations, incomplete agreement,
+replayed/invalid/stale data and future stamps. The manual workflow exposes
+`obstacle-wait` and `obstacle-wait-frozen-scan`; changing perception/stop behavior
+requires both actual runs plus normal-navigation regression. Check actual box
+and robot poses, distinct blocked/unknown reasons, exact-goal cancellation,
+native closure/quiet, no delivered output, pending settlement, refused second
+admission and actual container cleanup. Unit tests alone do not prove this chain.
+The PR #19 counts and recorded results below remain historical; new hosted runs
+must identify their own revision before being reported as passed.
+
 The [Humble/Gazebo tutorial](../integrations/ros2/simulation/README.md) builds the
 Owner, native worker extensions and drive directly from repository source. The
 source package removes the external research launcher/build-mount prerequisite
-for the nine listed settlement/cancellation/loss scenarios. Earlier observations
+for the eleven listed settlement/cancellation/loss/obstacle scenarios. Earlier observations
 in this document remain tied to their original fixtures and revisions.
 
-The automatic [Humble workflow](../.github/workflows/ros2.yml) retains its five
-Owner predicate checks, eleven Python launcher/mirror checks and seven diagnostic
-checks. The latter use real child processes to verify query success, malformed
+The automatic [Humble workflow](../.github/workflows/ros2.yml) runs six
+Owner predicate checks and 30 Python checks: eleven launcher/mirror, seven diagnostic,
+eight viewer and four obstacle-evidence checks. The latter use real child processes to verify query success, malformed
 pose/nonzero-exit rejection, timeout evidence and process reaping, plus diagnostic-collection/logging
 failure and receipt-versus-progress semantics. These do not reproduce the
 historical intermittent Gazebo or TF failures.
@@ -1307,7 +1319,7 @@ Diagnostic write failure must not prevent container cleanup; a create timeout
 without a returned ID must retain an uncertain cleanup state and a unique name. They do not establish
 actual Docker cleanup or robot
 motion. Full simulation and interrupted-container observations must be recorded
-separately. The image build runs five Nav2 predicate tests plus the native BT
+separately. The image build runs six Nav2 predicate tests plus the native BT
 halt test and the inactive action-executor startup check. The latter checks the
 pinned pre-spin cancellation behavior, rejects discovery without a response,
 checks both controller/planner action types in a task namespace, and rejects an

@@ -87,6 +87,24 @@ Docker builds should select the intended target explicitly.
 
 ## Try cancellation, replacement and loss
 
+For a real environmental change, use:
+
+```sh
+python3 integrations/ros2/simulation/simulate.py run obstacle-wait --output simulation-results/obstacle-01
+python3 integrations/ros2/simulation/simulate.py run obstacle-wait-frozen-scan --output simulation-results/obstacle-frozen-01
+```
+
+A Gazebo box appears after initial movement. Fresh laser and costmap observations
+cause cancellation and a bounded waiting outcome; the frozen-scan case must
+instead report `unknown`. Both require native closure and quiet motion, retain
+pending settlement and refuse a second admission. This is not automatic detour
+planning or resumption. Read the [obstacle boundary](../../../docs/ROS2_INTEGRATION.md#obstacle-driven-waiting).
+`obstacle.jsonl` records fixture activity; `owner.jsonl` records the independent
+perception decision and cancellation; `verification.json` includes actual Gazebo
+poses. Use `--visual` with a visual image for captured frames. These cases are
+available through the CLI and manual CI; the viewer's three existing buttons
+remain unchanged.
+
 ```sh
 python3 integrations/ros2/simulation/simulate.py run cancel-moving --output simulation-results/cancel-01
 python3 integrations/ros2/simulation/simulate.py run replace-moving --output simulation-results/replace-01

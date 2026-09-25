@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[3]
 IMAGE = 'robot-harness-simulation:humble'
 VISUAL_IMAGE = 'robot-harness-simulation:humble-visual'
 CASES = ('normal', 'cancel-moving', 'replace-moving',
+         'obstacle-wait', 'obstacle-wait-frozen-scan',
          'runtime-odometry-loss', 'runtime-odometry-replay',
          'runtime-odometry-resume', 'runtime-clock-loss',
          'runtime-stop-unreachable', 'runtime-stop-unreachable-withhold-drive-ack')

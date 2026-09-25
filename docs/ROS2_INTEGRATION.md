@@ -16,11 +16,41 @@ Core and its public API remain ROS-independent.
 
 The [M1-M3 applicability mapping](TESTING.md#m1-m3-applicability-to-the-ros-profile)
 distinguishes validated ROS behavior from local-only guarantees and missing
-evidence. The next functional increment is an actual obstructed-path task:
-fresh sensor/costmap observations drive a deterministic caller to wait or revise,
-using the existing cancellation/settlement/handoff path. Missing or frozen
-perception must remain unknown. The current fixed-distance cancellation trigger
-does not demonstrate that task. A model is not required for this baseline.
+evidence. The bounded obstacle-wait increment below adds an actual obstructed-path
+task. Resuming or revising the goal after waiting remains a separate increment.
+A model is not required for this deterministic baseline.
+
+## Obstacle-driven waiting
+
+`obstacle-wait` starts the existing A goal. After 0.2 m of observed motion a
+fixture inserts a static Gazebo box at (-0.5, -0.5), with collision and laser
+geometry. That displacement triggers only the environmental change. The Owner
+does not read the spawn event to decide cancellation.
+
+Before dispatch, a fixed-corridor caller policy requires fresh, clear forward
+laser observations and a known unoccupied cell at the planned obstacle location
+in the global costmap. During navigation, three advancing forward scans within
+1.05 m plus a fresh occupied costmap cell trigger a wait decision. Scan receipt
+and simulation-stamp age must be below 1.5 seconds, and costmap age below 3
+seconds; future stamps beyond 0.25 seconds are invalid. These are observation
+budgets for this isolated example, not physical stopping guarantees. The example
+assumes the documented map, scan frame and unrotated costmap grid; it is not
+general perception or an obstacle-avoidance controller.
+
+The wait decision uses the existing exact-goal cancellation path. The Owner
+revokes output authority, separately observes cancellation and native terminal,
+closes native work and drive, and observes fresh quiet motion. It never creates
+B. The final receipt stays revoked/pending, and another admission is refused.
+The finite runner ends after verifying that state; it is not a persistent wait
+service or automatic resume API.
+
+`obstacle-wait-frozen-scan` inserts the same physical obstacle while replaying a
+pre-insertion scan only to the Owner. Native Nav2 retains its live scan input.
+Duplicates cannot renew freshness; unavailable/invalid/stale perception yields
+an `unknown` wait reason, never a clear-road or successful-task verdict. The
+external checker queries the actual Gazebo robot and obstacle poses separately
+from the fixture request and Owner observations. Core and native safety retain
+their existing responsibilities.
 
 ## Sequential settlement boundary
 

@@ -49,4 +49,28 @@ int main() {
   expect(delayed.decision(4100, 4100000000) == ObstacleDecision::kContinue);
   delayed.observe_scan(4200000000, 4200, .8, true);
   expect(delayed.decision(4200, 4200000000) == ObstacleDecision::kBlocked);
+  ObstacleWatch recovery;
+  recovery.observe_costmap(1000000000, 1000, false, true);
+  for (int i = 1; i <= 3; ++i)
+    recovery.observe_scan(1000000000 + i * 100000000, 1000 + i * 100, 2., true);
+  expect(!recovery.can_resume(1300, 1300000000, 1300, 1300000000));
+  recovery.observe_costmap(1400000000, 1400, false, true);
+  recovery.observe_scan(1400000000, 1400, 2., true);
+  recovery.observe_scan(1500000000, 1500, 2., true);
+  expect(!recovery.can_resume(1500, 1500000000, 1300, 1300000000));
+  recovery.observe_scan(1500000000, 1550, 2., true);  // duplicate isn't a third frame
+  expect(!recovery.can_resume(1550, 1550000000, 1300, 1300000000));
+  recovery.observe_scan(1600000000, 1600, 2., true);
+  expect(recovery.can_resume(1600, 1600000000, 1300, 1300000000));
+  expect(!recovery.can_resume(2900, 2900000000, 1300, 1300000000));
+  recovery.observe_scan(3000000000, 3000, .8, true);
+  expect(!recovery.can_resume(3000, 3000000000, 1300, 1300000000));
+  // A fresh scan sequence cannot compensate for a stale or occupied map.
+  for (int i = 1; i <= 3; ++i)
+    recovery.observe_scan(3000000000 + i * 100000000, 3000 + i * 100, 2., true);
+  expect(!recovery.can_resume(3300, 3300000000, 1500, 1500000000));
+  recovery.observe_costmap(3300000000, 3300, true, true);
+  expect(!recovery.can_resume(3300, 3300000000, 1300, 1300000000));
+  recovery.observe_costmap(3400000000, 3400, false, true);
+  expect(recovery.can_resume(3400, 3400000000, 1300, 1300000000));
 }

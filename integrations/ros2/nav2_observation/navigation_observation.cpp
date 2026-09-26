@@ -100,7 +100,7 @@ rclcpp::NodeOptions observation_options(const std::string& mode) {
   auto options =
       rclcpp::NodeOptions().parameter_overrides({rclcpp::Parameter("use_sim_time", true)});
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
-  if (mode.rfind("runtime-", 0) == 0)
+  if (mode.rfind("runtime-", 0) == 0 || mode == "obstacle-resume-runtime-loss")
     options.arguments({"--ros-args", "-r", "odom:=/owner_odom", "-r", "clock:=/owner_clock"});
 #else
   (void)mode;
@@ -333,7 +333,7 @@ public:
     require(!is_runtime_loss_case(), "runtime fault was not observed");
     if (is_cancellation_case()) {
       observe_cancelled_terminal();
-      if (!is_replacement_case())
+      if (!is_replacement_case() && !is_resume_case())
         return finish_cancellation();
     }
     return handoff();
@@ -531,6 +531,15 @@ private:
     };
     submitted_sim_ns_ = clock_ns_;
     require(client_->action_server_is_ready(), "navigation server lost before dispatch");
+#ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
+    if (is_resume_case() && native_send_count_ == 1) {
+      record_resume_observation("obstacle_resume_dispatch_check");
+      if (!resume_ready()) {
+        refuse_resumed_dispatch();
+        return;
+      }
+    }
+#endif
     require(gate_.claim_dispatch(authority_, now()), "Core dispatch claim denied");
     // No callbacks run between the authority claim and the native submission.
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
@@ -558,7 +567,94 @@ private:
 
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
   bool is_obstacle_case() const {
-    return mode_ == "obstacle-wait" || mode_ == "obstacle-wait-frozen-scan";
+    return mode_ == "obstacle-wait" || mode_ == "obstacle-wait-frozen-scan" || is_resume_case();
+  }
+
+  bool is_resume_case() const {
+    return mode_ == "obstacle-resume" || mode_.rfind("obstacle-resume-", 0) == 0;
+  }
+
+  bool resume_ready() const {
+    return now() - clock_seen_ < 1000 &&
+           obstacle_watch_.can_resume(now(), clock_ns_, resume_after_ms_, resume_after_ns_);
+  }
+
+  void record_resume_observation(const char* event) const {
+    std::cout << nlohmann::json{{"event", event},
+                                {"steady_ms", now()},
+                                {"sim_ns", clock_ns_},
+                                {"after_ms", resume_after_ms_},
+                                {"after_ns", resume_after_ns_},
+                                {"scan_stamp_ns", obstacle_watch_.scan_stamp()},
+                                {"costmap_stamp_ns", obstacle_watch_.costmap_stamp()},
+                                {"scan_fresh", obstacle_watch_.scan_fresh(now(), clock_ns_)},
+                                {"costmap_fresh", obstacle_watch_.costmap_fresh(now(), clock_ns_)},
+                                {"clearance_m", obstacle_watch_.clearance()},
+                                {"costmap_occupied", obstacle_watch_.occupied()},
+                                {"ready", resume_ready()}}
+                     .dump()
+              << std::endl;
+  }
+
+  bool wait_for_clear_corridor() {
+    require(obstacle_reason_ == "blocked", "resume requires an observed obstruction");
+    resume_after_ms_ = now();
+    resume_after_ns_ = std::max(clock_ns_, odometry_stamp_ns_);
+    const auto receipt = gate_.receipt(authority_);
+    require(receipt && receipt->settlement == rh::SettlementStatus::kPending &&
+                receipt->authority_disposition == rh::AuthorityDisposition::kRevoked &&
+                gate_.admit(request()).status == rh::AdmissionStatus::kDomainOccupied,
+            "waiting released A prematurely");
+    record_resume_observation("obstacle_waiting");
+    const auto until = std::min(SteadyClock::now() + 20s, deadline_);
+    while (!resume_ready() && !callback_error_ && rclcpp::ok() && SteadyClock::now() < until) {
+      executor_.spin_some(10ms);
+      std::this_thread::sleep_for(5ms);
+    }
+    if (callback_error_)
+      std::rethrow_exception(callback_error_);
+    record_resume_observation("obstacle_resume_observation");
+    return resume_ready();
+  }
+
+  void refuse_resumed_dispatch() {
+    // B has a prepared context/drive generation but no dispatch claim or goal.
+    // Revoke first, record that fact, then independently seal the opened drive.
+    require(native_send_count_ == 1 && !handle_, "B submission already occurred");
+    require(gate_.request_cancel(authority_, now()).status == rh::ControlStatus::kApplied,
+            "unsubmitted B revocation failed");
+    gate_.close_admission();
+    accepted(gate_.observe_non_submission(
+        {authority_, {config_.settlement_evidence_source, now(), ++settlement_sequence_}}));
+    accepted(gate_.observe_output_not_delivered(
+        {authority_,
+         rh::OutputNonDeliveryReason::kNoOutputProduced,
+         "",
+         {config_.settlement_evidence_source, now(), ++settlement_sequence_}}));
+    closure_->request_drive_close();
+    wait([this] { return closure_->drive_isolated(); }, 5s,
+         "unsubmitted B drive seal not observed");
+    const bool stopped = quiet();
+    const auto receipt = gate_.receipt(authority_);
+    require(stopped && receipt && receipt->dispatch == rh::DispatchStatus::kNotSubmitted &&
+                receipt->native_outcome == rh::NativeOutcome::kNotExecuted &&
+                receipt->output == rh::OutputDisposition::kNotDelivered &&
+                receipt->authority_disposition == rh::AuthorityDisposition::kRevoked &&
+                receipt->settlement == rh::SettlementStatus::kPending &&
+                !gate_.claim_dispatch(authority_, now()),
+            "unsubmitted B refusal incomplete");
+    resume_dispatch_denied_ = true;
+    std::cout << nlohmann::json{{"event", "owner_resume_dispatch_refused"},
+                                {"passed", mode_ == "obstacle-resume-dispatch-scan-loss"},
+                                {"b_operation", authority_.operation_id},
+                                {"b_submitted", false},
+                                {"b_revoked", true},
+                                {"b_settled", false},
+                                {"drive_isolated", true},
+                                {"motion_observed", stopped},
+                                {"native_send_count", native_send_count_}}
+                     .dump()
+              << std::endl;
   }
 
   bool is_replacement_case() const {
@@ -583,8 +679,9 @@ private:
   }
 
   void maybe_cancel_moving() {
-    if (!is_cancellation_case() || native_send_count_ != 1 || stop_requested_ || done_ ||
-        callback_error_ || !handle_ || !feedback_ || feedback_count_ == 0) {
+    if (!is_cancellation_case() || (native_send_count_ != 1 && !is_resume_case()) ||
+        stop_requested_ || done_ || callback_error_ || !handle_ || !feedback_ ||
+        feedback_count_ == 0) {
       return;
     }
     const auto displacement = std::hypot(odometry_.x + 2.0, odometry_.y + 0.5);
@@ -797,7 +894,8 @@ private:
                 !gate_.can_deliver_result(authority_),
             "observation restoration reauthorized withdrawn work");
     std::cout << nlohmann::json{{"event", "owner_runtime_loss_result"},
-                                {"passed", is_runtime_loss_case()},
+                                {"passed",
+                                 is_runtime_loss_case() || mode_ == "obstacle-resume-runtime-loss"},
                                 {"case", mode_},
                                 {"steady_ms", now()},
                                 {"native_closed", native_closed},
@@ -819,7 +917,8 @@ private:
                                 {"native_cancel_count", native_cancel_count_}}
                      .dump()
               << std::endl;
-    require(is_runtime_loss_case(), "unexpected runtime observation loss");
+    require(is_runtime_loss_case() || mode_ == "obstacle-resume-runtime-loss",
+            "unexpected runtime observation loss");
     gate_.close_admission();
     return 0;
   }
@@ -872,7 +971,8 @@ private:
                                 {"native_send_count", native_send_count_}}
                      .dump()
               << std::endl;
-    require(mode_ != "normal" && mode_ != "replace-moving", "normal handoff incomplete");
+    require(mode_ != "normal" && mode_ != "replace-moving" && mode_ != "obstacle-resume",
+            "normal handoff incomplete");
     gate_.close_admission();
     return 0;
   }
@@ -885,6 +985,8 @@ private:
     if (!quiet())
       return blocked("fresh-motion");
     std::cout << "{\"event\":\"owner_a_closed\"}" << std::endl;
+    if (is_resume_case() && !wait_for_clear_corridor())
+      return blocked("clear-corridor");
     // The fixture creates processes only. Owner independently probes the new
     // namespace's services, native readiness and command producers before Core.
     auto prepare = node_->create_client<std_srvs::srv::Trigger>("/prepare_next_context");
@@ -915,7 +1017,14 @@ private:
       std::cerr << "Next context unavailable: " << error.what() << std::endl;
       return blocked("next-context");
     }
-    require(mode_ == "normal" || mode_ == "replace-moving",
+    if (is_resume_case()) {
+      record_resume_observation("obstacle_resume_settlement_check");
+      if (!resume_ready())
+        return blocked("clear-corridor");
+    }
+    require(mode_ == "normal" || mode_ == "replace-moving" || mode_ == "obstacle-resume" ||
+                mode_ == "obstacle-resume-dispatch-scan-loss" ||
+                mode_ == "obstacle-resume-runtime-loss",
             "fault case unexpectedly reached settlement");
     require(!callback_error_ && closure_->closed(), "A closure invalidated before settlement");
     accepted(gate_.observe_settlement(
@@ -940,7 +1049,7 @@ private:
     require(b.status == rh::AdmissionStatus::kAdmitted && b.authority,
             "B admission denied after A settlement");
     const auto a_operation = authority_.operation_id;
-    if (is_replacement_case()) {
+    if (is_replacement_case() || is_resume_case()) {
       require(a_receipt->native_outcome == rh::NativeOutcome::kCancelled &&
                   a_receipt->output == rh::OutputDisposition::kNotDelivered && !result_slot_ &&
                   native_cancel_count_ == 1,
@@ -965,9 +1074,32 @@ private:
     // Opening is after admission; actual native submission still requires the
     // immediately adjacent Core dispatch claim in run_goal().
     closure_->open_drive();
-    run_goal(is_replacement_case() ? 0.0 : -1.5);
+    if (mode_ == "obstacle-resume-dispatch-scan-loss") {
+      // Explicit fault injection only after B's generation has opened. Keep
+      // clock/odometry advancing so refusal specifically tests scan freshness.
+      scan_subscription_.reset();
+      const auto until = SteadyClock::now() + 2s;
+      wait([&] { return SteadyClock::now() >= until; }, 3s, "scan fault wait interrupted");
+    }
+    run_goal(is_resume_case() ? 0.7 : (is_replacement_case() ? 0.0 : -1.5));
+    if (resume_dispatch_denied_)
+      return mode_ == "obstacle-resume-dispatch-scan-loss" ? 0 : 1;
     if (runtime_loss_seen_)
       return finish_runtime_loss();
+    if (is_resume_case() && stop_requested_) {
+      observe_cancelled_terminal();
+      const bool closed = closure_->close();
+      const bool stopped = closed && quiet();
+      gate_.close_admission();
+      std::cout << nlohmann::json{{"event", "owner_resume_interrupted"},
+                                  {"native_closed", closed},
+                                  {"motion_observed", stopped},
+                                  {"settled", false},
+                                  {"passed", false}}
+                       .dump()
+                << std::endl;
+      return 1;  // No second recovery cycle; retain the revoked B receipt.
+    }
     require(closure_->close() && quiet(), "B closure or motion incomplete");
     const auto receipt = gate_.receipt(authority_);
     const auto third = gate_.admit(request());
@@ -976,7 +1108,7 @@ private:
                 receipt->settlement == rh::SettlementStatus::kPending &&
                 third.status == rh::AdmissionStatus::kDomainOccupied && !third.authority &&
                 native_send_count_ == 2 &&
-                native_cancel_count_ == (is_replacement_case() ? 1u : 0u),
+                native_cancel_count_ == ((is_replacement_case() || is_resume_case()) ? 1u : 0u),
             "B final boundary inconsistent");
     gate_.close_admission();
     std::cout << nlohmann::json{{"event", "owner_handoff_result"},
@@ -1078,6 +1210,8 @@ private:
 #ifdef ROBOT_HARNESS_NAV2_SETTLEMENT
   rh::nav2_example::ObstacleWatch obstacle_watch_;
   std::string obstacle_reason_;
+  bool resume_dispatch_denied_ = false;
+  std::int64_t resume_after_ms_ = 0, resume_after_ns_ = 0;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription_;
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr costmap_subscription_;
 #endif
@@ -1126,7 +1260,9 @@ int main(int argc, char** argv) {
        mode != "runtime-odometry-resume" && mode != "runtime-clock-loss" &&
        mode != "runtime-stop-unreachable" &&
        mode != "runtime-stop-unreachable-withhold-drive-ack" && mode != "obstacle-wait" &&
-       mode != "obstacle-wait-frozen-scan"
+       mode != "obstacle-wait-frozen-scan" && mode != "obstacle-resume" &&
+       mode != "obstacle-resume-frozen-scan" && mode != "obstacle-resume-missing-controller" &&
+       mode != "obstacle-resume-dispatch-scan-loss" && mode != "obstacle-resume-runtime-loss"
 #endif
        )) {
     std::cerr
@@ -1139,7 +1275,9 @@ int main(int argc, char** argv) {
            "replace-moving-withhold-odometry, replace-moving-missing-map or "
            "replace-moving-missing-controller, runtime-odometry-loss, runtime-odometry-replay, "
            "runtime-odometry-resume, runtime-clock-loss, runtime-stop-unreachable or "
-           "runtime-stop-unreachable-withhold-drive-ack, obstacle-wait or obstacle-wait-frozen-scan"
+           "runtime-stop-unreachable-withhold-drive-ack, obstacle-wait, obstacle-wait-frozen-scan, "
+           "obstacle-resume, obstacle-resume-frozen-scan, obstacle-resume-missing-controller, "
+           "obstacle-resume-dispatch-scan-loss or obstacle-resume-runtime-loss"
 #endif
         << '\n';
     return 2;

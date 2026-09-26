@@ -19,16 +19,24 @@ def verify_observations(owner, fixture, mode):
     assert not verdict['settled'] and not verdict['output_delivered']
     assert verdict['second_admission_blocked'] and verdict['native_send_count'] == 1
     assert verdict['native_cancel_count'] == 1
+    reason, terminal_ms = verify_trigger(owner, fixture, mode)
+    assert terminal_ms <= verdict['steady_ms']
+    assert not any(r['event'] == 'owner_core_handoff' for r in owner)
+    return reason
+
+
+def verify_trigger(owner, fixture, mode):
     baseline, = [r for r in owner if r['event'] == 'obstacle_baseline_clear']
     decision, = [r for r in owner if r['event'] == 'obstacle_wait_requested']
     requested, = [r for r in owner if r['event'] == 'owner_cancel_requested']
-    response, = [r for r in owner if r['event'] == 'owner_cancel_response']
-    terminal, = [r for r in owner if r['event'] == 'native_result']
+    response, = [r for r in owner if r['event'] == 'owner_cancel_response'
+                  and r['operation_id'] == requested['operation_id']]
+    terminal, = [r for r in owner if r['event'] == 'native_result'
+                  and r['operation_id'] == requested['operation_id']]
     assert requested['goal_uuid'] == response['goal_uuid'] == terminal['goal_uuid']
     assert requested['operation_id'] == response['operation_id'] == terminal['operation_id']
     assert decision['steady_ms'] <= requested['steady_ms'] <= min(response['steady_ms'], terminal['steady_ms'])
     assert response['acknowledged'] and terminal['result_code'] == 5
-    assert max(response['steady_ms'], terminal['steady_ms']) <= verdict['steady_ms']
     spawn, = [r for r in fixture if r['event'] == 'obstacle_spawned']
     injection, = [r for r in fixture if r['event'] == 'obstacle_spawn_requested']
     assert spawn['steady_ns'] // 1000000 <= decision['steady_ms']
@@ -44,8 +52,7 @@ def verify_observations(owner, fixture, mode):
         assert decision['scan_stamp_ns'] == injection['frozen_scan_stamp_ns']
         assert (decision['scan_progress_age_ms'] >= 1500 or
                 decision['sim_ns'] - decision['scan_stamp_ns'] >= 1500000000)
-    assert not any(r['event'] == 'owner_core_handoff' for r in owner)
-    return decision['reason']
+    return decision['reason'], max(response['steady_ms'], terminal['steady_ms'])
 
 
 def main():

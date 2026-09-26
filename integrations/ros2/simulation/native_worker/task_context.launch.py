@@ -14,7 +14,8 @@ def generate_launch_description():
     original_node = module.Node
 
     def context_node(**kwargs):
-        if (os.environ.get('M4_CONTEXT_CASE') in ('missing-controller', 'replace-moving-missing-controller')
+        if (os.environ.get('M4_CONTEXT_CASE') in ('missing-controller', 'replace-moving-missing-controller',
+                                                   'obstacle-resume-missing-controller')
                 and kwargs.get('executable') == '/native/native_worker_controller'):
             return GroupAction([])
         return original_node(**kwargs)

@@ -17,7 +17,8 @@ Core and its public API remain ROS-independent.
 The [M1-M3 applicability mapping](TESTING.md#m1-m3-applicability-to-the-ros-profile)
 distinguishes validated ROS behavior from local-only guarantees and missing
 evidence. The bounded obstacle-wait increment below adds an actual obstructed-path
-task. Resuming or revising the goal after waiting remains a separate increment.
+task. The bounded resume scenario below continues the original target after
+observed clearance; selecting a revised target remains separate.
 A model is not required for this deterministic baseline.
 
 ## Obstacle-driven waiting
@@ -51,6 +52,51 @@ an `unknown` wait reason, never a clear-road or successful-task verdict. The
 external checker queries the actual Gazebo robot and obstacle poses separately
 from the fixture request and Owner observations. Core and native safety retain
 their existing responsibilities.
+
+## Resuming after observed clearance
+
+`obstacle-resume` first follows the same blocked-path cancellation and native
+closure/quiet sequence. Only then does the fixture remove the physical box.
+The Owner keeps observing; it does not consume the removal acknowledgement.
+Three individually fresh forward scans above 1.3 m and a fresh unoccupied
+costmap cell must all be produced and received after the stopped boundary.
+The previous clear baseline, repeated frames and one clear frame cannot qualify.
+The finite observation phase allows 20 wall seconds; expiration refuses recovery.
+
+With clearance, the Owner prepares a new B context using existing readiness
+checks, observes quiet again, then rechecks perception and readiness before
+settling A and admitting B. It rechecks clearance immediately before dispatch
+because opening B's drive generation can process callbacks. B receives a new
+Core operation, native goal UUID, scope and drive generation and navigates toward
+the original (0.7, -0.5) target. A's cancelled output remains undelivered.
+A stale or obstructed corridor cannot authorize submission. If it becomes stale
+after B admission, B is revoked and recorded as not submitted/no output; its
+opened drive is explicitly sealed and fresh quiet is observed. B remains pending
+and admission is closed. Observation-loss monitoring and the obstacle policy remain active during B; another stop ends
+this attempt without another recovery cycle. B closes and remains unsettled
+because no C context is prepared.
+
+`obstacle-resume-frozen-scan` freezes the Owner's scan when the box is removed:
+it must remain stopped with A pending and no B. Native Nav2 still gets live
+scans. `obstacle-resume-missing-controller` supplies fresh clearance but omits
+B's controller: context readiness must refuse settlement and admission.
+
+`obstacle-resume-dispatch-scan-loss` stops the Owner scan subscription after
+opening B's drive, and waits for expiry before dispatch; it must show no B goal,
+revocation and applied drive isolation. `obstacle-resume-runtime-loss` drops and
+restores Owner odometry during B motion; withdrawal/closure must take precedence
+over ordinary obstacle cancellation, and restoration must not reauthorize B.
+These are CLI/manual-CI scenarios; the live viewer buttons are unchanged.
+
+This is one deterministic recovery in a fixed corridor, with the same living,
+polled Owner and reachable drive. It does not implement an indefinite waiting
+service, Owner restart recovery, general route selection, or a physical stop
+bound. Runtime clock/odometry monitoring follows the existing active-goal scope
+and
+starts a new grace period at each actual send. The idle waiting/preparation phase
+requires fresh perception and fresh quiet before handoff. Restored runtime
+clock/odometry after binding withdrawal still cannot recover authority through
+this path.
 
 ## Sequential settlement boundary
 

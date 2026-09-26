@@ -12,5 +12,5 @@ cmake -S integrations/ros2/simulation/native_worker -B /native -DCMAKE_BUILD_TYP
 cmake --build /native --parallel 2
 ctest --test-dir /native --output-on-failure --no-tests=error
 cmake -S integrations/ros2/nav2_observation -B /harness -DCMAKE_PREFIX_PATH=/drive -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DROBOT_HARNESS_NAV2_SETTLEMENT=ON
-cmake --build /harness --parallel 2 --target robot_harness_nav2_observation robot_harness_nav2_settlement nav2_motion_window_test nav2_closure_observations_test nav2_cancel_response_test nav2_runtime_observation_watch_test
+cmake --build /harness --parallel 2 --target robot_harness_nav2_observation robot_harness_nav2_settlement nav2_motion_window_test nav2_closure_observations_test nav2_cancel_response_test nav2_runtime_observation_watch_test nav2_obstacle_watch_test
 ctest --test-dir /harness -R '^nav2_' --output-on-failure --no-tests=error

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 [[ ${M4_ISOLATED_SIMULATION:-} == 1 && -n ${M4_FRESH_NAV2_RUN:-} && -f /.dockerenv ]] || exit 2
-case ${M4_CONTEXT_CASE:-} in normal|missing-controller|missing-map|withhold-feedback|withhold-planner-ack|withhold-drive-ack|withhold-odometry|cancel-moving|cancel-moving-withhold-planner-ack|cancel-moving-withhold-drive-ack|cancel-moving-withhold-odometry|replace-moving|replace-moving-withhold-planner-ack|replace-moving-withhold-drive-ack|replace-moving-withhold-odometry|replace-moving-missing-map|replace-moving-missing-controller|runtime-odometry-loss|runtime-odometry-replay|runtime-odometry-resume|runtime-clock-loss|runtime-stop-unreachable|runtime-stop-unreachable-withhold-drive-ack) ;; *) exit 2 ;; esac
+case ${M4_CONTEXT_CASE:-} in normal|obstacle-wait|obstacle-wait-frozen-scan|missing-controller|missing-map|withhold-feedback|withhold-planner-ack|withhold-drive-ack|withhold-odometry|cancel-moving|cancel-moving-withhold-planner-ack|cancel-moving-withhold-drive-ack|cancel-moving-withhold-odometry|replace-moving|replace-moving-withhold-planner-ack|replace-moving-withhold-drive-ack|replace-moving-withhold-odometry|replace-moving-missing-map|replace-moving-missing-controller|runtime-odometry-loss|runtime-odometry-replay|runtime-odometry-resume|runtime-clock-loss|runtime-stop-unreachable|runtime-stop-unreachable-withhold-drive-ack) ;; *) exit 2 ;; esac
 # Container exit is the final process boundary (including a SIGSTOP fault).
 # Supervise long-lived helpers while the Owner and checker run; early helper
 # termination, even exit 0, is a failed fixture rather than a valid scenario.
@@ -95,6 +95,10 @@ if [[ $M4_CONTEXT_CASE == runtime-* ]]; then
   python3 /simulation/runtime_observation_relay.py > /output/runtime-relay.jsonl 2>&1 &
   helpers+=($!)
 fi
+if [[ $M4_CONTEXT_CASE == obstacle-wait* ]]; then
+  python3 /simulation/obstacle_fixture.py > /output/obstacle.jsonl 2>&1 &
+  helpers+=($!)
+fi
 injector=''
 if [[ $M4_CONTEXT_CASE == replace-moving ]]; then
   python3 /simulation/inject_old_producer.py > /output/old-producer-injection.jsonl 2>&1 &
@@ -112,6 +116,7 @@ fi
 if [[ -n $injector ]]; then wait "$injector"; fi
 
 case $M4_CONTEXT_CASE in
+  obstacle-wait*) checker=check_obstacle_wait.py ;;
   runtime-*) checker=check_runtime_observation_loss.py ;;
   cancel-moving*) checker=check_owner_cancellation.py ;;
   *) checker=check_owner_handoff.py ;;

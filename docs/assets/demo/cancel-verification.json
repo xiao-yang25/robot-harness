@@ -1,0 +1,1 @@
+{"passed": true, "case": "cancel-moving", "gazebo_final": [-1.44482, -0.539883, 0.008722, 1.6e-05, 0.001553, -0.05028], "displacement_m": 0.5566107132359204, "late_command_rejections": 10, "response_after_cancel_ms": 14, "terminal_after_cancel_ms": 36, "quiet_observed_after_cancel_ms": 3743}

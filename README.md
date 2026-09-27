@@ -28,13 +28,15 @@ Applications choose goals; robot stacks retain control and device protection.
 
 ## See it move
 
-[![Recorded Harness navigation in simulation](docs/assets/demo/navigation-poster.png)](https://xiao-yang25.github.io/robot-harness/#demo)
+[![Recorded Harness cancellation and handoff in simulation](docs/assets/demo/replace-poster.png)](https://xiao-yang25.github.io/robot-harness/#demo)
 
-[Watch the 24-second recording](https://xiao-yang25.github.io/robot-harness/#demo) ·
-[Download MP4](docs/assets/demo/navigation.mp4) · [Demo details](docs/assets/demo/README.md)
+[Watch cancellation and handoff](https://xiao-yang25.github.io/robot-harness/#demo) ·
+[Full recordings & evidence](docs/assets/demo/README.md)
 
-An actual TurtleBot3 / Nav2 simulation, viewed in RViz. This early recording shows
-normal navigation through Harness; later handoff work is described in the docs.
+Actual TurtleBot3 / Nav2 simulation, viewed in RViz. A moves and is cancelled;
+Harness admits B only after A settles. A second clip shows why stopping alone
+does not establish settlement. Excerpts preserve playback speed; full originals
+and same-run receipts are available.
 
 ## Build
 

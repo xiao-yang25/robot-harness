@@ -7,11 +7,38 @@ case ${M4_CONTEXT_CASE:-} in normal|obstacle-resume-dispatch-scan-loss|obstacle-
 # termination, even exit 0, is a failed fixture rather than a valid scenario.
 helpers=()
 diagnostic_pid=''
+capture_pid=''
+finish_capture() {
+  [[ -n $capture_pid ]] || return 0
+  # Stop capture before the display and simulator helpers. A bounded wait keeps
+  # a stuck encoder from delaying container cleanup indefinitely.
+  kill -INT "$capture_pid" 2>/dev/null || true
+  for ((attempt=0; attempt<30; ++attempt)); do
+    kill -0 "$capture_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  if kill -0 "$capture_pid" 2>/dev/null; then
+    kill -KILL "$capture_pid" 2>/dev/null || true
+    wait "$capture_pid" 2>/dev/null || true
+    echo 'video capture did not finish within three seconds' >&2
+    return 1
+  fi
+  # ffmpeg returns 255 for the requested interrupt. Earlier helper failure is
+  # separately rejected by supervise; a playable file is not a scenario verdict.
+  local capture_status=0
+  wait "$capture_pid" || capture_status=$?
+  [[ $capture_status == 0 || $capture_status == 255 ]] || return 1
+  timeout --kill-after=1s 5s ffmpeg -nostdin -y -loglevel error -i /output/recording.mkv \
+    -c copy -movflags +faststart /output/recording.mp4 > /output/remux.log 2>&1
+}
 cleanup() {
   local status=$?
   trap - EXIT
+  finish_capture || status=1
   if [[ -n $diagnostic_pid ]]; then kill -TERM "$diagnostic_pid" 2>/dev/null || true; fi
-  for pid in "${helpers[@]}"; do kill -TERM "$pid" 2>/dev/null || true; done
+  for pid in "${helpers[@]}"; do
+    if [[ $pid != "$capture_pid" ]]; then kill -TERM "$pid" 2>/dev/null || true; fi
+  done
   exit "$status"
 }
 trap cleanup EXIT
@@ -77,10 +104,13 @@ if [[ ${M4_VISUAL:-0} == 1 ]]; then
   LP_NUM_THREADS=1 rviz2 -d /output/live-view.rviz --ros-args -p use_sim_time:=true > /output/rviz.log 2>&1 &
   helpers+=($!)
   ffmpeg -nostdin -y -loglevel error -f x11grab -video_size 1600x900 \
-    -framerate 5 -i "$DISPLAY" -threads 1 -pix_fmt yuvj444p \
+    -framerate 5 -i "$DISPLAY" \
+    -threads 1 -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p /output/recording.mkv \
+    -threads 1 -pix_fmt yuvj444p \
     -q:v 2 -f image2 -update 1 -atomic_writing 1 /output/live.jpg \
     > /output/capture.log 2>&1 &
-  helpers+=($!)
+  capture_pid=$!
+  helpers+=("$capture_pid")
 fi
 python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
 helpers+=($!)

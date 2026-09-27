@@ -60,6 +60,15 @@ jobs:
           flags=()
           if [[ "$VISUAL" == true ]]; then flags+=(--visual); fi
           python3 integrations/ros2/simulation/simulate.py run "$SCENARIO" "${flags[@]}" --output simulation-results/run
+      - name: Decode the complete recording
+        if: inputs.visual
+        shell: bash
+        run: |
+          docker run --rm --network none --entrypoint ffmpeg \
+            --mount "type=bind,source=$PWD/simulation-results/run,target=/recording,readonly" \
+            robot-harness-simulation:humble-visual \
+            -v error -xerror -i /recording/recording.mp4 -f null - \
+            > simulation-results/run/video-decode.log 2>&1
       - name: Retain diagnostics including failed runs
         if: always()
         uses: actions/upload-artifact@v4

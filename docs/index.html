@@ -42,13 +42,27 @@
       <div class="actions"><a class="button" href="https://github.com/xiao-yang25/robot-harness#build">Start building ↗</a><a class="button secondary" href="#demo">Watch the robot</a></div>
       <div class="stage">Experimental · C++17 · Software + simulation</div>
     </header>
-    <section class="demo" id="demo" aria-label="Recorded navigation demonstration">
-      <div class="demo-top"><strong>01 / Navigation, in the simulator</strong><span>ACTUAL RECORDING · 00:24</span></div>
-      <video controls playsinline preload="metadata" poster="assets/demo/navigation-poster.png" aria-label="Recorded TurtleBot3 navigation in RViz, 24 seconds">
-        <source src="assets/demo/navigation.mp4" type="video/mp4">
-        <p><a href="assets/demo/navigation.mp4">Download the navigation recording</a>.</p>
+    <section class="demo" id="demo" aria-label="Recorded cancellation and handoff demonstration">
+      <div class="demo-top"><strong>01 / Cancel. Close. Hand off.</strong><span>ACTUAL SIMULATION · EXCERPT</span></div>
+      <video controls playsinline preload="metadata" poster="assets/demo/replace-poster.png" aria-label="Recorded moving cancellation and handoff to a new navigation goal">
+        <source src="assets/demo/replace.mp4" type="video/mp4">
+        <p><a href="assets/demo/replace.mp4">Download the handoff recording</a>.</p>
       </video>
-      <div class="demo-bottom"><p>Harness → Nav2 → simulated TurtleBot3, viewed in RViz. An early normal-navigation run; cancellation and sequential handoff are not shown in this clip. Silent recording.</p><a href="https://github.com/xiao-yang25/robot-harness/blob/master/docs/assets/demo/README.md">Recording notes ↗</a></div>
+      <div class="demo-bottom"><p>A moves, then is cancelled. After native closure, fresh stillness and a ready replacement context, Harness settles A and admits B. Green: A's path. Blue: B's path. B moves about 1.18 m; its final receipt remains pending.</p><a href="guide/docs/assets/demo/index.html#moving-handoff">Read the evidence ↗</a></div>
+    </section>
+    <section class="section demo-comparison" aria-label="What cancellation establishes">
+      <div class="section-title"><h2>Stopped. Still not settled.</h2><span>ONE RUN, DISTINCT FACTS</span></div>
+      <div class="scope">
+        <article class="demo">
+          <div class="demo-top"><strong>02 / Cancellation without a successor</strong></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/cancel-poster.png" aria-label="Recorded cancellation without admitting a second task">
+            <source src="assets/demo/cancel.mp4" type="video/mp4">
+            <p><a href="assets/demo/cancel.mp4">Download the cancellation recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>The robot moves about 0.56 m, then stops. No replacement task is sent.</p></div>
+        </article>
+        <article><h3>A stop is one part of the story.</h3><p>The native action is cancelled, its work and drive close, and fresh observations confirm stillness. A's output is not delivered.</p><p>Without a ready successor context, this example keeps settlement pending and refuses another admission. The handoff run above supplies those additional facts.</p><p>Silent RViz recordings from Gazebo / ROS 2 Humble. Startup is trimmed and the image cropped for readability; playback speed is unchanged. These are scripted scenarios, not manual robot controls or physical safety guarantees.</p><a class="text-link" href="guide/docs/assets/demo/index.html">Full uncut videos, receipts &amp; reproduction ↗</a></article>
+      </div>
     </section>
     <section class="section">
       <div class="section-title"><h2>A decision is only the beginning.</h2><span>EXECUTE / OBSERVE / CONTINUE</span></div>

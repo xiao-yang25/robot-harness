@@ -57,6 +57,7 @@ For documentation-only changes, check relative links and headings, keep commands
 consistent with the actual build, and execute new or changed runnable examples.
 No particular maintainer-local documentation checker is required. Keep the
 distinction between implemented behavior and planned features explicit.
+For published guides or site tooling, run the [documentation build and checks](docs/WEBSITE.md#build-and-preview).
 
 ## Pull requests and review
 

@@ -1,0 +1,78 @@
+site_name: Robot Harness
+site_description: Build, integrate and understand Robot Harness.
+site_url: https://xiao-yang25.github.io/robot-harness/guide/
+repo_url: https://github.com/xiao-yang25/robot-harness
+repo_name: robot-harness
+edit_uri: edit/master/
+docs_dir: build-docs/source
+site_dir: build-docs/site/robot-harness/guide
+use_directory_urls: false
+strict: true
+hooks:
+  - tools/docs/hooks.py
+theme:
+  name: material
+  font: false
+  logo: docs/assets/brand/kingfisher-light.svg
+  favicon: docs/assets/brand/kingfisher-light.svg
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      primary: custom
+      accent: custom
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark theme
+    - media: '(prefers-color-scheme: dark)'
+      primary: custom
+      accent: custom
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light theme
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+plugins:
+  - search
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+  - pymdownx.highlight
+  - pymdownx.superfences
+extra_css:
+  - docs/site.css
+validation:
+  links:
+    # The hook maps repository source links to GitHub after Markdown rendering.
+    # The final HTML checker then rejects unresolved local paths and anchors.
+    not_found: ignore
+    unrecognized_links: ignore
+nav:
+  - Use Robot Harness:
+      - Start here: docs/README.md
+      - Build and current scope: README.md
+      - Runnable examples: examples/README.md
+      - Install Core: examples/installed_core/README.md
+      - Robot simulation: integrations/ros2/simulation/README.md
+  - Integrate a backend:
+      - Architecture: docs/DESIGN.md
+      - API entry points: docs/API.md
+      - ROS 2 boundary: docs/ROS2_INTEGRATION.md
+      - Nav2 example: integrations/ros2/nav2_observation/README.md
+  - Contribute:
+      - Contribution guide: CONTRIBUTING.md
+      - Testing and troubleshooting: docs/TESTING.md
+      - C++ style: docs/CODING_STYLE.md
+      - Documentation development: docs/WEBSITE.md
+      - Integrity standard: docs/standards/MINIMAL_INTEGRITY_STANDARD.md
+      - Agent instructions: AGENTS.md
+  - Project:
+      - Website and demo: https://xiao-yang25.github.io/robot-harness/
+      - Recording notes: docs/assets/demo/README.md
+      - Kingfisher identity: docs/assets/brand/README.md
+      - Simulation dependencies: integrations/ros2/simulation/THIRD_PARTY_NOTICES.md

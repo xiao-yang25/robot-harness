@@ -1,7 +1,91 @@
-# Navigation recording
+# Simulation recordings
 
-[Watch on the project website](https://xiao-yang25.github.io/robot-harness/#demo)
-or [download the original MP4](navigation.mp4).
+[Watch on the project website](https://xiao-yang25.github.io/robot-harness/#demo).
+These are actual TurtleBot3 / Gazebo Classic recordings, viewed through RViz on
+Ubuntu 22.04 / ROS 2 Humble. They are silent, scripted simulation scenarios.
+The checker reads actual Gazebo poses and native/Owner observations. Video alone
+cannot establish cancellation, settlement or a physical stopping guarantee.
+
+## Moving handoff
+
+[Readable excerpt](replace.mp4) · [Full uncut recording](replace-full.mp4) ·
+[Owner events](replace-owner.jsonl) · [Scenario verification](replace-verification.json)
+
+A starts toward (0.7, -0.5). After about 0.5 m of observed movement, the caller
+cancels it. The same Owner observes native work/drive closure and fresh stillness,
+prepares and checks a new context, settles A and admits B toward (0, -0.5).
+Green is A's path; blue is B's distinct task-scoped path. RViz may retain A's old
+path after cancellation; a visible path is not active execution authority.
+
+In this run A moved 0.555 m and B moved 1.179 m. Fifty old-A commands were rejected
+at the drive while B was moving. That isolation claim comes from the native
+observations and checker, not from what the camera can show.
+
+| Final observation | Value |
+|---|---|
+| A native result / output | Cancelled / not delivered |
+| A settlement | Settled after closure and replacement readiness |
+| B | Admitted, native result accepted, native work closed |
+| B settlement / third admission | Pending / refused; no C context was prepared |
+
+## Cancellation without a successor
+
+[Readable excerpt](cancel.mp4) · [Full uncut recording](cancel-full.mp4) ·
+[Owner events](cancel-owner.jsonl) · [Scenario verification](cancel-verification.json)
+
+A moved 0.557 m. The Owner sent one exact-goal cancellation and independently
+observed native termination, work/drive closure and a fresh quiet-motion window.
+No output was delivered and no B goal was sent. Ten injected late commands were
+rejected. The final receipt remains **revoked and unsettled**, and a second
+admission is refused. A successful scenario check means these expected facts
+were observed; it does not label the cancelled navigation task successful.
+
+## Recording provenance and edits
+
+Captured on 2026-09-27 using the packaged `cancel-moving` and `replace-moving`
+scenarios. Runtime sources match commit
+[`4911d79`](https://github.com/xiao-yang25/robot-harness/tree/4911d799f61303fb3bb5aba47b0413b4978b42d6);
+this delivery adds capture/finalization only. The local visual dependency image
+was reused with the changed capture script. Runtime source comparison found no
+code differences; this was not a fresh dependency rebuild. This does not replace
+hosted clean-source simulation evidence in the testing guide.
+
+| Recording | Uncut duration | Captured frames | Public excerpt |
+|---|---|---|---|
+| Cancellation | 34.4 s | 164 | From 22 s to the end |
+| Moving handoff | 56.6 s | 255 | From 22 s to the end |
+
+Full recordings retain the original 1600×900 capture and timestamps, remuxed to
+MP4 without re-encoding. Capture requests 5 fps; frame drops under load mean
+frame count is not a clock. Excerpts remove only the first 22 seconds of startup,
+crop the 800×450 region at (400,300), and resize it to 1280×720. There are no
+internal cuts, speed changes, invented movement or simulated replacement frames.
+Posters come from the corresponding excerpt (8 s cancellation, 25 s handoff).
+Use logs for event ordering; no frame-exact event/video synchronization is claimed.
+The native result, observed quiet and settlement remain distinct. Neither timing
+from these recordings nor the emulated Linux environment establishes a stop bound.
+
+## Reproduce
+
+From a checkout containing the recording support:
+
+```sh
+python3 integrations/ros2/simulation/simulate.py build --visual
+python3 integrations/ros2/simulation/simulate.py run cancel-moving --visual --output simulation-results/record-cancel-01
+python3 integrations/ros2/simulation/simulate.py run replace-moving --visual --output simulation-results/record-replace-01
+```
+
+Use a new output directory each time. `recording.mp4` is the uncut capture;
+`run.json` must report a passed run and completed container cleanup, and
+`verification.json` must pass the scenario checks. Failed or interrupted runs
+may still produce video. See the [simulation tutorial](../../../integrations/ros2/simulation/README.md#watch-a-live-run)
+for requirements and failure handling. A model or real robot is not needed.
+These runs do not validate Owner restart, full network partition, general route
+replanning or physical-robot safety.
+
+## Earlier normal navigation
+
+[Download the original MP4](navigation.mp4).
 
 This is an uncut 23.8-second, 1600×900 recording of a TurtleBot3 simulation on
 Ubuntu 22.04 / ROS 2 Humble, captured on 2026-09-21. Gazebo simulates the robot;
@@ -21,6 +105,6 @@ Current behavior and validation are documented in
 [Testing](../../TESTING.md#current-validation-baseline) and
 [ROS integration](../../ROS2_INTEGRATION.md). The current
 [simulation tutorial](../../../integrations/ros2/simulation/README.md)
-provides a source build, eleven bounded scenarios and an optional live viewer.
+provides a source build, bounded scenarios and an optional live viewer.
 This historical recording does not demonstrate those later capabilities;
-public cancellation and handoff recordings remain to be added.
+the cancellation and handoff recordings above cover their own later scope.

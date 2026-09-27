@@ -9,8 +9,8 @@ prebuilt project image or host ROS installation is required.
 It is an isolated experimental simulator, not a general ROS adapter or robot
 controller. The default package runs without a graphical window; the optional
 [local viewer](#watch-a-live-run) captures RViz from the same scenario.
-The [recorded introduction](https://xiao-yang25.github.io/robot-harness/) remains
-a separate earlier normal-navigation run.
+The [public recordings](https://xiao-yang25.github.io/robot-harness/#demo)
+show moving cancellation and handoff; their notes identify the exact recorded scope.
 
 ## First run
 
@@ -80,8 +80,16 @@ For a visible run without the web server:
 python3 integrations/ros2/simulation/simulate.py run replace-moving --visual --output simulation-results/visual-replace-01
 ```
 
+Visual runs also retain `recording.mkv` and a browser-compatible `recording.mp4`
+from the same capture, without cuts or speed changes. Recording starts during
+simulator startup and ends after the scenario check. The five-frame-per-second
+capture may drop frames under load; this is not timing or stop-latency evidence.
+Finalization is bounded and a capture/remux failure fails the run. Interruption
+or forced container shutdown may leave only an incomplete recording; use
+`run.json` and `verification.json`, never video existence, to determine the outcome.
+
 The manual GitHub simulation workflow also accepts `visual: true`, retaining
-`live.jpg`, RViz/capture logs and the usual evidence. Default headless builds
+both recordings, `live.jpg`, RViz/capture/remux logs and the usual evidence. Default headless builds
 select the `simulation` Docker target; visual builds select `visual`. Direct
 Docker builds should select the intended target explicitly.
 

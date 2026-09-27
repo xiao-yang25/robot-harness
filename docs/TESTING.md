@@ -1370,11 +1370,17 @@ executes the existing scenario launcher. Python discovery in Humble and manual
 simulation CI includes viewer HTTP Host/Origin/token/path/session rejection,
 output symlink/FIFO handling, stale/completed frame classification, conservative
 result/cleanup handling, duplicate launch and real child shutdown tests. These
-host tests do not prove Docker cleanup or robot motion.
+host tests do not prove Docker cleanup or robot motion. Linux discovery also runs
+five recorder supervision/cleanup fault-injection tests with real GNU `timeout`;
+those tests are skipped on macOS. A visual manual CI run decodes its complete MP4
+and retains the decode log alongside the recording.
 
 For changes to the visual execution path, build `--visual` and run normal,
 cancel-moving and replace-moving with real frames and the existing scenario
-checks. Inspect the browser's live/final-frame distinction and Owner event
+checks. Decode each complete MP4, inspect motion frames and preserve the uncut
+recording with its same-run evidence. Exercise early encoder failure and a stuck
+remux: both must fail and reach cleanup within the existing outer limits.
+Inspect the browser's live/final-frame distinction and Owner event
 presentation, plus raw output and actual container removal. Check one mid-run
 viewer interruption separately; its outcome must be interrupted, not passed or
 settled. Preserve failed attempts. A successful headless run does not prove the

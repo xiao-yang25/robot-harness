@@ -1,0 +1,1 @@
+{"passed": true, "case": "replace-moving", "gazebo_final": [-0.268145, -0.575943, 0.008721, 1.4e-05, 0.001554, 0.09335], "a_displacement_m": 0.554873197799281, "b_displacement_m": 1.1792125194493144, "old_a_commands_rejected_while_b_moving": 50}

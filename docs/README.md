@@ -18,6 +18,8 @@ the detailed contracts and evidence.
 These software paths need no model or robot. For a failed command, start with
 [example troubleshooting](../examples/README.md#if-a-command-fails).
 
+For signatures and the installed/source-tree boundary, use the [API entry points](API.md).
+
 ## Understand the architecture
 
 Read the design in this order:
@@ -86,8 +88,9 @@ check or interface is not evidence that it has been implemented.
 
 ## Project website
 
-The presentation page is maintained in [index.html](index.html); guides and
-contracts remain in these Markdown files, linked from the page. GitHub Pages
-serves `master` / `docs` as static files (`.nojekyll`). Keep website changes
-responsive and check media playback and local assets before publishing. The
+The [presentation homepage](https://xiao-yang25.github.io/robot-harness/) and
+[searchable guides](https://xiao-yang25.github.io/robot-harness/guide/docs/index.html)
+are published together. Guides are generated from the Markdown you are reading;
+there is no second maintained copy. See [documentation development](WEBSITE.md)
+for building, previewing, link checks and publishing. The
 [recording notes](assets/demo/README.md) identify the demo's scope and provenance.

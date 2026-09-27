@@ -33,3 +33,7 @@ jobs:
         run: cmake --build build-sanitizers --parallel 2
       - name: Test ASan and UBSan
         run: ctest --test-dir build-sanitizers --output-on-failure --no-tests=error
+      - name: Install Core and run an independent consumer after relocation
+        run: >-
+          cmake -DSOURCE_DIR="$PWD" -DTEST_ROOT="$PWD/build-install-check"
+          -DCMAKE_CXX_COMPILER=g++ -P tests/installed_core_test.cmake

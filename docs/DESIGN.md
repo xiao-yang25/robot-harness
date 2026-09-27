@@ -107,6 +107,27 @@ headers or an actual consumer requires a distinct packaging boundary. Splitting
 the authority implementation itself should follow a separate responsibility or
 invariant boundary, not file length alone.
 
+### Installed Core boundary
+
+The first installable package exports `RobotHarness::core` with the existing
+`authority_gate.hpp` entry header, static library and transitive C++17 requirement.
+`find_package(RobotHarness CONFIG REQUIRED)` locates the installed package; its
+paths are relative to the installation prefix so consumers can relocate it.
+The same target alias is available in a source-tree build.
+
+Installation deliberately selects Core rather than copying all public headers:
+compute and sample hosts, workers, private recovery and optional ROS fixtures
+retain source-tree deployment. A consumer needing one of these modules must first
+define its worker/resource deployment contract before expanding the package.
+This avoids implying that copying a worker library installs a functioning backend.
+Runtime authority, ownership and settlement semantics are unchanged.
+
+The package version follows the existing project version with exact-version
+matching only. It does not promise stable SDK/API/ABI compatibility or authorize
+redistribution; licensing remains pending. The independent
+[consumer example](../examples/installed_core/README.md) and
+[relocation check](TESTING.md#installed-core-consumer) exercise this boundary.
+
 ## Execution ownership
 
 The core is a C++17 passive state machine driven by a host-owned single logical

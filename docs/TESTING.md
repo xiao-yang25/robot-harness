@@ -1379,3 +1379,30 @@ viewer interruption separately; its outcome must be interrupted, not passed or
 settled. Preserve failed attempts. A successful headless run does not prove the
 optional display tools work, and viewer integration does not establish unfamiliar
 contributor usability or physical-robot safety.
+
+
+## Installed Core consumer
+
+The Core Ubuntu workflow also runs a separate installation check:
+
+```sh
+cmake -DSOURCE_DIR="$PWD" -DTEST_ROOT="$PWD/build-install-check" \
+  -P tests/installed_core_test.cmake
+```
+
+Run from the repository root. This creates a fresh Release Core build with tests
+disabled, installs it, moves the prefix, then copies and builds the
+[independent consumer](../examples/installed_core/README.md). The consumer uses
+only the installed header/library and verifies that missing readiness denies
+admission. It inherits C++17 from the exported target. Failure of any configure,
+build, install or consumer run fails the check. Per-run directories are retained
+beneath `build-install-check` for inspection; remove them when no longer needed.
+This separate check does not change the existing Core behavioral test count or
+run Gazebo. Sanitizer-instrumented libraries are not reused for its clean consumer.
+
+Optional `CMAKE_CXX_COMPILER`, `CMAKE_OSX_SYSROOT` and `CMAKE_TOOLCHAIN_FILE` values
+are passed to both builds; use a compatible native toolchain. This is not a
+cross-compilation/emulator test. Package compatibility is limited to matching
+architecture and compatible C++ runtimes; it is not a stable ABI or binary release.
+The package installs Core only, as specified in the
+[installation boundary](DESIGN.md#installed-core-boundary).

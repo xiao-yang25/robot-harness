@@ -38,6 +38,10 @@ or survive Owner/machine restart.
 
 ## Connect a backend
 
+Use the [installed Core consumer](../examples/installed_core/README.md) for a
+standalone CMake application. Installation exposes Core only; the integrations
+below retain their own deployment requirements.
+
 Start with the existing [local compute integration contract](DESIGN.md#local-compute-integration-contract)
 and its [usage and verification](TESTING.md#local-compute-usage-and-verification).
 Use it to identify a backend's submission, result and cleanup boundaries, rather

@@ -1,6 +1,8 @@
 # ROS 2 integration: probe and robot simulation
 
-Status: **M4 in progress**. Two optional builds share the C++ Owner:
+Status: **M4 simulation scope complete; experimental**.
+The [closeout evidence and retained limits](TESTING.md#m4-closeout) define this status.
+Two optional builds share the C++ Owner:
 `robot_harness_nav2_observation` retains the first, observation-only behavior;
 `robot_harness_nav2_settlement` adds bounded sequential A-to-B and
 accepted-goal movement-time cancellation, replacement, observation-loss

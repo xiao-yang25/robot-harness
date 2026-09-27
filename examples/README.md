@@ -11,6 +11,11 @@ stated software scenario.
 
 For robot motion, use the separate [Humble/Gazebo simulation tutorial](../integrations/ros2/simulation/README.md). It builds its own isolated environment.
 
+## Use Core in your own project
+
+Follow the [installed Core consumer](installed_core/README.md) to build, install
+and link Core from a separate CMake project. No ROS installation is required.
+
 ## Normal execution
 
 ```sh

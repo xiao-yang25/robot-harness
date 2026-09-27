@@ -2,13 +2,20 @@ cmake_minimum_required(VERSION 3.16)
 
 project(robot_harness VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 add_library(robot_harness_core STATIC
   src/core/authority_gate.cpp
 )
 
+add_library(RobotHarness::core ALIAS robot_harness_core)
+set_target_properties(robot_harness_core PROPERTIES EXPORT_NAME core)
+
 target_compile_features(robot_harness_core PUBLIC cxx_std_17)
 target_include_directories(robot_harness_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
@@ -116,3 +123,22 @@ endif()
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
+
+# Install only Core. Adapter deployment and private recovery remain source-tree APIs.
+set(robot_harness_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/RobotHarness")
+install(TARGETS robot_harness_core EXPORT RobotHarnessTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES include/robot_harness/authority_gate.hpp
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/robot_harness)
+install(EXPORT RobotHarnessTargets NAMESPACE RobotHarness::
+  DESTINATION ${robot_harness_package_dir})
+configure_package_config_file(cmake/RobotHarnessConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/RobotHarnessConfig.cmake
+  INSTALL_DESTINATION ${robot_harness_package_dir})
+# Preview versions make no cross-version API/ABI compatibility promise.
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/RobotHarnessConfigVersion.cmake
+  VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion)
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/RobotHarnessConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/RobotHarnessConfigVersion.cmake
+  DESTINATION ${robot_harness_package_dir})

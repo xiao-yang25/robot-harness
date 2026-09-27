@@ -75,7 +75,8 @@ are future directions, not current product capabilities.
 
 ## Interfaces and compatibility
 
-C++17 · ROS-independent Core · source-tree examples. APIs are evolving; there is
+C++17 · ROS-independent Core · [CMake installation](examples/installed_core/README.md)
+and source-tree adapters/examples. APIs are evolving; there is
 no stable SDK/API/ABI or published release yet. Start with the
 [architecture guide](docs/README.md#understand-the-architecture) or
 [backend integration](docs/README.md#connect-a-backend).

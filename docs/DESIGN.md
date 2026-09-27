@@ -8,8 +8,11 @@ and merged. M2a implements failure closure; M2b/M2c add cancellation and expiry
 with macOS and Ubuntu validation. M3a adds replacement within one live host/binding;
 M3b adds provider rebinding within a live Host and a finite task caller.
 M3c adds a private Linux Host-recovery prototype with the same task caller;
-M4 is in progress with optional Nav2 observation and bounded sequential settlement
-profiles. See [README](../README.md#current-scope) and [Testing](TESTING.md#current-validation-baseline)
+M4 is complete for the experimental Humble simulation profile, including bounded
+sequencing, cancellation, loss isolation and obstacle waiting/resumption. This closes
+the declared simulation milestone, not physical integration or production readiness.
+See [M4 closeout](TESTING.md#m4-closeout), [README](../README.md#current-scope)
+and [Testing](TESTING.md#current-validation-baseline)
 for tested status and validation limits. New readers can follow the
 [architecture reading path](README.md#understand-the-architecture).
 

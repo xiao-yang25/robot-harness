@@ -6,23 +6,23 @@ their relevant target environments.
 
 ## Current validation baseline
 
-The latest functional baseline is `56dd7ef`, merged through
-[PR #19](https://github.com/xiao-yang25/robot-harness/pull/19). Its
-[Core CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36027030969)
-passed all 57 Linux tests in Debug and ASan/UBSan. Its
-[Humble CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36027030570)
-compiled both optional binaries and passed five Owner checks and 26 Python
-launcher, diagnostics and viewer tests. Automatic Humble CI does not run Gazebo.
-The separate [hosted visual simulation](https://github.com/xiao-yang25/robot-harness/actions/runs/36024898474)
-validated normal A-to-B navigation for the reviewed feature revision `13ad3b7`:
-A moved about 2.511 m and B 1.870 m, with successful verification and container
-removal. That run does not cover every fault scenario or unfamiliar contributors.
+The closeout runtime baseline is `1a80291`, merged through
+[PR #24](https://github.com/xiao-yang25/robot-harness/pull/24). Its post-merge
+[Core CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36297967494)
+passed 57 Linux tests in Debug and ASan/UBSan, plus the installed, relocated Core
+consumer. Its [Humble CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36297967493)
+built both optional binaries and passed six Owner checks and 40 Python tests.
+[Documentation CI](https://github.com/xiao-yang25/robot-harness/actions/runs/36297967511)
+passed six tooling tests, checked 20 generated pages and deployed the site.
+Automatic Humble CI does not run Gazebo.
 
-The [simulation package](#repository-simulation-package) now includes the
-optional live viewer. Local normal, moving-cancel, replacement and interruption
-observations supplement the hosted run. Two local B-context response failures
-remain unexplained; successful later runs and a renderer thread limit do not
-establish their root cause or sustained reliability. M4 remains in progress.
+The separate [clean-source visual handoff](https://github.com/xiao-yang25/robot-harness/actions/runs/36297578136)
+validated the reviewed `27dd259` tree, identical to the merged runtime baseline:
+A moved about 0.553 m and B 1.199 m; 56 old-A commands were rejected while B moved.
+A settled before B admission; B remained pending and third admission was blocked.
+The run removed its container and decoded the complete MP4. The earlier clean
+build failed on an omitted CMake template; the final revision includes both the
+Docker COPY and build-context fix. It does not turn earlier failed runs into passes.
 
 The sections below retain older dated evidence, including M3c at `dabad9b`
 ([PR #7](https://github.com/xiao-yang25/robot-harness/pull/7)). Historical counts
@@ -33,13 +33,53 @@ and results do not replace checks for the revision being changed.
 | GitHub-hosted Ubuntu 22.04 x86_64, GCC | All 57 CTests in Debug and ASan/UBSan | No ROS, hardware or deployment-timing validation |
 | Ubuntu 22.04 ARM64 in local Docker, GCC | All 57 Core CTests in Debug for the M4 second slice; earlier recovery-specific sanitizer results retained below | Runs in a Linux VM; not a target-device performance result |
 | macOS ARM64, AppleClang | All 47 portable Debug CTests on `56dd7ef`; earlier ASan/UBSan results predate the Linux-only launcher correction | Compatible SDK selected explicitly; Linux recovery targets are not built; no hosted macOS CI job |
-| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries and five local observation/deployment/cancel-response/freshness checks; separate Gazebo evidence below | Automatic CI compiles/tests predicates and launcher boundaries; full movement uses the separate manual simulation workflow |
+| Optional Ubuntu 22.04/Humble build | Both Nav2 binaries, six Owner checks and 40 Python checks at `1a80291`; separate Gazebo evidence below | Automatic CI compiles/tests predicates and launcher boundaries; full movement uses the separate manual simulation workflow |
 | Other platforms/toolchains | No verified support claim | CMake platform branches alone are not platform validation |
 
 For a first run use [Build](../README.md#build) and the
 [example guide](../examples/README.md). The normal CTest command discovers all
 tests built for that platform. Later revisions must carry their own CI results;
 the links here establish only the recorded revision.
+
+## M4 closeout
+
+**Complete for the experimental `nav2-fixed-context-sequence-v1` simulation
+scope, assessed on 2026-09-27.** The accepted [M4 exit](DESIGN.md#implementation-sequence)
+is ROS/Core reuse with native observations agreeing with receipts, explicit
+capability limits and a reproducible [robot demonstration](ROS2_INTEGRATION.md#user-facing-m4-outcome).
+The applicability mapping below remains the detailed scope; completion does not
+extend local-worker guarantees to unsupported ROS paths.
+
+| Delivered requirement | Evidence and boundary |
+|---|---|
+| Normal motion and Core reuse | [Observation and sequencing checks](#m1-m3-applicability-to-the-ros-profile) cover submission guards, correlated native events, settlement and second admission. ROS uses the same Core gate. |
+| Moving cancellation, replacement and unknown evidence | The mapping covers exact-goal cancellation, native closure, fresh quiet, old-generation rejection, missing-evidence denial, observation loss and reachable-drive isolation with an unresponsive navigator. Cancel-only remains unsettled. |
+| Environment-driven waiting and bounded recovery | [PR #20](https://github.com/xiao-yang25/robot-harness/pull/20) adds obstacle/frozen-scan waiting; [PR #21](https://github.com/xiao-yang25/robot-harness/pull/21) adds fresh-clearance resume. [Normal resume](https://github.com/xiao-yang25/robot-harness/actions/runs/36287186100), [frozen scan](https://github.com/xiao-yang25/robot-harness/actions/runs/36287187762), [missing controller](https://github.com/xiao-yang25/robot-harness/actions/runs/36287189350), [pre-dispatch loss](https://github.com/xiao-yang25/robot-harness/actions/runs/36287190777) and [B observation loss](https://github.com/xiao-yang25/robot-harness/actions/runs/36287558508) passed from source on Ubuntu/Humble at `71d4812`. Later install/docs/recording changes do not replace those scenario-specific results. |
+| Reproduction and presentation | The [source-built tutorial](../integrations/ros2/simulation/README.md), live viewer and [recordings with same-run receipts](assets/demo/README.md) are delivered. The current-baseline hosted run verifies clean-source visual replacement; it is not a fresh run of every scenario. |
+
+Retained limits and follow-up triggers:
+
+- Historical TF/query and B-context response failures remain unresolved. The
+  [first hosted B-loss attempt](https://github.com/xiao-yang25/robot-harness/actions/runs/36287192390)
+  failed during B readiness, before fault injection; it is not a loss-test pass.
+  One unchanged-source repeat reached the intended boundary. These failures limit
+  availability/reliability claims; observed refusal retained pending settlement.
+  Further diagnosis needs a new failure or discriminating request/response evidence.
+  They do not block the declared experimental behavior, but do block a reliability guarantee.
+- Owner survival and polling, reachable drive control, a fresh exclusive deployment
+  and the matching native fixture remain prerequisites. Owner death, full drive/link
+  loss, hard stop bounds, durable recovery, arbitrary task loops and physical safety
+  are not established. Missing evidence must continue to prevent fresh authority.
+- Licensing/contribution terms, actual unfamiliar-contributor feedback, release
+  packaging and stable API/ABI are separate adoption work. This milestone is not a
+  versioned release or a claim of mature-project readiness.
+
+The next integration work is first-device preparation: identify the actual Linux/
+ROS stack and map command identity, native stop/loss protection and observations.
+Begin read-only; validate the device protections before a short controlled normal
+movement, then cancellation/closure and handoff. The simulator drive fixture is not
+an implemented hardware driver. ACT/ALOHA and other learning-skill research is
+retained for later application work, not a prerequisite or an extra M4 gate.
 
 ## M1-M3 applicability to the ROS profile
 

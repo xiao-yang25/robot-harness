@@ -68,6 +68,10 @@ to watch navigation, cancellation and replacement.
 | Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
 | Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
 
+[M4 simulation scope is complete](docs/TESTING.md#m4-closeout). The next integration
+step is first-device preparation: identify the native control and stop/loss boundaries,
+then validate them before controlled motion. Learning-based skill integration remains later work.
+
 **Early-stage software and simulation.** No physical-robot integration or hard stop
 guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation
 uses an exclusive simulator. The source-built [simulation package](integrations/ros2/simulation/README.md)

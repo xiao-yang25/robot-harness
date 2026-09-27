@@ -1441,3 +1441,12 @@ profile and ROS-independent Core retain their existing behavior. One Owner owns
 the callbacks and Gate throughout; task identity captured by callbacks prevents
 late A observations from becoming B evidence. This experimental integration does
 not change D-073 recovery boundaries or define a general navigation Host.
+
+
+The [obstacle-resume caller](ROS2_INTEGRATION.md#resuming-after-observed-clearance)
+adds a task-level condition to this existing sequence: post-stop fresh clear
+perception before preparing B and again before settlement and dispatch. This
+caller condition cannot substitute for native closure, fresh quiet or context
+readiness. A is settled once; B has a new identity and revisits the original
+navigation target. Restoring perception never reinstates A's revoked authority.
+The finite single-recovery policy belongs to the optional example, not Core.

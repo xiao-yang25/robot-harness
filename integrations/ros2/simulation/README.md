@@ -97,13 +97,32 @@ python3 integrations/ros2/simulation/simulate.py run obstacle-wait-frozen-scan -
 A Gazebo box appears after initial movement. Fresh laser and costmap observations
 cause cancellation and a bounded waiting outcome; the frozen-scan case must
 instead report `unknown`. Both require native closure and quiet motion, retain
-pending settlement and refuse a second admission. This is not automatic detour
-planning or resumption. Read the [obstacle boundary](../../../docs/ROS2_INTEGRATION.md#obstacle-driven-waiting).
+pending settlement and refuse a second admission. These waiting-only cases do not resume. Read the [obstacle boundary](../../../docs/ROS2_INTEGRATION.md#obstacle-driven-waiting).
 `obstacle.jsonl` records fixture activity; `owner.jsonl` records the independent
 perception decision and cancellation; `verification.json` includes actual Gazebo
 poses. Use `--visual` with a visual image for captured frames. These cases are
 available through the CLI and manual CI; the viewer's three existing buttons
 remain unchanged.
+
+To continue toward the original goal after the box is removed:
+
+```sh
+python3 integrations/ros2/simulation/simulate.py run obstacle-resume --output simulation-results/resume-01
+python3 integrations/ros2/simulation/simulate.py run obstacle-resume-frozen-scan --output simulation-results/resume-frozen-01
+python3 integrations/ros2/simulation/simulate.py run obstacle-resume-missing-controller --output simulation-results/resume-no-controller-01
+python3 integrations/ros2/simulation/simulate.py run obstacle-resume-dispatch-scan-loss --output simulation-results/resume-dispatch-loss-01
+python3 integrations/ros2/simulation/simulate.py run obstacle-resume-runtime-loss --output simulation-results/resume-runtime-loss-01
+```
+
+The first case must stop, observe new clearance, prepare a new context, settle
+A and drive B to the original target. The frozen-scan and missing-controller cases must remain stopped: removed
+geometry alone cannot replace fresh perception, and clear perception alone
+cannot replace context readiness. Dispatch scan loss after B admission must
+revoke B and seal its opened drive without sending B. Runtime observation loss
+during B must withdraw the binding and remain withdrawn after observations
+return. The checker compares actual Gazebo poses at
+the waiting boundary and at the end, and verifies the distinct operation/goal
+identities. Read the [resume boundary](../../../docs/ROS2_INTEGRATION.md#resuming-after-observed-clearance).
 
 ```sh
 python3 integrations/ros2/simulation/simulate.py run cancel-moving --output simulation-results/cancel-01

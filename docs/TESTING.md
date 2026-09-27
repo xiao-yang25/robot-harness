@@ -59,7 +59,7 @@ observation. Unit tests, simulation runs and hardware evidence are distinct.
 | M3 replacement and stale work | [Replacement](#optional-movement-time-nav2-replacement) closes A, checks fresh B context, settles A and opens generation 2 before sending B; retained old producer probes test isolation | Fixed A/B scenario, not an arbitrary-goal/preemption API |
 | M3 observation loss and independent stopping | [Runtime loss](#optional-runtime-observation-loss) withdraws authority; [consumer isolation](#optional-independent-consumer-isolation) tests the declared stop path with an unresponsive navigator | Full network/drive loss, Owner death and hard stop bounds are not validated |
 | M3 provider rebinding and recovery | Core/Linux Host checks cover their documented local execution domains | Generic ROS rebinding, Owner restart and durable task recovery are unsupported by this profile |
-| Environment-driven waiting | [Obstacle waiting](ROS2_INTEGRATION.md#obstacle-driven-waiting) uses a real Gazebo box, fresh laser/costmap evidence and the existing cancel/closure path; frozen scan must yield unknown | Finite fixed-corridor scenario; resumption, goal revision and general obstacle avoidance remain unimplemented |
+| Environment-driven waiting | [Obstacle waiting](ROS2_INTEGRATION.md#obstacle-driven-waiting) uses a real Gazebo box, fresh laser/costmap evidence and the existing cancel/closure path; frozen scan must yield unknown | Finite fixed-corridor scenario; [one bounded resume](ROS2_INTEGRATION.md#resuming-after-observed-clearance) uses fresh post-stop clearance and a new context; goal revision and general obstacle avoidance remain unimplemented |
 
 For an unfamiliar checkout, follow [Build](../README.md#build), then the
 [simulation tutorial](../integrations/ros2/simulation/README.md). Check the
@@ -1286,18 +1286,32 @@ requires both actual runs plus normal-navigation regression. Check actual box
 and robot poses, distinct blocked/unknown reasons, exact-goal cancellation,
 native closure/quiet, no delivered output, pending settlement, refused second
 admission and actual container cleanup. Unit tests alone do not prove this chain.
+The resume increment extends the same predicate test with post-stop sample
+boundaries, three fresh clear scans, duplicate/stale observations and occupied
+costmaps. Five focused checker regressions reject stale/pre-wait clearance,
+identity reuse and accidental admission in fault cases. Actual `obstacle-resume`
+must show stop, physical box removal and renewed movement to the original goal
+under a new identity. `obstacle-resume-frozen-scan` and
+`obstacle-resume-missing-controller` must show no B admission/drive opening and
+no resumed movement. The post-admission scan-loss case must explicitly revoke
+B, record non-submission and seal its drive without another goal. The B runtime
+loss/restoration case must retain withdrawal after native closure and quiet.
+Re-run waiting-only and replacement paths when their
+shared policy/handoff/checker changes. Automatic Humble CI discovers the tests;
+all five new full scenarios are explicit manual-CI options.
+
 The PR #19 counts and recorded results below remain historical; new hosted runs
 must identify their own revision before being reported as passed.
 
 The [Humble/Gazebo tutorial](../integrations/ros2/simulation/README.md) builds the
 Owner, native worker extensions and drive directly from repository source. The
 source package removes the external research launcher/build-mount prerequisite
-for the eleven listed settlement/cancellation/loss/obstacle scenarios. Earlier observations
+for the sixteen listed settlement/cancellation/loss/obstacle scenarios. Earlier observations
 in this document remain tied to their original fixtures and revisions.
 
 The automatic [Humble workflow](../.github/workflows/ros2.yml) runs six
-Owner predicate checks and 30 Python checks: eleven launcher/mirror, seven diagnostic,
-eight viewer and four obstacle-evidence checks. The latter use real child processes to verify query success, malformed
+Owner predicate checks and 35 Python checks: eleven launcher/mirror, seven diagnostic,
+eight viewer and nine obstacle-evidence checks. The diagnostic checks use real child processes to verify query success, malformed
 pose/nonzero-exit rejection, timeout evidence and process reaping, plus diagnostic-collection/logging
 failure and receipt-versus-progress semantics. These do not reproduce the
 historical intermittent Gazebo or TF failures.

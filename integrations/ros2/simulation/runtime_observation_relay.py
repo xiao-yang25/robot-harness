@@ -20,6 +20,7 @@ class Relay(Node):
         self.fault_at = None
         self.restored = False
         self.last_odometry = None
+        self.b_running = False
         self.odom_out = self.create_publisher(Odometry, '/owner_odom', qos_profile_sensor_data)
         self.clock_out = self.create_publisher(Clock, '/owner_clock', qos_profile_sensor_data)
         self.create_subscription(Odometry, '/odom', self.odometry, qos_profile_sensor_data)
@@ -37,7 +38,8 @@ class Relay(Node):
         pose = message.pose.pose.position
         speed = math.hypot(message.twist.twist.linear.x, message.twist.twist.linear.y)
         distance = math.hypot(pose.x + 2, pose.y + .5)
-        if self.fault_at is None and distance >= .5 and speed >= .05:
+        if (self.fault_at is None and distance >= .5 and speed >= .05
+                and (self.mode != "obstacle-resume-runtime-loss" or self.b_running)):
             if self.last_odometry is None:
                 raise RuntimeError('no pre-fault observation')
             if self.mode.startswith('runtime-stop-unreachable'):
@@ -69,13 +71,17 @@ class Relay(Node):
             self.last_odometry = message
 
     def tick(self):
+        if self.mode == 'obstacle-resume-runtime-loss' and not self.b_running:
+            owner = Path('/output/owner.jsonl')
+            if owner.exists():
+                self.b_running = '"event":"owner_core_handoff"' in owner.read_text()
         if self.fault_at is None:
             return
         if self.mode == 'runtime-odometry-replay':
             self.odom_out.publish(self.last_odometry)
             stamp = self.last_odometry.header.stamp
             self.record('old_odometry_replayed', stamp_ns=stamp.sec * 10**9 + stamp.nanosec)
-        if ((self.mode == 'runtime-odometry-resume' or self.mode.startswith('runtime-stop-unreachable')) and not self.restored
+        if ((self.mode in ('runtime-odometry-resume', 'obstacle-resume-runtime-loss') or self.mode.startswith('runtime-stop-unreachable')) and not self.restored
                 and time.monotonic() - self.fault_at >= 6):
             self.restored = True
             self.record('observation_flow_restored')
@@ -84,7 +90,7 @@ class Relay(Node):
 def main():
     mode = os.environ.get('M4_CONTEXT_CASE')
     if (os.environ.get('M4_ISOLATED_SIMULATION') != '1' or not Path('/.dockerenv').exists()
-            or mode not in ('runtime-odometry-loss', 'runtime-odometry-replay',
+            or mode not in ('obstacle-resume-runtime-loss', 'runtime-odometry-loss', 'runtime-odometry-replay',
                             'runtime-odometry-resume', 'runtime-clock-loss',
                             'runtime-stop-unreachable', 'runtime-stop-unreachable-withhold-drive-ack')):
         return 2

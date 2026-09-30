@@ -47,7 +47,7 @@ below record this project's concrete boundaries and decisions.
 ## Product boundary
 
 Robot Harness is independently usable by agents, behavior trees, and deterministic
-applications. A separate Robot Agent project owns model selection, prompts,
+applications. The caller/Agent side owns model selection, prompts,
 context, goals, and task-level recovery. Dependency flows from Agent to Harness.
 
 The small core is one component of the Harness product. Reusable capability
@@ -124,6 +124,12 @@ retain source-tree deployment. A consumer needing one of these modules must firs
 define its worker/resource deployment contract before expanding the package.
 This avoids implying that copying a worker library installs a functioning backend.
 Runtime authority, ownership and settlement semantics are unchanged.
+
+The optional [Python session package](../bindings/python/README.md) has an additive
+install path under `lib/robot-harness/python` (or the selected library directory).
+It uses a private extension linked to Core; the default Core-only build and C++
+package remain independent of Python. This does not install compute/recovery or
+ROS adapters through the Core package.
 
 The package version follows the existing project version with exact-version
 matching only. It does not promise stable SDK/API/ABI compatibility or authorize
@@ -604,6 +610,95 @@ Concrete C++ types stay repository-local while the examples settle. Add only the
 source/header/example/test directories used by the current slice; no empty module
 scaffold or new production dependency is needed. The example is an actual caller
 of the library and adapter, not a script that prints expected events.
+
+## Incremental embodiment and backend coverage
+
+### System integration review after M4
+
+The implemented Core and path-specific hosts establish scoped execution
+governance, not a complete system runtime. The accepted development direction is
+to test a minimal integration runtime that assembles existing capabilities,
+drives a run, supplies continuous observations and progress, and coordinates
+owned component lifetimes. Task strategy stays with the caller or Agent; native
+controllers and runtimes retain their execution and protection responsibilities.
+Existing authority and receipt semantics remain a reusable component of that
+design, rather than the owner of every system responsibility.
+
+This accepts the direction of the next bounded design and experiment, not a new
+public API or a replacement for the Core execution contract. Qualify one complete
+native task and specify the consumer/host boundary before implementing its next
+adapter. Compare a native solution with equivalent required behavior, including
+integration effort, normal completion, responsiveness and unnecessary blocking.
+Any implementation that expands product ownership must explicitly revise the
+affected contract first. Platform-wide supervision and Robot OS capabilities are
+not established by M4 or by this recommendation.
+
+### Agent consumer and repository organization
+
+Develop the first integration-runtime slice with an actual task Agent consumer,
+starting with existing Codex through a local MCP bridge. Keep reusable runtime
+coordination, Core and backend adapters in this repository; keep goals, model/context
+dependencies, skill selection and task-level recovery on the consumer side. Create
+a separate Agent project when owned task strategy, memory/skills/recovery or an
+independently released application justifies it. The dependency is Agent to Harness public interfaces;
+deterministic applications, behavior trees and other agents remain valid callers.
+Repository boundaries do not dictate process boundaries.
+
+The first slice should demonstrate a real goal-to-skill-to-observation-to-decision
+loop alongside a deterministic baseline. A pretrained action policy alone is not
+a task Agent. An unavailable skill must not trigger an action, model inference
+must not block host progress, and a late model response cannot revive an old
+operation. Task failure, native termination and settlement remain distinct.
+Replay-based development does not establish a live model/simulation result.
+
+Keep the tested version manifest and end-to-end test entry with the consumer;
+the initial Codex experiment stays outside the product repository. Once an Agent
+repository exists, keep the cross-repository combination entry there. Test each candidate with an explicit counterpart
+revision; passing both repositories' unit tests is insufficient. Extract a stack,
+simulation or tooling repository only when independent consumers, maintenance or
+release needs justify it. A GitHub organization is not a runtime prerequisite.
+
+Retain the existing Gazebo/Humble regression path, qualify a manipulator/MuJoCo
+candidate for the first slice, then use a concrete Isaac combination to test reuse.
+Each delivered combination needs reproducible setup, task outcomes, a recording,
+relevant failure checks and its actual environment/version limits. Simulator,
+policy and model dependencies remain optional to the installed Core. No Agent
+repository, new model/backend support or cross-repository CI is delivered by this
+roadmap change. The [first Runtime slice](RUNTIME_SLICE.md) now specifies the
+consumer, lifecycle and Python/Core bridge. The optional bridge/session and concrete MuJoCo/ACT path are now locally implemented
+and tested. A research Codex/MCP consumer has exercised two real trials in the
+same host/model session with RGB observations, old receipts and cleanup. Public
+MCP packaging, broader task planning and cross-repository delivery remain pending.
+
+### Candidate combinations
+
+After M4, extend coverage through concrete tasks across wheeled robots,
+manipulators and legged robots, and across simulation backends. The current
+validated paths are the bounded TurtleBot3/Nav2/Gazebo profile and the experimental
+Mac ACT/ALOHA MuJoCo session described in [Testing](TESTING.md#first-runtime-slice).
+Isaac Sim/Isaac Lab and other learning-policy combinations remain candidates,
+not supported integrations. LeRobot is a policy/data integration tool, not a
+simulator. No particular available device defines the product roadmap.
+
+Select one robot, task, backend and controller/policy combination per increment.
+First qualify assets, an existing controller/policy and normal native execution;
+then integrate Core admission, observed outcomes and declared settlement, followed
+by relevant cancellation, stale-action, observation-loss and handoff tests.
+A manipulator/MuJoCo candidate can build on existing research; a later Isaac or
+legged combination tests reuse. Record differences when tasks/assets cannot be
+matched across simulators; do not claim equivalence from API similarity.
+Hardware validation proceeds when a suitable device and its native protections
+are available, independently of the simulation schedule.
+
+Core remains C++17, ROS-, embodiment- and payload-independent. Native adapters
+own submission/observation boundaries; controllers and task profiles define the
+permitted post-cancellation state. Stopping locomotion may require continuing
+balance control; cancelling manipulation may require retaining a grasp. Neither
+zero commands nor process termination is a universal settlement predicate.
+Extract shared implementation only after concrete integrations identify a need;
+this roadmap introduces no generic robot API, plugin framework or second authority
+state machine. Document verified combinations and explicit limitations rather than
+promising every robot on every simulator.
 
 ## M3a operation replacement boundary
 

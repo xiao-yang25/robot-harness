@@ -61,6 +61,9 @@ nav:
       - Robot simulation: integrations/ros2/simulation/README.md
   - Integrate a backend:
       - Architecture: docs/DESIGN.md
+      - Runtime slice: docs/RUNTIME_SLICE.md
+      - Experimental Python session: bindings/python/README.md
+      - MuJoCo trial backend: integrations/mujoco/README.md
       - API entry points: docs/API.md
       - ROS 2 boundary: docs/ROS2_INTEGRATION.md
       - Nav2 example: integrations/ros2/nav2_observation/README.md

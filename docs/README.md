@@ -38,11 +38,19 @@ Read the design in this order:
 limited surviving-Owner prototype. Recovery does not restore a missing result
 or survive Owner/machine restart.
 
+For the next integration, read the [first Runtime / Agent slice](RUNTIME_SLICE.md).
+It defines the session/worker/bridge boundary and explicitly distinguishes native
+task termination from full manipulation success. The optional
+[Python session](../bindings/python/README.md) and
+[MuJoCo trial backend](../integrations/mujoco/README.md) implement the deterministic
+and ACT manipulation paths. An existing Codex consumer has exercised two real
+trials through a research MCP bridge; public MCP packaging remains pending.
+
 ## Connect a backend
 
 Use the [installed Core consumer](../examples/installed_core/README.md) for a
-standalone CMake application. Installation exposes Core only; the integrations
-below retain their own deployment requirements.
+standalone CMake application. The default installation exposes Core; the optional Python build additionally
+installs its session and backend source. Integrations retain their own dependencies.
 
 Start with the existing [local compute integration contract](DESIGN.md#local-compute-integration-contract)
 and its [usage and verification](TESTING.md#local-compute-usage-and-verification).

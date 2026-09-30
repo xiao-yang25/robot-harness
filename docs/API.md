@@ -30,6 +30,15 @@ or exhaustive generated symbol reference.
 
 ## Source-tree hosts and examples
 
+Python callers can use the optional experimental
+[`Session`](../bindings/python/README.md) package for the deterministic local
+fixture or the optional [MuJoCo trial](../integrations/mujoco/README.md). It has a
+separate opt-in build/install path and does not
+change the installed C++ Core. Its private `_core` wrapper is not a public binding
+for all Core APIs. The ACT worker is supplied by the consumer. An existing Codex
+consumer has completed local trials through a research MCP bridge; a reusable
+public MCP module remains pending.
+
 | Interface | Purpose | Availability |
 |---|---|---|
 | [`SampleExecutionHost`](../include/robot_harness/sample_execution.hpp) | Deterministic examples for learning the execution flow | Source tree; not installed |

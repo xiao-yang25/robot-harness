@@ -74,12 +74,96 @@ Retained limits and follow-up triggers:
   packaging and stable API/ABI are separate adoption work. This milestone is not a
   versioned release or a claim of mature-project readiness.
 
-The next integration work is first-device preparation: identify the actual Linux/
-ROS stack and map command identity, native stop/loss protection and observations.
-Begin read-only; validate the device protections before a short controlled normal
-movement, then cancellation/closure and handoff. The simulator drive fixture is not
-an implemented hardware driver. ACT/ALOHA and other learning-skill research is
-retained for later application work, not a prerequisite or an extra M4 gate.
+Next integrations follow the [incremental embodiment/backend plan](DESIGN.md#incremental-embodiment-and-backend-coverage).
+The [system integration review](DESIGN.md#system-integration-review-after-m4)
+recommends qualifying a complete native task and the consumer/host boundary first;
+it does not add implemented runtime capabilities or expand M4's validation claim.
+The [Agent consumer](DESIGN.md#agent-consumer-and-repository-organization) needs
+a real model/task run alongside deterministic tests. Existing Codex has local
+research evidence below; cross-repository jobs apply once an independent Agent
+project exists. Live model/simulator runs are not part of the current CI baseline.
+Validate each declared robot/task/backend/controller combination separately;
+simulation results do not transfer automatically to another simulator or hardware.
+Physical integration starts with read-only interface checks and native protection
+validation before controlled motion. The simulator drive fixture is not an
+implemented hardware driver. Device availability does not block simulation work.
+
+<a id="first-runtime-slice"></a>
+## First Runtime slice: validation and remaining checks
+
+The optional [Python session](../bindings/python/README.md) implements the bridge
+and host loop in the [slice design](RUNTIME_SLICE.md). On macOS/Python3.12,
+23 focused session/transport/Core tests pass: repeated operations and old receipts,
+caller delay, queued cancellation, slow-worker expiry, worker loss/cleanup,
+partial Core/socket/worker startup, reset failure, deadline-crossing output,
+recording failure without settlement, and bounded JSON/RGB framing.
+Three optional backend tests cover native float32 representability, failed-reset
+observation invalidation, and recording failure while still freeing physics.
+These backend tests require NumPy but no model, renderer or MuJoCo installation.
+The previous bridge batch's47 existing macOS CTest cases and Core-only build passed;
+this increment changes Python/integration paths, not Core source or headers.
+
+Local ACT/MuJoCo integration used original seeds0–4, one surviving host/model,
+explicit reset, actual RGB/joint transmission and retained old receipts. All five
+runs reached the same limited native condition in258/260/272/262/306 steps;
+action/qpos/qvel/control/contact traces matched the original baseline exactly.
+All five640×480 videos decoded completely. Actual simulator checks also passed
+for a3-step budget with failed native outcome/no successful output, cancellation
+with queued actions and no steps after host revocation, and an exception after
+an actual native effect with a retained partial trace/video. Host and worker
+process reaping was observed. This is bounded local evidence, not reliability,
+complete handoff, live Agent or Linux model/renderer qualification.
+
+A separate Codex CLI consumer was locally exercised through a research stdio MCP
+bridge. Two real trials used one session/host/model, seed0 then explicit reset to
+seed1,258/260 steps, four actual camera samples, retained prior receipts and
+observed process cleanup. Its response distinguished the native condition from
+unverified complete handoff/stable holding. Two pre-effect tool errors were
+rejected and corrected; this is not a zero-error or general planning result.
+Seven focused bridge/verifier tests and an official-SDK stdio run passed; the
+latter also exercised queued cancellation and EOF cleanup. Request-cancellation
+shielding has unit/SDK-source evidence, not an end-to-end MCP cancellation-notice
+test. A disabled tool-dispatch configuration produced no calls and was retained
+as a failed experiment; CLI exit zero alone is never execution evidence. The
+research bridge is not an installed public MCP module or a security boundary.
+The only product-code change for stdio use routes child stdout to stderr, keeping
+model/library diagnostics out of protocol output;23 session tests passed again.
+
+The separate Ubuntu22.04 optional-Python job builds the extension, runs session
+tests, runs the three lightweight backend checks with distro NumPy, and consumes
+the installed package after relocation. Its build/test/install sequence passed
+locally on2026-09-30 in an amd64 Ubuntu22.04 container, using Python3.10.12,
+GCC11.4.0, CMake3.22.1 and distro NumPy1.21.5. The source was mounted read-only;
+build/install directories stayed in the disposable container. The relocated
+consumer completed two operations with values7/4 and retained the first result.
+This is local container evidence. Hosted workflow results for delivery are tracked
+separately in the pull request checks.
+
+The same amd64-emulated container's additional default-Core run passed56/57;
+`compute_prelaunch` failed its invalid-executable spawn expectation. A focused
+probe returned spawn success followed by child exit127 for an executable text
+file without a valid format. On native ARM64 Ubuntu22.04, the same probe returned
+`ENOEXEC` without a child, and all57 default-Core tests passed. Keep the failed
+emulated result distinct; do not weaken that test or infer native x86 CI failure.
+No Core implementation or behavioral test was changed for this difference.
+Default Core/sanitizer jobs remain Python-free. It does not install models or
+run MuJoCo. Research evidence and the reproducible consumer remain in the host's
+existing experiment record; no weights or machine paths are shipped here.
+
+Before delivering each remaining increment, exercise its actual boundaries:
+
+| Increment | Required evidence | What it does not establish |
+|---|---|---|
+| Optional Core bridge and session | Real C++ Core from an independent Python consumer; clean Core-only build; partial startup/close; bounded framing and duplicate request handling; two operations in one host; caller/worker delays do not block host control progress | MuJoCo support, live Agent or host-death recovery |
+| MuJoCo/ACT normal closure | Fixed native baseline versus host-owned chunk execution; same supported input and result condition; all selected runs/videos retained; explicit reset then second trial with the same host and loaded model; actual resource cleanup and result retention | Complete release/stable grasp from reward4, continuous physical stopping or general reliability |
+| Separate Agent consumer | Fixed tested counterpart versions; live goal, capability choice, real observation, skill call and grounded result in one run; unsupported full-handoff goals remain explicit; model/version/cost recorded | A pretrained ACT worker or replay alone is not a task Agent |
+| Cancellation and faults before broader support | Nonempty queue cleared; no native submission after host revocation; slow/late/malformed prediction rejected; no new admission on unresolved cleanup; caller loss and partial recording preserve uncertainty | Request-send time is not revocation time; one in-flight native step and host stalls have no hard stop bound |
+
+The native qualification's contact criterion and full-task assessment must remain
+separate. Do not change evaluator meaning to make an integrated run appear equal.
+Linux simulation/CI and the later Isaac combination need their own setup and
+runtime evidence; the optional job covers the deterministic session and lightweight
+backend checks only.
 
 ## M1-M3 applicability to the ROS profile
 
@@ -1451,5 +1535,7 @@ Optional `CMAKE_CXX_COMPILER`, `CMAKE_OSX_SYSROOT` and `CMAKE_TOOLCHAIN_FILE` va
 are passed to both builds; use a compatible native toolchain. This is not a
 cross-compilation/emulator test. Package compatibility is limited to matching
 architecture and compatible C++ runtimes; it is not a stable ABI or binary release.
-The package installs Core only, as specified in the
+The default package installs Core only, as specified in the
 [installation boundary](DESIGN.md#installed-core-boundary).
+The opt-in Python session has its separate installation path and validation
+described in [First Runtime slice](#first-runtime-slice).

@@ -33,7 +33,8 @@ to this repository.
 - Enforce authority at the adapter's declared submission boundary. Keep cancel
   acknowledgement, native termination, required settlement, and task verdict
   distinct; evidence gaps must not become success or fresh authority.
-- Task strategy and model dependencies belong to the separate Agent project.
+- Task strategy and model dependencies belong to the caller/Agent side.
+  Existing Agent consumers may be validated before a separate project is needed.
   A model cannot allocate execution authority or override native safety.
 - Follow D-068 for new documents, tools, and experiments: no MD5, no routine
   source snapshots/digests, and no repeated full semantic adjudication. Preserve

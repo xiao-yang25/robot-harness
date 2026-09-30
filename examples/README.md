@@ -11,6 +11,12 @@ stated software scenario.
 
 For robot motion, use the separate [Humble/Gazebo simulation tutorial](../integrations/ros2/simulation/README.md). It builds its own isolated environment.
 
+For Python callers, use the optional [Session example](../bindings/python/README.md).
+For an existing Agent or a deterministic SDK client, follow the
+[MCP tutorial](../integrations/mcp/README.md) and [two-operation caller](mcp_session.py).
+These are distinct consumer paths; no embodied business task policy is implemented
+by those examples.
+
 ## Use Core in your own project
 
 Follow the [installed Core consumer](installed_core/README.md) to build, install

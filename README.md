@@ -74,8 +74,10 @@ Python/Core bridge, with an [external Agent consumer](docs/DESIGN.md#agent-consu
 developed alongside it. The optional [Python session](bindings/python/README.md)
 now runs a deterministic fixture and an optional [MuJoCo/ACT trial](integrations/mujoco/README.md)
 through the real Core, with repeated tasks in one host/model process.
-An existing Codex consumer has completed two local trials through a research MCP bridge;
-reusable MCP packaging and broader Agent tasks remain pending.
+The optional [local MCP integration](integrations/mcp/README.md) lets existing agents
+such as Codex consume this session. Its tool path is separate from an embodied
+business Agent's task state, perception interpretation and recovery; that application
+may use Runtime directly. Broader business-agent tasks remain planned work.
 Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
 one reproducible task at a time. Simulation work can proceed independently of
 physical-device availability; hardware validation retains its own prerequisites.

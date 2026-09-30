@@ -18,7 +18,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Python development headers
-        run: sudo apt-get update && sudo apt-get install -y python3-dev python3-numpy
+        run: sudo apt-get update && sudo apt-get install -y python3-dev python3-numpy python3-pip
       - name: Configure optional bridge
         run: >-
           cmake -S . -B build-python -DROBOT_HARNESS_BUILD_PYTHON=ON
@@ -32,13 +32,21 @@ jobs:
         run: >-
           PYTHONPATH="$PWD/build-python/python" /usr/bin/python3 -m unittest discover
           -s integrations/mujoco/tests -v
+      - name: Install optional MCP consumer dependencies
+        run: /usr/bin/python3 -m pip install -r integrations/mcp/requirements.txt
+      - name: Check MCP protocol, cancellation and process cleanup
+        run: >-
+          PYTHONPATH="$PWD/build-python/python" /usr/bin/python3 -m unittest discover
+          -s integrations/mcp/tests -v
       - name: Install and consume after relocation
         run: |
           cmake --install build-python --prefix "$RUNNER_TEMP/python-install"
           mv "$RUNNER_TEMP/python-install" "$RUNNER_TEMP/python-relocated"
           cp examples/python_session.py "$RUNNER_TEMP/python-consumer.py"
+          cp examples/mcp_session.py "$RUNNER_TEMP/mcp-consumer.py"
           cd "$RUNNER_TEMP"
           PYTHONPATH="$RUNNER_TEMP/python-relocated/lib/robot-harness/python" /usr/bin/python3 python-consumer.py
+          PYTHONPATH="$RUNNER_TEMP/python-relocated/lib/robot-harness/python" /usr/bin/python3 mcp-consumer.py --output "$RUNNER_TEMP/mcp-results"
   core:
     name: Build and test Core
     runs-on: ubuntu-22.04

@@ -35,9 +35,11 @@ Python callers can use the optional experimental
 fixture or the optional [MuJoCo trial](../integrations/mujoco/README.md). It has a
 separate opt-in build/install path and does not
 change the installed C++ Core. Its private `_core` wrapper is not a public binding
-for all Core APIs. The ACT worker is supplied by the consumer. An existing Codex
-consumer has completed local trials through a research MCP bridge; a reusable
-public MCP module remains pending.
+for all Core APIs. The ACT worker is supplied by the consumer. Existing agents
+can use the optional [local MCP tools](../integrations/mcp/README.md); embodied
+business applications may consume Session directly. The MCP package is installed
+as source with the optional Python build, with separately installed SDK dependencies.
+Neither path brings business task logic or model dependencies into Core.
 
 | Interface | Purpose | Availability |
 |---|---|---|

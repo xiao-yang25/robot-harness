@@ -4,7 +4,8 @@ The optional [Python session](../bindings/python/README.md) implements both the
 deterministic fixture and the [MuJoCo backend](../integrations/mujoco/README.md).
 A research ACT worker now supplies real candidates to the same Core-backed host;
 five original seeds match the saved native trajectories exactly. An existing Codex task consumer has completed two real local trials through a
-research MCP bridge. Public MCP/skill packaging and broader Agent tasks remain pending. This page owns the
+research MCP bridge. The optional [MCP module](../integrations/mcp/README.md) now packages
+the local tool path; skill packaging and an owned embodied business Agent remain separate work. This page owns the
 implementation design; [Testing](TESTING.md#first-runtime-slice) owns verification
 scope. Core's authority semantics remain unchanged.
 
@@ -77,6 +78,44 @@ an already supported package. Packaging paths may be refined during implementati
 without changing these ownership boundaries.
 
 ## Session interface and data
+
+### Optional MCP consumer boundary
+
+`integrations/mcp/robot_harness_mcp` adapts this Session for existing tool-using
+agents. A single local stdio connection owns one Session client; its independently
+progressing host and worker remain the existing Runtime processes. The operator
+selects the fixture or ALOHA backend, worker/checkpoint/device and fresh recording
+directory before launch. Tools cannot supply executable paths, model configuration,
+raw actions or authority. Core and the direct Python client do not import MCP.
+The source package is copied/installed with the optional Python build; the SDK
+and image encoder are separately installed only by MCP consumers.
+
+Tool calls serialize access to the non-thread-safe Session. A request cancelled
+while waiting for that client does not start a new call. Once a synchronous call
+starts, cancellation is shielded until it finishes and its result/error is retained;
+then a cancellation checkpoint returns control to the SDK without a duplicate
+response. MCP request cancellation does not revoke a robot operation: query its
+request ID, then explicitly call the task-cancel tool if needed. EOF closes admission
+and cleans up owned processes through the existing Session shutdown. A failed close
+retains the handle for explicit retry and cannot reopen a replacement session.
+Startup failure cannot silently create a replacement either.
+
+The operator bounds tool calls and distinct supported submission IDs. Reserve an
+ID before Runtime submission, including refused or uncertain outcomes; repeated
+IDs reach Runtime deduplication. Close remains available after either budget is
+exhausted. This is cooperating-local-client accounting, not a sandbox or a hard
+wall-time/physical-stop guarantee. Actual camera samples become bounded PNG MCP
+content with correlated epoch/sequence/age; no evaluator-only cube/contact truth
+is exposed. Deterministic fixture observations contain measurements without a
+fabricated robot image.
+
+This adapter is deliberately separate from an embodied business Agent. That Agent
+owns a concrete business goal, task state, observation interpretation and recovery;
+it may consume Session directly and need not use a general-purpose coding agent or
+MCP. The ACT worker is an action policy, neither of these task-level consumers.
+An in-process business application and a tool consumer are both valid front ends
+to the same Runtime. No universal Agent framework, backend plugin registry,
+HTTP service or business-agent repository is introduced by this increment.
 
 The initial client operations are `open`, `capabilities`, `observe`, `submit`,
 `status`, `cancel`, `reset` and `close`. These operations are implemented by the experimental `Session` client. `submit` names a registered skill and supported arguments; the host
@@ -223,6 +262,31 @@ contexts (`gym.close()` alone is empty in the qualified version). Partial startu
 and repeated close need the same ownership accounting. If required cleanup cannot
 be confirmed, return/report an error and do not mark successful closure. Preserve
 partial traces and videos. No restart recovery or persistent task replay is promised.
+
+## Delivery stages
+
+The current Runtime/Agent work is organized as M5, with separate delivery stages:
+
+| Stage | Deliverable | Boundary |
+|---|---|---|
+| M5a | Core-backed session, independent host/worker, concrete ACT/MuJoCo connection and repeated trials | Existing foundation; Linux model/render qualification is separate |
+| M5b | Optional MCP module, tutorial, protocol/install checks and an existing Codex consumer | Existing-agent tool integration; no owned embodied business Agent |
+| M5c | First business task design: goal, initial conditions, skills, task predicate, observations, state, budget and allowed recovery | Planned application design; native-condition success cannot silently replace its goal |
+| M5d | Implement that business Agent's normal observation/decision/skill/result loop | Planned; fresh observations must inform an actual task decision, with execution facts and task evaluation distinct |
+| M5e | Public consumer/skill preparation, fixed combination versions, fresh installation and actual Linux model/simulation reproduction | Planned; fixture/backend numeric CI does not qualify model/render execution |
+| M5f | Task-relevant faults, comparable native cost/behavior evidence and bounded M5 closeout | Planned; explicit limitations and negative results remain valid outcomes |
+
+[Testing](TESTING.md#first-runtime-slice) owns actual verification coverage; the
+stages are delivery scope, not new authority rules or proof of completion. M5a/b
+can be delivered independently while the business application remains planned.
+Packaging, Linux preparation and relevant fault/comparison work can start alongside
+the normal application loop; expanding support claims requires their corresponding
+evidence. M6 then selects one heterogeneous combination to test reuse. Hardware,
+preview preparation and later improvement experiments retain their own prerequisites.
+Public design/API, testing, installation examples and supported scope are updated
+with each applicable implementation increment; private task history stays outside
+this repository. No new Agent repository, model service or simulator is created by
+this stage organization.
 
 ## Alternatives and next implementation batches
 

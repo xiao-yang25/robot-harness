@@ -126,12 +126,42 @@ shielding has unit/SDK-source evidence, not an end-to-end MCP cancellation-notic
 test. A disabled tool-dispatch configuration produced no calls and was retained
 as a failed experiment; CLI exit zero alone is never execution evidence. The
 research bridge is not an installed public MCP module or a security boundary.
-The only product-code change for stdio use routes child stdout to stderr, keeping
+That earlier experiment's product-code change routes child stdout to stderr, keeping
 model/library diagnostics out of protocol output;23 session tests passed again.
+
+The reusable [local MCP module](../integrations/mcp/README.md) now packages this
+tool boundary independently of the research paths/model configuration. Its15 focused
+tests passed on macOS/Python3.12 and locally in Ubuntu22.04/Python3.10. They exercise
+real stdio/Core tasks, same-owner reset/retained receipts, schema
+rejection, task cancellation and EOF during active work. Actual MCP cancellation
+notifications are also checked with a controlled startup barrier: a started call
+finishes, a cancelled queued submit never executes, subsequent queries work and
+owned processes are reaped. An initial protocol run exposed SDK1.30's duplicate
+response after shielded cancellation; a checkpoint after the completed client
+call fixes that path. Initial failure evidence remains in the research record.
+Trace failure must not prevent owned cleanup, and failed close retains its handle.
+Local build and installed/relocated fixture examples completed with values7/4.
+The configured ACT/MuJoCo SDK example also completed two trials at258/260 steps,
+four real camera samples and confirmed close. A deterministic SDK caller does
+not prove a live Agent or an embodied business Agent has run.
+
+A fresh live Codex consumer also passed against the product module:14 actual tool
+calls, two trials at258/260 steps, four camera samples, one session/host/worker,
+retained prior receipt, explicit close and observed process absence. Its answer
+kept full handoff/stable holding unassessed. This used CLI0.159.0, requested
+`gpt-6-sol/high`; the service-resolved model snapshot is unknown. The first attempt
+completed two native trials but timed out after network retries before final
+consumer verification; it remains a failed run. A bounded same-budget proxy-enabled
+retry passed. Independent review covered the module, protocol/installed consumer
+and final live traces/images. These are existing-Agent access results, not a
+business Agent application or reliability/performance estimates.
 
 The separate Ubuntu22.04 optional-Python job builds the extension, runs session
 tests, runs the three lightweight backend checks with distro NumPy, and consumes
-the installed package after relocation. Its build/test/install sequence passed
+the installed package after relocation. It additionally installs the optional MCP
+requirements, runs its protocol tests and consumes the relocated MCP package.
+Hosted results are reported in PR checks; these jobs do not run ACT or MuJoCo.
+The prior Session/backend build/test/install sequence passed
 locally on2026-09-30 in an amd64 Ubuntu22.04 container, using Python3.10.12,
 GCC11.4.0, CMake3.22.1 and distro NumPy1.21.5. The source was mounted read-only;
 build/install directories stayed in the disposable container. The relocated
@@ -157,6 +187,8 @@ Before delivering each remaining increment, exercise its actual boundaries:
 | Optional Core bridge and session | Real C++ Core from an independent Python consumer; clean Core-only build; partial startup/close; bounded framing and duplicate request handling; two operations in one host; caller/worker delays do not block host control progress | MuJoCo support, live Agent or host-death recovery |
 | MuJoCo/ACT normal closure | Fixed native baseline versus host-owned chunk execution; same supported input and result condition; all selected runs/videos retained; explicit reset then second trial with the same host and loaded model; actual resource cleanup and result retention | Complete release/stable grasp from reward4, continuous physical stopping or general reliability |
 | Separate Agent consumer | Fixed tested counterpart versions; live goal, capability choice, real observation, skill call and grounded result in one run; unsupported full-handoff goals remain explicit; model/version/cost recorded | A pretrained ACT worker or replay alone is not a task Agent |
+| Reusable MCP integration | Real SDK/stdio, installed/relocated consumer, MCP request cancellation versus explicit task cancellation, queued-call rejection, EOF/partial startup/failed close and trace-failure cleanup | Existing-agent tool access is not an embodied business Agent, adversarial sandbox or real-device support |
+| Embodied business Agent application | Concrete business goal/state, changing observations, skill decisions and bounded recovery, evaluated end to end on its selected task/backend | MCP packaging or successful Codex tool calls do not supply this task logic |
 | Cancellation and faults before broader support | Nonempty queue cleared; no native submission after host revocation; slow/late/malformed prediction rejected; no new admission on unresolved cleanup; caller loss and partial recording preserve uncertainty | Request-send time is not revocation time; one in-flight native step and host stalls have no hard stop bound |
 
 The native qualification's contact criterion and full-task assessment must remain

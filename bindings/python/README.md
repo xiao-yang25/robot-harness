@@ -4,7 +4,9 @@ An optional POSIX package connects a Python session host to the **existing C++
 Core**. The default backend is a deterministic counter. An optional
 [MuJoCo backend](../../integrations/mujoco/README.md) now runs the qualified ALOHA
 trial with a consumer-supplied ACT worker. Only the host executes candidates.
-This is an experimental Runtime session; a live task Agent is not yet integrated.
+This is an experimental Runtime session. Existing agents can consume it through
+the optional [local MCP module](../../integrations/mcp/README.md); an embodied
+business Agent may use this client directly. Its task strategy remains outside Runtime.
 
 The client, host and worker are separate processes. One host thread drives Core,
 checks current authority/capability/deadline before each effect, owns the candidate

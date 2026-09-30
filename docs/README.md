@@ -43,8 +43,10 @@ It defines the session/worker/bridge boundary and explicitly distinguishes nativ
 task termination from full manipulation success. The optional
 [Python session](../bindings/python/README.md) and
 [MuJoCo trial backend](../integrations/mujoco/README.md) implement the deterministic
-and ACT manipulation paths. An existing Codex consumer has exercised two real
-trials through a research MCP bridge; public MCP packaging remains pending.
+and ACT manipulation paths. The optional [MCP tutorial](../integrations/mcp/README.md)
+provides an SDK example and existing-Agent configuration. This path is distinct
+from an embodied business Agent using Runtime directly; its task logic remains
+an application responsibility.
 
 ## Connect a backend
 
@@ -88,6 +90,7 @@ the contributor documents; personal agent tools are not required to participate.
 | [src/compute](../src/compute), [src/sample](../src/sample) | Native process adapter and deterministic fixture |
 | [examples](../examples/README.md) | Runnable callers, task controller and recovery demonstrations |
 | [integrations/ros2](../integrations/ros2) | Optional navigation builds and experimental fixture messages |
+| [integrations/mcp](../integrations/mcp/README.md) | Optional local tools for existing agents; no business task strategy |
 | [tests](../tests) | Software regressions registered with CTest |
 
 For planned behavior, use the [implementation sequence](DESIGN.md#implementation-sequence)

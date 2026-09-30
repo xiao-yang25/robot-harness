@@ -22,3 +22,14 @@ configure_file("${robot_harness_mujoco_source}"
   "${CMAKE_BINARY_DIR}/python/robot_harness_mujoco/__init__.py" COPYONLY)
 install(FILES "${robot_harness_mujoco_source}"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/robot-harness/python/robot_harness_mujoco")
+
+# MCP is source-only and opt-in at execution; the Core/Session import needs no SDK.
+file(GLOB robot_harness_mcp_sources CONFIGURE_DEPENDS
+  "${PROJECT_SOURCE_DIR}/integrations/mcp/robot_harness_mcp/*.py")
+foreach(robot_harness_mcp_source IN LISTS robot_harness_mcp_sources)
+  get_filename_component(robot_harness_mcp_name "${robot_harness_mcp_source}" NAME)
+  configure_file("${robot_harness_mcp_source}"
+    "${CMAKE_BINARY_DIR}/python/robot_harness_mcp/${robot_harness_mcp_name}" COPYONLY)
+endforeach()
+install(FILES ${robot_harness_mcp_sources}
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/robot-harness/python/robot_harness_mcp")

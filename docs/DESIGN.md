@@ -635,12 +635,18 @@ not established by M4 or by this recommendation.
 
 ### Agent consumer and repository organization
 
-Develop the first integration-runtime slice with an actual task Agent consumer,
-starting with existing Codex through a local MCP bridge. Keep reusable runtime
-coordination, Core and backend adapters in this repository; keep goals, model/context
-dependencies, skill selection and task-level recovery on the consumer side. Create
-a separate Agent project when owned task strategy, memory/skills/recovery or an
-independently released application justifies it. The dependency is Agent to Harness public interfaces;
+There are two distinct consumer paths. Existing general-purpose agents such as
+Codex access Runtime tools through the optional [local MCP integration](../integrations/mcp/README.md).
+An embodied business Agent is an application we implement for a concrete task:
+it owns task state, perception interpretation, skill choice, memory and bounded
+recovery across changing observations. It may call the Python/native Runtime
+interfaces directly; MCP is a transport choice, not a required layer or its task
+architecture. Qualifying the Codex tool path does not deliver this business Agent.
+
+Keep reusable runtime coordination, Core and backend adapters in this repository;
+keep both kinds of consumer's goals, model/context and task strategy outside it.
+Create a separate Agent project when the first owned business task needs its own
+strategy/state/recovery or an independently released application. The dependency is Agent to Harness public interfaces;
 deterministic applications, behavior trees and other agents remain valid callers.
 Repository boundaries do not dictate process boundaries.
 
@@ -667,8 +673,10 @@ repository, new model/backend support or cross-repository CI is delivered by thi
 roadmap change. The [first Runtime slice](RUNTIME_SLICE.md) now specifies the
 consumer, lifecycle and Python/Core bridge. The optional bridge/session and concrete MuJoCo/ACT path are now locally implemented
 and tested. A research Codex/MCP consumer has exercised two real trials in the
-same host/model session with RGB observations, old receipts and cleanup. Public
-MCP packaging, broader task planning and cross-repository delivery remain pending.
+same host/model session with RGB observations, old receipts and cleanup. Embodied
+business-agent planning and cross-repository delivery remain separate work. The
+optional MCP module packages the existing tool path; it does not introduce a
+business Agent, an action policy or a model dependency into Core.
 
 ### Candidate combinations
 

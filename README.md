@@ -68,9 +68,19 @@ to watch navigation, cancellation and replacement.
 | Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
 | Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
 
-[M4 simulation scope is complete](docs/TESTING.md#m4-closeout). The next integration
-step is first-device preparation: identify the native control and stop/loss boundaries,
-then validate them before controlled motion. Learning-based skill integration remains later work.
+[M4 simulation scope is complete](docs/TESTING.md#m4-closeout). The next
+[Runtime slice](docs/RUNTIME_SLICE.md) specifies a session host, policy worker and
+Python/Core bridge, with an [external Agent consumer](docs/DESIGN.md#agent-consumer-and-repository-organization)
+developed alongside it. The optional [Python session](bindings/python/README.md)
+now runs a deterministic fixture and an optional [MuJoCo/ACT trial](integrations/mujoco/README.md)
+through the real Core, with repeated tasks in one host/model process.
+An existing Codex consumer has completed two local trials through a research MCP bridge;
+reusable MCP packaging and broader Agent tasks remain pending.
+Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
+one reproducible task at a time. Simulation work can proceed independently of
+physical-device availability; hardware validation retains its own prerequisites.
+[Preview and adoption preparation](CONTRIBUTING.md#adoption-stages) proceeds alongside
+integration work; licensing and a versioned preview remain pending.
 
 **Early-stage software and simulation.** No physical-robot integration or hard stop
 guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation

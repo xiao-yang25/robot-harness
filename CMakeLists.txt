@@ -12,6 +12,15 @@ add_library(robot_harness_core STATIC
 add_library(RobotHarness::core ALIAS robot_harness_core)
 set_target_properties(robot_harness_core PROPERTIES EXPORT_NAME core)
 
+option(ROBOT_HARNESS_BUILD_PYTHON "Build the experimental local Python session" OFF)
+if(ROBOT_HARNESS_BUILD_PYTHON)
+  if(NOT UNIX OR CMAKE_VERSION VERSION_LESS 3.18)
+    message(FATAL_ERROR "Python sessions require a POSIX host and CMake 3.18+")
+  endif()
+  find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
+  set_target_properties(robot_harness_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
 target_compile_features(robot_harness_core PUBLIC cxx_std_17)
 target_include_directories(robot_harness_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -124,7 +133,19 @@ if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 
-# Install only Core. Adapter deployment and private recovery remain source-tree APIs.
+if(ROBOT_HARNESS_BUILD_PYTHON)
+  add_subdirectory(bindings/python)
+  if(BUILD_TESTING)
+    add_test(NAME python_session
+      COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/python"
+      ${Python3_EXECUTABLE} -m unittest discover
+      -s ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/tests -v)
+    set_tests_properties(python_session PROPERTIES TIMEOUT 60)
+  endif()
+endif()
+
+# The default install exports only Core; the optional Python install is configured above.
+# Adapter deployment and private recovery remain source-tree APIs.
 set(robot_harness_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/RobotHarness")
 install(TARGETS robot_harness_core EXPORT RobotHarnessTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

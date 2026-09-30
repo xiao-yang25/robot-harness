@@ -29,6 +29,28 @@ Keep discussion respectful and focused on the technical issue. The project has
 no response-time commitment. Once contribution terms are settled, focused tests,
 clearer examples and documentation are useful small patches.
 
+## Adoption stages
+
+The current experimental simulation results and documentation can support
+technical discussion and feedback. A developer preview needs explicit licensing
+and contribution terms, a pinned version, reproducible installation/tutorials,
+known limitations and a feedback route. Those terms and a versioned release remain
+pending; this plan does not announce a release or expand support.
+
+Preview preparation can proceed alongside the next embodiment/backend integration.
+Invite initial reproduction attempts when the preview is ready; use their actual
+feedback to improve onboarding. Broader outreach should follow delivery of a
+second meaningfully different combination and resolution of blocking issues found
+by external users. Neither internal CI nor maintainer reproduction is external
+adoption evidence.
+
+Use in a deployed system needs validation for that particular combination and
+its native protections, failure/recovery behavior, compatibility and maintenance.
+Simulation, research use and production guarantees remain distinct. Improve
+examples, documentation, releases and contributor support with each increment;
+a full platform matrix or mature ecosystem is not a prerequisite for an early
+experimental preview.
+
 ## Build and test
 
 Follow the [build instructions](README.md#build),

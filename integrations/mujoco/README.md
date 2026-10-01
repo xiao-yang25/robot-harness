@@ -18,7 +18,7 @@ qualification, not a supported dependency matrix. The research consumer retains
 its baseline; CMake does not install model dependencies.
 The first [Robot Agent delivery](https://github.com/xiao-yang25/robot-agent/pull/1)
 now provides a bundled worker, Mac dependency lock and explicit weight preparation
-in its [pinned setup tutorial](https://github.com/xiao-yang25/robot-agent/blob/3a5a4d44d8404cbd5ffa47776219b5c7c197f090/skills/aloha/README.md).
+in its [pinned setup tutorial](https://github.com/xiao-yang25/robot-agent/blob/45c94dea5ea15aece6175c253cdd6586dd359821/skills/aloha/README.md).
 That installed Mac application passed its local normal path with new prepared
 assets, reusing the qualified Harness installation. The first consumer increment
 is merged as Agent06cbee4, with this runtime pinned at3acc9aa. It remains an
@@ -26,8 +26,10 @@ experimental combination, not a stable standalone skill interface or clean-machi
 reproduction. Linux Ubuntu22.04/aarch64 CPU ACT and OSMesa passed the deterministic seed0
 400+50-step path with a fresh environment/Harness installation,451 decoded
 frames, two correlated settled receipts and process reaping. The same-run fixed
-physical evaluator passed the bounded one-second hold. The complete visual Agent
-application on Linux remains unqualified.
+physical evaluator passed the bounded one-second hold. A separate installed Linux
+visual application subsequently passed three real camera-based decisions, the
+same400+50-step task, full recording, process exits and its own fixed physical
+evaluation. Both results cover only the selected normal scope.
 The portable session fixture needs none of these dependencies.
 
 ## Consumer configuration
@@ -141,6 +143,6 @@ and locally qualified only as described in [Testing](../../docs/TESTING.md#conti
 The separate Robot Agent application adds observation-driven skill selection and
 its own preparation tutorial. Its visual assessment does not prove the physical
 task predicate. The deterministic Linux CPU/model/render path above passed; the
-complete Linux visual Agent, selected live failure cases and combination-wide
-qualification remain subsequent work. No dependencies or model
+separate Linux visual normal task also passed. Selected live failure cases and
+combination-wide delivery closeout remain subsequent work. No dependencies or model
 assets are installed by CMake.

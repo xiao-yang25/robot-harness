@@ -46,8 +46,12 @@ class HandoffTests(unittest.TestCase):
         backend.facts = lambda: {'sim_seconds': self.sim_seconds}
         writer = Mock()
         fake_imageio = SimpleNamespace(v2=SimpleNamespace(get_writer=Mock(return_value=writer)))
-        with patch.dict('sys.modules', {'imageio': fake_imageio, 'imageio.v2': fake_imageio.v2}):
-            backend.reset(seed=0)
+        # Later reset/close paths use the same test-only recorder. The lightweight
+        # suite must not silently depend on imageio installed on the developer host.
+        recording_patch = patch.dict('sys.modules', {'imageio': fake_imageio, 'imageio.v2': fake_imageio.v2})
+        recording_patch.start()
+        self.addCleanup(recording_patch.stop)
+        backend.reset(seed=0)
         self.parent, self.child = socket.socketpair()
         self.worker_log = self.root / 'worker.jsonl'
         with patch('robot_harness_mujoco.AlohaHandoffBackend', return_value=backend):

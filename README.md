@@ -85,7 +85,13 @@ a separately admitted50-step hold in one episode.
 The optional [local MCP integration](integrations/mcp/README.md) lets existing agents
 such as Codex consume this session. Its tool path is separate from an embodied
 business Agent's task state, perception interpretation and recovery; that application
-may use Runtime directly. Broader business-agent tasks remain planned work.
+may use Runtime directly. The first
+[Robot Agent application](https://github.com/xiao-yang25/robot-agent/pull/1)
+uses camera/joints to choose transfer and a subsequent hold. Its
+[pinned skill setup](https://github.com/xiao-yang25/robot-agent/blob/7e302440408ddb3290de92d26b8a47d195164815/skills/aloha/README.md)
+includes the external worker, dependencies and weight preparation; local qualification
+is macOS/MPS seed0. The first Agent delivery is under PR review; Linux model/render
+reproduction and broader business-agent tasks remain planned work.
 Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
 one reproducible task at a time. Simulation work can proceed independently of
 physical-device availability; hardware validation retains its own prerequisites.

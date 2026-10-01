@@ -144,10 +144,62 @@ model decisions. A final-decision model-list refresh timeout remains in diagnost
 logs; an unavailable optional Code Mode host failed closed in CLI events, with
 no tool calls. The actual structured decisions completed, without an application retry.
 This qualifies one normal Linux visual task, not live counterexamples, reliability,
-CUDA/amd64, physical robots or a released support matrix. Public tutorial/delivery
-completion remains distinct from the local execution result. The
+CUDA/amd64, physical robots or a released support matrix. The selected normal
+consumer scope is delivered through Agent PR3 (f19531f) and Harness PR30 (b3d93e7),
+with merged trees, mainline CI and published documentation checked. The
 [pinned visual consumer tutorial](https://github.com/xiao-yang25/robot-agent/blob/45c94dea5ea15aece6175c253cdd6586dd359821/skills/aloha/README.md#real-visual-agent-in-linux)
 provides the setup at that documentation commit.
+
+A later seed0 research counterexample changed only the cube free-joint pose and
+velocity immediately before native step 400, relocating it to the tabletop.
+A trusted Host-only fixture loaded the installed backend and recorded this
+explicit discontinuous disturbance; it is not a product plugin, a public scene
+mutation API or evidence that the ACT policy naturally dropped the object.
+Robot joint state, controls and simulation time were preserved at the disturbance;
+the normal native step then generated the new camera/joint observation. Neither
+the disturbance label nor simulator truth entered the model input. With the same
+Codex 0.159.0 and requested gpt-6-sol/high backend, the installed Agent proposed
+transfer at sequence 0, then help at sequence 400, bound to the same task and epoch 0.
+The task returned `needs_help` in 48.657 seconds; one 400-step transfer was delivered,
+settled and released, with no hold submission or native hold steps. All 401 frames at 640×480 decoded, the final recorded frame matched the model image within codec
+loss, and Host/worker/two decision processes plus all six sampled related
+processes exited. The fixed task evaluator remained `unknown` because the
+one-second hold window was not executed; Agent/Core task verdict stayed
+`unassessed`. CLI exit1 reports incomplete application work here, not a failed
+model request or missing cleanup.
+
+Two earlier fixture attempts are retained as setup failures: the installed module
+initially took precedence over the research override, then a physics reset helper
+reset arm state and simulation time as well as the cube. Neither is counted as the
+cube-only counterexample. This one explicit disturbance supports bounded visual
+abstention and no subsequent hold effects, not broad perception reliability,
+continuously evolving scenes, physical safety or recovery. Selected temporal boundaries have separate checks below; broader model faults
+and a comparable native baseline remain M5f work.
+
+Two Linux CPU/OSMesa seed0 temporal cases used a declared deterministic initial
+transfer proposal and real ACT/MuJoCo execution, then the decision at sequence 400.
+One started an actual Codex0.159.0 client, observed `turn.started`, requested
+cancellation and reaped the client; the task reported `cancelled` in 36.628 seconds.
+Its events retained the optional Code Mode host error and no completed model turn.
+This proves the local client path, not remote model acceptance or termination.
+The other used a controlled CLI with a one-second decision budget; its termination
+handler still produced a valid bound `hold` answer after that deadline and exited
+normally. The task rejected that answer and reported `needs_help` in 35.574 seconds.
+Each retained one 400-step delivered/settled/released transfer, no hold submission
+or native hold steps, 401 decoded frames and no remaining sampled related processes.
+Both task verdicts stayed `unassessed`; with no executed hold window, no full-task
+physical evaluation or success is claimed. These mixed-caller cases are distinct
+from the normal real visual task and the actual-image disturbance counterexample.
+
+The Agent's eight additional real subprocess tests cover prelaunch cancellation
+and expiry, late answers during termination, process-exit races with cancellation
+or expiry, and a child that ignores terminate and requires kill/reap. Two focused
+checks reject the pre-fix adapter; the final complete application suite has 30
+passing tests. Agent CI installs its existing `vision` extra and discovers these
+checks in the existing Ubuntu job; no Core, Host or Harness workflow change is
+needed. The checks do not qualify remote service cancellation, all transient
+processes, physical hard-stop latency, continuously running scenes or recovery.
+Comparable native results/costs and bounded M5 closeout remain pending.
 
 A separate Codex CLI consumer was locally exercised through a research stdio MCP
 bridge. Two real trials used one session/host/model, seed0 then explicit reset to

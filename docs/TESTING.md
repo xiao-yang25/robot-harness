@@ -114,6 +114,23 @@ an actual native effect with a retained partial trace/video. Host and worker
 process reaping was observed. This is bounded local evidence, not reliability,
 complete handoff, live Agent or Linux model/renderer qualification.
 
+A later Linux consumer qualification used Ubuntu22.04/aarch64, Python3.12.14,
+CPU ACT and OSMesa, Agent3a5a4d4 (including its Linux platform-lock extension),
+and Harness3acc9aa. It used independent source copies, a new skill environment,
+a fresh Harness build/install and read-only public originals migrated in Linux;
+234 learned tensors were preserved. The public Agent Docker recipe passed the
+seed0 deterministic400+50-step caller from outside source working directories.
+It retained two correlated accepted/settled receipts, observations0/400/450 in
+epoch0, stale-reference rejection, explicit reset and both process exits.
+The same episode's451640×480 video frames fully decoded and the single fixed
+physical evaluator passed its one-second holding window. This is one normal
+Linux model/render/execution result; the visual Codex backend, complete business
+Agent in Linux, CUDA/amd64, live counterexamples and task reliability remain
+unqualified. Lightweight hosted CI is still separate. The
+[pinned Linux consumer tutorial](https://github.com/xiao-yang25/robot-agent/blob/3a5a4d44d8404cbd5ffa47776219b5c7c197f090/skills/aloha/README.md#linux-consumer-path)
+records the setup at that commit; a qualified local run does not imply a merged
+Linux increment or a complete visual Agent qualification.
+
 A separate Codex CLI consumer was locally exercised through a research stdio MCP
 bridge. Two real trials used one session/host/model, seed0 then explicit reset to
 seed1,258/260 steps, four actual camera samples, retained prior receipts and

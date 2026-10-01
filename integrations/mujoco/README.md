@@ -18,11 +18,16 @@ qualification, not a supported dependency matrix. The research consumer retains
 its baseline; CMake does not install model dependencies.
 The first [Robot Agent delivery](https://github.com/xiao-yang25/robot-agent/pull/1)
 now provides a bundled worker, Mac dependency lock and explicit weight preparation
-in its [pinned setup tutorial](https://github.com/xiao-yang25/robot-agent/blob/7e302440408ddb3290de92d26b8a47d195164815/skills/aloha/README.md).
-That installed application passed its local normal path with new prepared assets,
-reusing the qualified Harness installation. This is an experimental consumer
-combination under PR review, not a stable standalone skill interface or clean-machine
-reproduction. Linux rendering/model execution remains unverified.
+in its [pinned setup tutorial](https://github.com/xiao-yang25/robot-agent/blob/3a5a4d44d8404cbd5ffa47776219b5c7c197f090/skills/aloha/README.md).
+That installed Mac application passed its local normal path with new prepared
+assets, reusing the qualified Harness installation. The first consumer increment
+is merged as Agent06cbee4, with this runtime pinned at3acc9aa. It remains an
+experimental combination, not a stable standalone skill interface or clean-machine
+reproduction. Linux Ubuntu22.04/aarch64 CPU ACT and OSMesa passed the deterministic seed0
+400+50-step path with a fresh environment/Harness installation,451 decoded
+frames, two correlated settled receipts and process reaping. The same-run fixed
+physical evaluator passed the bounded one-second hold. The complete visual Agent
+application on Linux remains unqualified.
 The portable session fixture needs none of these dependencies.
 
 ## Consumer configuration
@@ -90,7 +95,9 @@ PYTHONPATH="$PWD/build-python/python" python3 -m unittest discover \
 Only NumPy is needed for those tests. They and the standard session suite passed
 in a local Ubuntu22.04/Python3.10 container with distro NumPy1.21.5. The optional
 Ubuntu job includes the same checks; it does not run ACT or MuJoCo. Hosted workflow
-results are tracked in PR checks; Linux model/render qualification remains pending. See
+results are tracked in PR checks; those hosted fixtures do not establish Linux
+model/render results. The separate local Linux normal qualification above has
+its own scope. See
 [Testing](../../docs/TESTING.md#first-runtime-slice) for current evidence boundaries.
 
 
@@ -133,6 +140,7 @@ through hold; close it before viewing the complete file. This profile is experim
 and locally qualified only as described in [Testing](../../docs/TESTING.md#continuous-handoff-profile).
 The separate Robot Agent application adds observation-driven skill selection and
 its own preparation tutorial. Its visual assessment does not prove the physical
-task predicate. Linux model/render reproduction, selected live failure cases and
-combination-wide qualification remain subsequent work. No dependencies or model
+task predicate. The deterministic Linux CPU/model/render path above passed; the
+complete Linux visual Agent, selected live failure cases and combination-wide
+qualification remain subsequent work. No dependencies or model
 assets are installed by CMake.

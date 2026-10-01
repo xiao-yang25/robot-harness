@@ -8,8 +8,9 @@ research MCP bridge. The optional [MCP module](../integrations/mcp/README.md) no
 the local tool path. The first external
 [Robot Agent application](https://github.com/xiao-yang25/robot-agent/pull/1) owns
 visual task decisions, budgets and a candidate worker, with a pinned Mac consumer
-setup. That first delivery is under review; clean/Linux reproduction and broader
-task/failure qualification remain separate work. This page owns the
+setup. That first delivery is merged as06cbee4. A separate fresh Linux ARM/CPU
+installation passed the deterministic ACT/MuJoCo path; the complete visual Agent
+on Linux and broader task/failure qualification remain separate work. This page owns the
 implementation design; [Testing](TESTING.md#first-runtime-slice) owns verification
 scope. Core's authority semantics remain unchanged.
 
@@ -277,8 +278,8 @@ The current Runtime/Agent work is organized as M5, with separate delivery stages
 | M5a | Core-backed session, independent host/worker, concrete ACT/MuJoCo connection and repeated trials | Existing foundation; Linux model/render qualification is separate |
 | M5b | Optional MCP module, tutorial, protocol/install checks and an existing Codex consumer | Existing-agent tool integration; no owned embodied business Agent |
 | M5c | First business task design: goal, initial conditions, skills, task predicate, observations, state, budget and allowed recovery | Task design and bounded native qualification completed; native-condition success cannot silently replace its goal |
-| M5d | Implement that business Agent's normal observation/decision/skill/result loop | Implemented and locally qualified on Mac/MPS seed0; first Agent delivery under PR review, with execution facts and task evaluation distinct |
-| M5e | Public consumer/skill preparation, fixed combination versions, fresh installation and actual Linux model/simulation reproduction | Candidate preparation and pinned versions provided; clean-consumer/Linux qualification pending, and fixture CI does not qualify model/render execution |
+| M5d | Implement that business Agent's normal observation/decision/skill/result loop | Implemented and locally qualified on Mac/MPS seed0; first Agent delivery merged as06cbee4, with execution facts and task evaluation distinct |
+| M5e | Public consumer/skill preparation, fixed combination versions, fresh installation and actual Linux model/simulation reproduction | Public preparation/pins provided; fresh Linux ARM/CPU deterministic model/render normal path qualified, complete Linux visual Agent pending; fixture CI does not qualify model/render execution |
 | M5f | Task-relevant faults, comparable native cost/behavior evidence and bounded M5 closeout | Planned; explicit limitations and negative results remain valid outcomes |
 
 [Testing](TESTING.md#first-runtime-slice) owns actual verification coverage; the
@@ -307,7 +308,7 @@ task. The opt-in continuous profile and deterministic caller are now implemented
 the external business Agent also implements the normal visual loop. Runtime
 qualification is scoped in [Testing](TESTING.md#continuous-handoff-profile);
 application qualification belongs to the
-[pinned Agent README](https://github.com/xiao-yang25/robot-agent/blob/7e302440408ddb3290de92d26b8a47d195164815/README.md#acceptance-and-delivery).
+[pinned Agent README](https://github.com/xiao-yang25/robot-agent/blob/3a5a4d44d8404cbd5ffa47776219b5c7c197f090/README.md#acceptance-and-delivery).
 
 The explicitly selected `mujoco-stepped-handoff-v1` profile has two operations:
 
@@ -347,11 +348,14 @@ M5d places the application, model/skill dependencies and task evaluation in an
 independent Agent repository, depending on Harness through its public interfaces.
 Reusable segment/profile mechanisms belong here. A fixed two-repository version
 combination and public preparation instructions precede M5e's fresh Linux/model/render
-reproduction. Agent PR1 provides the model-backed application and preparation at
-7e30244, pinning Harness3acc9aa. The installed default-worker normal path passed
+reproduction. Agent PR1 delivers the model-backed application and preparation at
+06cbee4, pinning Harness3acc9aa. The installed default-worker normal path passed
 with a new skill environment and newly downloaded/migrated weights, reusing the
-qualified Harness installation. Clean-consumer/Linux reproduction and selected
-live failure/comparison cases remain unqualified; the first delivery is under review.
+qualified Harness installation. A later fresh Linux ARM/CPU environment and
+Harness build/install passed the deterministic normal path, full recording,
+bounded physical evaluation and native process reaping. Complete visual-Agent
+Linux reproduction and selected live failure/comparison cases remain unqualified;
+the first Mac normal delivery is merged.
 Continuous-profile acceptance is distinct from the earlier native feasibility
 probe, business-Agent acceptance and Linux/model/render support.
 

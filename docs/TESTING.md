@@ -114,6 +114,41 @@ an actual native effect with a retained partial trace/video. Host and worker
 process reaping was observed. This is bounded local evidence, not reliability,
 complete handoff, live Agent or Linux model/renderer qualification.
 
+A later Linux consumer qualification used Ubuntu22.04/aarch64, Python3.12.14,
+CPU ACT and OSMesa, Agent3a5a4d4 (including its Linux platform-lock extension),
+and Harness3acc9aa. It used independent source copies, a new skill environment,
+a fresh Harness build/install and read-only public originals migrated in Linux;
+234 learned tensors were preserved. The public Agent Docker recipe passed the
+seed0 deterministic400+50-step caller from outside source working directories.
+It retained two correlated accepted/settled receipts, observations0/400/450 in
+epoch0, stale-reference rejection, explicit reset and both process exits.
+The same episode's451640×480 video frames fully decoded and the single fixed
+physical evaluator passed its one-second holding window. This is one normal
+Linux model/render/execution result; the visual Codex backend, complete business
+Agent in Linux, CUDA/amd64, live counterexamples and task reliability remain
+unqualified. Lightweight hosted CI is still separate. The
+[pinned Linux consumer tutorial](https://github.com/xiao-yang25/robot-agent/blob/3a5a4d44d8404cbd5ffa47776219b5c7c197f090/skills/aloha/README.md#linux-consumer-path)
+records the setup at that commit; a qualified local run does not imply a merged
+Linux increment or a complete visual Agent qualification.
+
+A separate installed Linux visual business-Agent run then used the same selected
+CPU/OSMesa environment, Agent code delivered through PR2 (merged ascd2e763),
+Harness3acc9aa and Codex0.159.0. Three real camera/joint proposals selected transfer,
+hold and `observed_success`, bound to sequences0/400/450 and the same epoch0.
+The task completed400+50 steps in75.476 seconds with two correlated delivered,
+settled receipts. All451640×480 frames decoded; Host, worker and three decision
+processes exited, with container process observations corroborating cleanup.
+The single fixed evaluator on this run independently passed its one-second
+hold. Agent/Core task verdict remains `unassessed`; physical truth never entered
+model decisions. A final-decision model-list refresh timeout remains in diagnostic
+logs; an unavailable optional Code Mode host failed closed in CLI events, with
+no tool calls. The actual structured decisions completed, without an application retry.
+This qualifies one normal Linux visual task, not live counterexamples, reliability,
+CUDA/amd64, physical robots or a released support matrix. Public tutorial/delivery
+completion remains distinct from the local execution result. The
+[pinned visual consumer tutorial](https://github.com/xiao-yang25/robot-agent/blob/45c94dea5ea15aece6175c253cdd6586dd359821/skills/aloha/README.md#real-visual-agent-in-linux)
+provides the setup at that documentation commit.
+
 A separate Codex CLI consumer was locally exercised through a research stdio MCP
 bridge. Two real trials used one session/host/model, seed0 then explicit reset to
 seed1,258/260 steps, four actual camera samples, retained prior receipts and

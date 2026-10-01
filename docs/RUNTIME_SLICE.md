@@ -5,7 +5,11 @@ deterministic fixture and the [MuJoCo backend](../integrations/mujoco/README.md)
 A research ACT worker now supplies real candidates to the same Core-backed host;
 five original seeds match the saved native trajectories exactly. An existing Codex task consumer has completed two real local trials through a
 research MCP bridge. The optional [MCP module](../integrations/mcp/README.md) now packages
-the local tool path; skill packaging and an owned embodied business Agent remain separate work. This page owns the
+the local tool path. The first external
+[Robot Agent application](https://github.com/xiao-yang25/robot-agent/pull/1) owns
+visual task decisions, budgets and a candidate worker, with a pinned Mac consumer
+setup. That first delivery is under review; clean/Linux reproduction and broader
+task/failure qualification remain separate work. This page owns the
 implementation design; [Testing](TESTING.md#first-runtime-slice) owns verification
 scope. Core's authority semantics remain unchanged.
 

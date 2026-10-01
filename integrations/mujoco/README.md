@@ -15,9 +15,15 @@ The external worker uses LeRobot revision
 migrated `lerobot/act_aloha_sim_transfer_cube_human` checkpoint at revision
 `ba73b2766f1371cdc133ca4efb97eb090d744625`. These source identities describe
 qualification, not a supported dependency matrix. The research consumer retains
-its lockfile, model preparation and baseline; CMake does not install them.
-Linux rendering/model execution and a public standalone skill package remain
-unverified. The portable session fixture needs none of these dependencies.
+its baseline; CMake does not install model dependencies.
+The first [Robot Agent delivery](https://github.com/xiao-yang25/robot-agent/pull/1)
+now provides a bundled worker, Mac dependency lock and explicit weight preparation
+in its [pinned setup tutorial](https://github.com/xiao-yang25/robot-agent/blob/7e302440408ddb3290de92d26b8a47d195164815/skills/aloha/README.md).
+That installed application passed its local normal path with new prepared assets,
+reusing the qualified Harness installation. This is an experimental consumer
+combination under PR review, not a stable standalone skill interface or clean-machine
+reproduction. Linux rendering/model execution remains unverified.
+The portable session fixture needs none of these dependencies.
 
 ## Consumer configuration
 
@@ -125,5 +131,8 @@ summaries retain400/50 counts, epoch, skill and Core operation IDs; observation
 sequence and the raw trace count the whole episode. Transfer recording stays open
 through hold; close it before viewing the complete file. This profile is experimental
 and locally qualified only as described in [Testing](../../docs/TESTING.md#continuous-handoff-profile).
-Public skill/weight preparation, Linux model/render reproduction and the business
-Agent are still separate work. No dependencies or model assets are installed by CMake.
+The separate Robot Agent application adds observation-driven skill selection and
+its own preparation tutorial. Its visual assessment does not prove the physical
+task predicate. Linux model/render reproduction, selected live failure cases and
+combination-wide qualification remain subsequent work. No dependencies or model
+assets are installed by CMake.

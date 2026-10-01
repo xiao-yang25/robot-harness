@@ -39,8 +39,13 @@ class Host:
             if mujoco is None:
                 self.backend = IncrementBackend()
             else:
-                from robot_harness_mujoco import AlohaBackend
-                self.backend = AlohaBackend(mujoco['output'], mujoco.get('seed', 0))
+                from robot_harness_mujoco import AlohaBackend, AlohaHandoffBackend
+                profile = mujoco.get('profile', 'mujoco-stepped-episode-v1')
+                backends = {'mujoco-stepped-episode-v1': AlohaBackend,
+                            'mujoco-stepped-handoff-v1': AlohaHandoffBackend}
+                if profile not in backends:
+                    raise ValueError('unsupported MuJoCo profile')
+                self.backend = backends[profile](mujoco['output'], mujoco.get('seed', 0))
             self.gate = _core.Gate(self.backend.provider, self.backend.domain,
                                    self.backend.capability, self.backend.profile, MAX_STEPS, now())
             self.session_id = uuid.uuid4().hex
@@ -49,6 +54,8 @@ class Host:
             self.active = None
             self.queue = deque()
             self.prediction = None
+            self.last_action = None
+            self.fixed_action = None
             self.prediction_sequence = 0
             self.worker_ready = False
             self.failure = None
@@ -136,8 +143,19 @@ class Host:
             elif command == 'observe':
                 result, payload = self.backend.sample()
             elif command == 'capabilities':
-                result = {'skill': self.backend.capability, 'profile': self.backend.profile, 'maximum_steps': MAX_STEPS,
-                          'available': self.phase == 'ready' and self.gate.supports(1, now())}
+                ready = (self.phase == 'ready' and self.worker.poll() is None and
+                         self.gate.supports(1, now()))
+                default = next(iter(self.backend.skills))
+                result = {'skill': default, 'profile': self.backend.profile, 'maximum_steps': MAX_STEPS,
+                          'available': ready and self.backend.can_start(default, 1)}
+                if self.backend.requires_observation:
+                    result['skills'] = [{'skill': skill, 'minimum_steps': bounds[0],
+                                         'maximum_steps': bounds[1], 'default_steps': bounds[1],
+                                         'available': ready and self.backend.can_start(skill, bounds[1]) and
+                                         (skill not in self.backend.local_target_skills or self.last_action is not None)}
+                                        for skill, bounds in self.backend.skills.items()]
+                    result['available'] = any(item['available'] for item in result['skills'])
+                    result['requires_observation'] = True
             elif command == 'submit':
                 result = self.submit(message)
             elif command == 'reset':
@@ -157,6 +175,7 @@ class Host:
                     self.fail_worker(f'backend reset error: {error}')
                     raise ValueError(self.failure) from error
                 self.refresh_capability(True)
+                self.last_action = self.fixed_action = None
                 self.phase = 'ready'
                 result = self.backend.observe()
             elif command == 'cancel':
@@ -178,7 +197,13 @@ class Host:
         deadline_ms = message.get('deadline_ms')
         if deadline_ms is not None:
             integer(deadline_ms, 'deadline_ms', 1, 60000)
-        arguments = (message.get('skill'), steps, deadline_ms)
+        expected = message.get('expected_observation')
+        if expected is not None:
+            if not isinstance(expected, dict):
+                raise ValueError('expected_observation requires epoch and sequence')
+            expected = (integer(expected.get('epoch'), 'epoch', 0, 2**31 - 1),
+                        integer(expected.get('sequence'), 'sequence', 0, 2**53))
+        arguments = (message.get('skill'), steps, deadline_ms, expected)
         if reference in self.records:
             record = self.records[reference]
             if record['arguments'] != arguments:
@@ -187,10 +212,27 @@ class Host:
         if len(self.records) >= MAX_RECORDS:
             raise ValueError('session record capacity reached; open a new session')
         record = {'request_id': reference, 'arguments': arguments, 'state': 'rejected',
-                  'operation_id': None, 'steps': 0, 'result': None, 'receipt': None}
+                  'operation_id': None, 'steps': 0, 'result': None, 'receipt': None,
+                  'skill': arguments[0], 'epoch': self.backend.observe()['epoch']}
         self.records[reference] = record
-        if arguments[0] != self.backend.capability or self.phase != 'ready':
-            record['reason'] = 'unsupported_skill' if arguments[0] != self.backend.capability else 'not_ready'
+        if not isinstance(arguments[0], str) or arguments[0] not in self.backend.skills:
+            record['reason'] = 'unsupported_skill'
+            return self.snapshot(record)
+        bounds = self.backend.skills[arguments[0]]
+        if not bounds[0] <= steps <= bounds[1]:
+            record['reason'] = 'unsupported_step_count'
+            return self.snapshot(record)
+        observation = self.backend.observe()
+        if ((self.backend.requires_observation and expected is None) or
+                (expected is not None and expected != (observation['epoch'], observation['sequence']))):
+            record['reason'] = 'observation_mismatch'
+            return self.snapshot(record)
+        if (self.phase != 'ready' or self.worker.poll() is not None or
+                not self.backend.can_start(arguments[0], steps) or
+                self.prediction is not None or self.queue or
+                (arguments[0] in self.backend.local_target_skills and self.last_action is None) or
+                (self.backend.requires_observation and not observation.get('valid', False))):
+            record['reason'] = 'not_ready'
             return self.snapshot(record)
         stamp = now()
         deadline = None if deadline_ms is None else stamp + deadline_ms * 1_000_000
@@ -201,6 +243,19 @@ class Host:
         record.update(operation_id=decision['operation_id'], state='running')
         self.active = record
         self.phase = 'running'
+        try:
+            # Preparation creates no native work. Even an expired/non-submitted
+            # operation must own its counters and diagnostic identity.
+            self.backend.begin_operation(arguments[0], record['operation_id'])
+            local_target = arguments[0] in self.backend.local_target_skills
+            self.fixed_action = self.last_action if local_target else None
+            if local_target and self.fixed_action is None:
+                raise ValueError('hold target unavailable')
+        except Exception as error:
+            self.fail_worker(f'backend operation start error: {error}')
+            accepted(self.gate.non_submission(record['operation_id'], now()))
+            self.finish('worker_error', native=False)
+            return self.snapshot(record)
         if not self.gate.dispatch(record['operation_id'], now()):
             accepted(self.gate.non_submission(record['operation_id'], now()))
             self.finish('not_submitted', native=False)
@@ -247,7 +302,7 @@ class Host:
             return
         if self.prediction is not None:
             return
-        if not self.queue:
+        if not self.queue and self.fixed_action is None:
             self.prediction_sequence += 1
             count = min(100, self.active['arguments'][1] - self.backend.steps)
             self.prediction = {'identity': self.identity(), 'count': count}
@@ -258,12 +313,13 @@ class Host:
         if time.monotonic() < self.next_step:
             return
         # Single writer: no await, callback or bulk submission between permission and effect.
-        action = self.queue.popleft()
+        action = self.fixed_action if self.fixed_action is not None else self.queue.popleft()
         try:
             self.backend.step(action)
         except Exception as error:
             self.fail_worker(f'backend step error: {error}')
             return
+        self.last_action = action
         if self.backend.steps == 1:
             accepted(self.gate.native(operation, 'started', now()))
         self.next_step = time.monotonic() + self.backend.step_interval
@@ -272,6 +328,8 @@ class Host:
             self.finish(reason)
 
     def finish(self, reason, native=True):
+        if self.prediction is not None:
+            raise RuntimeError('cannot settle with unresolved prediction')
         record = self.active
         operation = record['operation_id']
         self.gate.tick(operation, now())
@@ -304,8 +362,18 @@ class Host:
             accepted(self.gate.output(operation, disposition, reference, now()))
         accepted(self.gate.settle(operation, now()))
         record.update(state='finished', steps=self.backend.steps, receipt=self.gate.receipt(operation))
+        receipt = record['receipt']
+        delivered = (reason == 'completed' and record['result'] is not None and
+                     receipt['authority_disposition'] == 'released' and
+                     receipt['output'] == 'accepted' and self.failure is None and
+                     self.closing_at is None and self.worker.poll() is None)
+        continuation = self.backend.after_settlement(delivered)
         self.active = None
-        self.phase = 'failed' if self.failure else ('closing' if self.closing_at else 'needs_reset')
+        self.fixed_action = None
+        self.phase = 'failed' if self.failure else ('closing' if self.closing_at else
+                                                   ('ready' if continuation else 'needs_reset'))
+        if continuation:
+            self.refresh_capability(True)
 
     def fail_worker(self, error):
         if self.failure is None:

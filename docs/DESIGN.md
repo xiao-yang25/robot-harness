@@ -137,6 +137,46 @@ redistribution; licensing remains pending. The independent
 [consumer example](../examples/installed_core/README.md) and
 [relocation check](TESTING.md#installed-core-consumer) exercise this boundary.
 
+## Continuous Python operations
+
+The opt-in `mujoco-stepped-handoff-v1` profile adds a retained episode across two
+separately admitted operations:400 ACT transfer steps, then50 repeats of the
+last validated target actually submitted by the Host. The default trial profile
+still terminates on its native condition or step limit and requires reset.
+The explicit profile selects a different backend; it never resumes a terminated
+legacy episode. No new model dependency or C++ Core API is introduced.
+
+One `mujoco-host` binding owns both operations on the simulator domain. Its
+composite `aloha.handoff_segments` capability describes this finite profile;
+Host skill metadata constrains the400/50 programs. Core continues to enforce
+operation authority, native outcome, output disposition and settlement. Skill
+selection and stage checks do not create a second authority implementation.
+
+The Host clears transfer candidates, resolves outstanding prediction work, records
+native segment completion, and settles the operation before publishing hold
+readiness. Hold requires delivered normal transfer completion, current valid
+observation, healthy resources, and the saved submitted target. Contact truth is
+not consulted. Cancelled/expired/failed transfer never enables hold, even when its
+last physical step already returned. Every hold submission checks Core again.
+A late prediction cannot populate another operation's queue or supply a hold target.
+
+Observation sequence counts the whole episode, while operation steps count each
+segment. A submission carries expected epoch/sequence, compared at the single-writer
+admission boundary. Idempotency includes skill, step budget, deadline and that
+reference. A retained old receipt does not become current authority after reset.
+The example's observation reference is a concurrency precondition, not proof of
+business success; future Agent decisions still require their own task/stage binding.
+
+Simulation and episode recording stay owned by the Host between segments; physics
+is paused until another native step. Segment closure resolves that operation's
+future-effect obligations; it does not close the retained episode or prove a grasp.
+Hold or healthy cancellation ends the sequence and requires explicit reset;
+worker/native failures make the session unavailable. Reset prepares a new episode,
+not physical recovery. Recording errors cannot claim confirmed
+closure. Owner death, stalled native calls and durable recovery remain outside the
+profile. See [the interface](../bindings/python/README.md#continuous-skills) and
+[validation scope](TESTING.md#continuous-handoff-profile).
+
 ## Execution ownership
 
 The core is a C++17 passive state machine driven by a host-owned single logical

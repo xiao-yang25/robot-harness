@@ -1571,3 +1571,55 @@ The default package installs Core only, as specified in the
 [installation boundary](DESIGN.md#installed-core-boundary).
 The opt-in Python session has its separate installation path and validation
 described in [First Runtime slice](#first-runtime-slice).
+
+<a id="continuous-handoff-profile"></a>
+## Continuous ALOHA segments: M5d first batch
+
+The opt-in `mujoco-stepped-handoff-v1` implementation has a deterministic caller;
+the model-backed business Agent remains unimplemented. Local Mac/MPS execution
+completed400 transfer steps plus50 saved-target hold steps in the same epoch,
+with two distinct Core operations and accepted output/settlement. Observations
+progressed0→400→450, a stale post-transfer reference was refused, explicit reset
+created the next epoch, and old receipts stayed unchanged. Both processes were
+observed reaped. All450 action/qpos/qvel/control/contact/time samples matched the
+previous native continuation directly;451 video frames decoded, plus one frame
+for the explicitly reset idle episode.
+
+The fixed independent research task predicate accepted the same-run finite
+one-second hold. This is one native combination/seed, not visual-Agent acceptance,
+long-duration grasp reliability or a public evaluator/skill distribution. Core's
+domain verdict and execution summary task fields remain `unassessed`.
+
+Actual simulator cancellation checks stopped transfer at12 returned steps and
+hold at8 returned steps (episode sequence408). Neither advanced after the Host's
+recorded revocation step; both settled as cancelled without successful output,
+and follow-up hold was refused. Send time is still not revocation, and a blocked
+native call can delay Host progress. These observations do not establish a hard
+stop latency or Owner-death protection.
+
+The lightweight backend suite adds nine Host/Core/continuous-backend tests using
+an explicit no-physics sink and a separate binary test worker. They cover retained
+epoch/operation counters and target equality, no hold prediction, preconditions,
+unresolved/queued cancellation, expiry inside the last step, recording failure,
+an unsolicited old prediction, expiry before dispatch with a new0-step identity,
+and preparation-recording failure with non-submission settlement. Together with
+the three existing backend checks,12 tests pass locally using NumPy without loading a model or renderer.
+The23 ordinary Session tests pass, including default and explicit fixture skills.
+The optional Ubuntu job discovers these new backend tests through its existing
+command; this batch's hosted CI has not been run. Actual Linux ACT/render and
+business-Agent evidence remains required in its own stage.
+
+
+Independent implementation review initially found two preparation/non-submission
+recording defects. Both were fixed and verified with targeted regressions: the
+operation owns its counters before dispatch, and preparation failure uses factual
+non-submission evidence rather than a terminal event for unaccepted native work.
+Preparation changes metadata only; native stepping/prediction still requires
+Core dispatch. Final normal/cancellation runs and the Session/MCP checks were
+repeated on the repaired implementation. The five legacy ACT trials matched before
+this repair; their no-op preparation path is unchanged. Relocated fixture/MCP
+consumers and continuous-backend import also verify package consumption.
+
+Independent review of the repaired patch and its final normal/cancellation evidence
+concluded APPROVE. This qualification is local and uncommitted; hosted CI/mainline
+delivery, the business Agent and Linux/model/render support remain separate.

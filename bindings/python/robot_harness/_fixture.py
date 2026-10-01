@@ -7,6 +7,9 @@ class IncrementBackend:
     provider = 'deterministic-worker'
     domain = 'fixture-counter'
     step_interval = 0.005
+    skills = {'fixture.increment': (1, 400)}
+    requires_observation = False
+    local_target_skills = frozenset()
 
     def __init__(self):
         self.value = 0
@@ -44,3 +47,12 @@ class IncrementBackend:
 
     def finish(self, reason):
         return {'value': self.value, 'steps': self.steps}
+
+    def can_start(self, skill, steps):
+        return skill in self.skills
+
+    def begin_operation(self, skill, operation):
+        pass
+
+    def after_settlement(self, delivered):
+        return False

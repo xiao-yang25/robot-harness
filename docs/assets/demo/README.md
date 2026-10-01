@@ -1,10 +1,52 @@
 # Simulation recordings
 
 [Watch on the project website](https://xiao-yang25.github.io/robot-harness/#demo).
-These are actual TurtleBot3 / Gazebo Classic recordings, viewed through RViz on
-Ubuntu 22.04 / ROS 2 Humble. They are silent, scripted simulation scenarios.
-The checker reads actual Gazebo poses and native/Owner observations. Video alone
-cannot establish cancellation, settlement or a physical stopping guarantee.
+The gallery contains actual ALOHA / MuJoCo and TurtleBot3 / Gazebo Classic
+recordings. All are silent, scripted simulation scenarios. Video shows motion;
+the corresponding observations and receipts establish execution and settlement.
+It does not establish a physical stopping guarantee.
+
+## Continuous ALOHA transfer and hold
+
+[Complete recording](aloha-handoff.mp4) · [Same-run summary](aloha-handoff-run.json) ·
+[Runtime setup and caller](../../../integrations/mujoco/README.md#continuous-handoff)
+
+Recorded on 2026-10-01, using the explicit `mujoco-stepped-handoff-v1` profile,
+seed0 and a deterministic caller. The external ACT worker supplies 400 transfer
+targets. After delivered settlement, the caller obtains fresh RGB/joints and
+requests a separate50-step hold of the last actually executed target. There is
+no reset between operations and no policy prediction during hold.
+
+| Same-run observation | Value |
+|---|---|
+| Episode / observation sequence | Epoch0 throughout; 0 → 400 → 450 |
+| Core operations | IDs1/2; 400/50 returned steps; both outputs accepted and settled |
+| Core domain verdict | Unassessed; execution settlement is not task success |
+| Separate task evaluation | `aloha-left-handoff-hold-v1`: succeeded in the bounded one-second hold |
+| Recording | 451 frames, 640×480, 50fps, 9.02s; silent, uncut original |
+
+The video is copied from the final qualified `m5d-handoff-session-02` episode.
+It follows simulation time (0.02s per step), not elapsed runtime: inference and
+caller waits have no frames. There is no crop, resize, speed change, internal cut
+or authored motion. The poster is frame350 from this same recording. All450
+recorded steps matched the native continuation baseline, and all451 frames decoded.
+The linked summary selects existing report/evaluator fields and omits local paths;
+it is not the full raw trace or a second task evaluation.
+
+Qualification used a development tree based on `53e65c4` with the continuous
+profile patch delivered with these assets. This is locally qualified on macOS
+arm64/MPS; see the [backend version and dependency scope](../../../integrations/mujoco/README.md).
+Reproduction requires the external worker and migrated checkpoint described
+there; they are not installed or shipped with the Core package. Linux ACT/render
+reproduction remains unqualified. This single-seed demonstration is not a
+reliability estimate, an autonomous business Agent, self-improvement, or a
+physical grasp/stop guarantee. It does not demonstrate the separate cancellation
+checks. Raw experiment records and unsuccessful runs remain retained separately.
+
+## Navigation recordings
+
+The clips below show TurtleBot3 / Gazebo Classic through RViz on Ubuntu22.04 /
+ROS2 Humble. Their checker reads Gazebo poses and native/Owner observations.
 
 ## Moving handoff
 

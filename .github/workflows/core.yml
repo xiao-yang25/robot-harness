@@ -28,7 +28,7 @@ jobs:
         run: |
           cmake --build build-python --target _core --parallel 2
           ctest --test-dir build-python -R '^python_session$' --output-on-failure --no-tests=error
-      - name: Check optional backend payload and cleanup boundaries
+      - name: Check optional backend segments, payload and cleanup boundaries
         run: >-
           PYTHONPATH="$PWD/build-python/python" /usr/bin/python3 -m unittest discover
           -s integrations/mujoco/tests -v

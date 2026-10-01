@@ -28,15 +28,22 @@ Applications choose goals; robot stacks retain control and device protection.
 
 ## See it move
 
-[![Recorded Harness cancellation and handoff in simulation](docs/assets/demo/replace-poster.png)](https://xiao-yang25.github.io/robot-harness/#demo)
+<p align="center">
+  <a href="https://xiao-yang25.github.io/robot-harness/#demo"><img src="docs/assets/demo/aloha-handoff-poster.png" width="45%" alt="Watch ALOHA transfer and hold in MuJoCo"></a>
+  <a href="https://xiao-yang25.github.io/robot-harness/#navigation-demo"><img src="docs/assets/demo/replace-poster.png" width="45%" alt="Watch TurtleBot3 moving cancellation and handoff in Nav2"></a>
+</p>
 
-[Watch cancellation and handoff](https://xiao-yang25.github.io/robot-harness/#demo) ·
-[Full recordings & evidence](docs/assets/demo/README.md)
+**[Manipulation: transfer → hold](https://xiao-yang25.github.io/robot-harness/#demo).**
+ACT supplies 400 transfer steps; Runtime admits a separate 50-step hold in the
+same scene. The complete nine-second clip follows simulation time, omitting
+inference waits. A deterministic caller selects the skills.
 
-Actual TurtleBot3 / Nav2 simulation, viewed in RViz. A moves and is cancelled;
-Harness admits B only after A settles. A second clip shows why stopping alone
-does not establish settlement. Excerpts preserve playback speed; full originals
-and same-run receipts are available.
+**[Navigation: cancel → hand off](https://xiao-yang25.github.io/robot-harness/#navigation-demo).**
+TurtleBot3 moves, A is cancelled, and B starts after A settles. A companion clip
+shows stopping with settlement still pending.
+
+Click a cover to watch. Actual scripted simulations; original recordings and
+same-run evidence are in the [recording notes](docs/assets/demo/README.md).
 
 ## Build
 
@@ -72,8 +79,9 @@ to watch navigation, cancellation and replacement.
 [Runtime slice](docs/RUNTIME_SLICE.md) specifies a session host, policy worker and
 Python/Core bridge, with an [external Agent consumer](docs/DESIGN.md#agent-consumer-and-repository-organization)
 developed alongside it. The optional [Python session](bindings/python/README.md)
-now runs a deterministic fixture and an optional [MuJoCo/ACT trial](integrations/mujoco/README.md)
-through the real Core, with repeated tasks in one host/model process.
+now runs a deterministic fixture and optional [MuJoCo/ACT profiles](integrations/mujoco/README.md)
+through the real Core: repeated trials, or an opt-in400-step transfer followed by
+a separately admitted50-step hold in one episode.
 The optional [local MCP integration](integrations/mcp/README.md) lets existing agents
 such as Codex consume this session. Its tool path is separate from an embodied
 business Agent's task state, perception interpretation and recovery; that application

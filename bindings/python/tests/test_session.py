@@ -39,7 +39,7 @@ class SessionTests(unittest.TestCase):
             with self.assertRaises(SessionError):
                 session.submit('one', steps=8)
             session.reset()
-            second = session.submit('two', steps=4)
+            second = session.submit('two', steps=4, skill='fixture.increment')
             self.assertNotEqual(first['operation_id'], second['operation_id'])
             self.assertEqual(finished(session, 'two')['result']['value'], 4)
             self.assertEqual(session.status('one'), done)

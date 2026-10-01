@@ -288,6 +288,59 @@ with each applicable implementation increment; private task history stays outsid
 this repository. No new Agent repository, model service or simulator is created by
 this stage organization.
 
+## Continuous segments and the first business task
+
+The M5c design selects one ALOHA/MuJoCo task: transfer the cube to the left arm,
+release the right hand, and maintain the grasp for one simulated second. Task
+evaluation requires bilateral left-finger contact without other support, bounded
+relative cube/gripper pose change, table clearance, and actual simulation progress.
+Missing measurements remain unknown. Native reward and Core settlement retain
+their separate meanings. Bounded native qualification supports implementing this
+task. The opt-in continuous profile and deterministic caller are now implemented;
+the business Agent remains planned. Actual qualification is scoped in [Testing](TESTING.md#continuous-handoff-profile).
+
+The explicitly selected `mujoco-stepped-handoff-v1` profile has two operations:
+
+| Skill | Execution | Completion boundary |
+|---|---|---|
+| `aloha.transfer_cube_segment` | 400 ACT policy steps in a fresh episode | Returned steps and resolved execution/inference obligations; retain the episode for observation and a follow-up |
+| `aloha.hold_current_target` | 50 steps repeating the Host's last validated, submitted target | Returned steps and resolved obligations; require explicit reset before a new task |
+
+Select a skill with `Session.submit(..., skill=..., expected_observation=...)`;
+the expected epoch/sequence is compared with the Host's current observation before
+admission. This profile requires exactly400/50 steps, with those defaults when
+steps are omitted. Existing trial termination, step limits, default Session calls
+and explicit-reset behavior stay as documented. The separate profile owns native
+dm_control continuation and never steps a terminated legacy trial. Core stays
+payload-independent; its binding names the actual `mujoco-host` execution owner,
+with one composite segment capability on the same simulator domain.
+
+The planned business application owns the goal, task stages, memory, budgets and decision
+records. It observes RGB/joints, chooses transfer or help, receives a fresh
+post-transfer observation, then chooses hold or help before the final observation
+and report. That intermediate observation must affect the follow-up decision.
+The deterministic example exercises this interface; it does not implement a
+model-backed application or make an observation-driven task choice.
+Independent simulation evaluation cannot feed contact truth into those decisions
+or into hold admission. Admission checks the declared stage, resources, target
+provenance and resolved obligations; it still checks operation authority at every
+submission. A mistaken visual decision must remain visible in the task outcome.
+
+The initial design permits one transfer and one hold, with no automatic execution
+retry. Decisions are tied to task, epoch, stage and observation sequence; stale or
+cancelled decisions cannot start a follow-up. Simulation pauses while awaiting a
+decision, so rereading the same frame proves no new physical progress. Cancellation
+or incomplete execution does not grant hold readiness. Explicit reset prepares a
+new episode; it is not physical recovery or a hard bound on blocked native calls.
+
+M5d places the application, model/skill dependencies and task evaluation in an
+independent Agent repository, depending on Harness through its public interfaces.
+Reusable segment/profile mechanisms belong here. A fixed two-repository version
+manifest and public preparation instructions precede M5e's fresh Linux/model/render
+reproduction. The model-backed application and public/Linux combination remain unimplemented.
+Continuous-profile acceptance is distinct from the earlier native feasibility
+probe, business-Agent acceptance and Linux/model/render support.
+
 ## Alternatives and next implementation batches
 
 An in-process policy loop is the smallest native baseline, but its measured first

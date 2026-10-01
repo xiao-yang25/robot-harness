@@ -86,3 +86,44 @@ in a local Ubuntu22.04/Python3.10 container with distro NumPy1.21.5. The optiona
 Ubuntu job includes the same checks; it does not run ACT or MuJoCo. Hosted workflow
 results are tracked in PR checks; Linux model/render qualification remains pending. See
 [Testing](../../docs/TESTING.md#first-runtime-slice) for current evidence boundaries.
+
+
+## Continuous handoff
+
+Select `mujoco-stepped-handoff-v1` in the trusted local `mujoco` configuration.
+`AlohaHandoffBackend` then owns native dm_control continuation: it records reward4
+as a milestone and executes the fixed400-step transfer segment without applying
+Gym's legacy terminal mapping. After normal delivered settlement, it preserves
+the episode for fresh RGB/joints and a separately admitted50-step hold.
+The legacy `mujoco-stepped-episode-v1` remains the default.
+
+The [Session interface](../../bindings/python/README.md#continuous-skills) requires
+explicit expected epoch/sequence references. Stage/resource/target checks govern
+hold admission; cube contact/pose truth remains evaluator-only recording data.
+A mistaken caller may hold a dropped cube target; the independent task evaluator
+must report that failure instead of Runtime quietly filtering it out.
+
+Use the [deterministic caller](../../examples/mujoco_handoff.py) with the same
+qualified dependencies and externally supplied worker/checkpoint:
+
+```sh
+PYTHONPATH="$PWD/build-python/python" python3 examples/mujoco_handoff.py \
+  --output /absolute/new-handoff-run \
+  --worker-script /absolute/session_worker.py \
+  --checkpoint /absolute/migrated-checkpoint --device mps --seed 0
+```
+
+It performs both operations, checks continuous observations/settled receipts,
+rejects a stale hold reference, resets explicitly after hold, and closes/reaps the
+processes. It saves a plan and partial/error/final reports alongside episode
+recordings. Its status says whether the bounded execution checks completed;
+it does not report independently evaluated business success. It unconditionally
+selects hold as a deterministic baseline, not an observation-driven Agent.
+
+A normal episode records450 returned steps and451 video frames. Per-operation
+summaries retain400/50 counts, epoch, skill and Core operation IDs; observation
+sequence and the raw trace count the whole episode. Transfer recording stays open
+through hold; close it before viewing the complete file. This profile is experimental
+and locally qualified only as described in [Testing](../../docs/TESTING.md#continuous-handoff-profile).
+Public skill/weight preparation, Linux model/render reproduction and the business
+Agent are still separate work. No dependencies or model assets are installed by CMake.

@@ -1662,6 +1662,75 @@ described in [First Runtime slice](#first-runtime-slice).
 <a id="continuous-handoff-profile"></a>
 ## Continuous ALOHA segments: M5d first batch
 
+### Candidate identity regression (2026-10-02)
+
+The Host rejects integer identity counters echoed as booleans or floating-point
+numbers before queueing actions, while allowing unrelated optional metadata.
+Three focused regressions cover a malformed observation epoch with zero native
+effects and a failed native outcome with completed settlement, numeric aliases that preserve the pending request,
+and a valid candidate carrying extra metadata followed by all400 transfer steps.
+The existing normal, cancellation and stale-candidate checks remain enabled.
+
+The final patch passed12 handoff checks on Mac/Python3.12, and15 optional backend
+checks plus23 ordinary Session checks on Ubuntu22.04 ARM64/Python3.12 through its
+installed package. These are explicit no-physics fixtures. The existing Ubuntu
+Core workflow discovers the new regressions in `integrations/mujoco/tests`;
+no workflow expansion is needed. Hosted CI for this patch has not yet run.
+
+<a id="m5f-task-owner-comparison"></a>
+### Selected task owner comparison (2026-10-02)
+
+A research-only native owner/ACT worker was compared with the installed Harness
+candidate containing the identity fix above and Agent3482858. The published
+Agent manifest still pins Harness3acc9aa; these results do not silently qualify
+a new published combination. Native owns its own framing, scene, queue and
+shutdown path; its completion facts are not Core receipts.
+
+Both used Ubuntu22.04 ARM64, Python3.12.14, CPU ACT/OSMesa, seed0,
+float32/batch1/chunk100 and four Torch threads, in sequential fresh offline Docker
+containers launched with6GiB/6CPU. Both recorded640×480 video and physics for
+400 transfer plus50 saved-target hold steps. The task polling interval was10ms.
+Model revision was `ba73b2766f1371cdc133ca4efb97eb090d744625`, LeRobot
+`e595b7902714ba51f91e47523f66f89c5181b649`, gym-aloha
+`bd3325740ea8d1c97411c41ea1e0f4ce0a7de8da`.
+
+| Sequential run | Total wall seconds | Container cgroup peak GiB |
+|---|---:|---:|
+| Harness1 |36.591|1.815|
+| Native1 |36.962|1.867|
+| Native2 |37.411|1.873|
+| Harness2 |37.609|1.819|
+
+All450 recorded action/physics samples matched across the four runs. Each had
+451 decoded frames, completed cleanup and one successful evaluation of the same
+fixed finite one-second hold predicate. Evaluation/decoding ran outside timing;
+domain/task verdicts remained `unassessed`. Complete status/observation responses
+were observed inside actual ACT computation on both paths. With two runs each,
+overlapping wall ranges and cgroup accounting including observer/page cache, no
+general speed or memory advantage is established. CPU limits are evidenced by the
+accepted launch arguments; cgroup memory limits and peaks were directly sampled.
+RPC counts have implementation-specific startup boundaries; phase intervals do
+not isolate Core overhead.
+
+Matched Harness fault conditions stopped queued work at19 returned steps,
+inference-time and declared300ms post-inference-delay cancellation at100, and an
+injected wrong observation identity at0. Subsequent hold was refused, output was
+not delivered and cleanup was observed. Cancellation acknowledgements do not
+withdraw prior effects or establish a hard stop deadline. The finite modification
+case changed the post-transfer proposal to help: both paths observed0→400,
+completed transfer and closed without hold (401 frames). Harness reused its
+existing task consumer; native needed an explicit task-driver help branch.
+
+This shows reuse of the selected authority/queue/resource boundary, while a
+task-specific native implementation can provide the related guarantees too.
+Worker adaptation, dependencies and domain qualification remain application work.
+Historical development time and unfamiliar-user setup were not measured, so no
+net engineering time saving is claimed. Independent focused implementation and
+evidence reviews approved this bounded comparison. It does not qualify visual
+decisions, Owner death/recovery, hard physical stops, other bodies or GPU paths.
+
+### Previously delivered simulation evidence
+
 The opt-in `mujoco-stepped-handoff-v1` implementation has a deterministic caller;
 the model-backed business Agent remains unimplemented. Local Mac/MPS execution
 completed400 transfer steps plus50 saved-target hold steps in the same epoch,

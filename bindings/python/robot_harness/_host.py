@@ -27,6 +27,19 @@ def accepted(disposition):
         raise RuntimeError(f'Core rejected evidence: {disposition}')
 
 
+def matches_identity(actual, expected):
+    """Match consumed echo fields, including their JSON types; ignore extra metadata."""
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return all(key in actual and matches_identity(actual[key], value)
+                   for key, value in expected.items())
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            matches_identity(left, right) for left, right in zip(actual, expected))
+    return actual == expected
+
+
 class Host:
     def __init__(self, channel, worker_delay_ms, mujoco=None, startup_timeout=5.0):
         self.channel = channel
@@ -275,7 +288,7 @@ class Host:
             return
         if message.get('kind') != 'prediction' or self.prediction is None:
             raise ValueError('unsolicited worker response')
-        if message.get('identity') != self.prediction['identity']:
+        if not matches_identity(message.get('identity'), self.prediction['identity']):
             raise ValueError('prediction identity mismatch')
         actions = message.get('actions')
         self.backend.validate_actions(actions, self.prediction['count'])

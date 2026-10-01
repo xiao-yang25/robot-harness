@@ -1,4 +1,5 @@
 """Actual Host/Core and segment backend, with an explicit no-physics test sink."""
+import copy
 import json
 from pathlib import Path
 import socket
@@ -199,6 +200,62 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(len(self.effects), 400)
         self.assertEqual(self.host.records['hold']['receipt']['native_outcome'], 'failed')
         self.assertEqual(self.host.phase, 'failed')
+
+    def prediction_reply(self):
+        self.submit('identity-probe', TRANSFER)
+        self.drive(lambda: self.host.prediction is not None)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            for message in self.host.worker_channel.pump():
+                if message['kind'] == 'prediction':
+                    return message
+            time.sleep(.001)
+        self.fail('worker did not return a candidate')
+
+    def test_boolean_observation_identity_is_rejected_before_effects(self):
+        message = self.prediction_reply()
+        message['identity']['observation']['epoch'] = False
+        with self.assertRaisesRegex(ValueError, 'identity mismatch'):
+            self.host.worker_message(message)
+        self.host.fail_worker('invalid candidate identity')
+        # Host.run closes the malformed worker channel, then drives actual exit
+        # before resolving its pending candidate and settling the operation.
+        self.host.worker_channel.close()
+        self.host.worker_channel = None
+        deadline = time.monotonic() + 5
+        while self.host.active is not None:
+            self.host.stop_worker()
+            self.host.advance()
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(.001)
+        record = self.host.snapshot(self.host.records['identity-probe'])
+        self.assertEqual(self.effects, [])
+        self.assertEqual(record['steps'], 0)
+        self.assertIsNone(record['result'])
+        self.assertEqual(record['receipt']['native_outcome'], 'failed')
+        self.assertEqual(record['receipt']['settlement'], 'settled')
+
+    def test_numeric_aliases_do_not_consume_pending_prediction(self):
+        original = self.prediction_reply()
+        for field, value in [('prediction', True), ('prediction', 1.0)]:
+            message = copy.deepcopy(original)
+            message['identity'][field] = value
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, 'identity mismatch'):
+                    self.host.worker_message(message)
+                self.assertIsNotNone(self.host.prediction)
+                self.assertEqual(list(self.host.queue), [])
+        self.host.worker_message(original)
+        self.drive(lambda: self.host.active is None)
+        self.assertEqual(len(self.effects), 400)
+
+    def test_optional_candidate_metadata_does_not_change_identity(self):
+        message = self.prediction_reply()
+        message['identity']['diagnostic'] = {'worker_note': 'optional'}
+        message['identity']['observation']['diagnostic'] = 'optional'
+        self.host.worker_message(message)
+        self.drive(lambda: self.host.active is None)
+        self.assertEqual(len(self.effects), 400)
 
     def test_expiry_before_hold_dispatch_records_its_own_zero_steps(self):
         first = self.transfer()

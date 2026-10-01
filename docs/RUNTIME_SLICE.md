@@ -73,12 +73,13 @@ network RPC service, public C ABI or cross-version Python binary ABI promise is
 needed for the first bridge. The extension has local build and installed-consumer validation; binary ABI portability
 is not promised.
 
-Planned locations are `bindings/python/` for the extension/package,
+Implemented locations are `bindings/python/` for the extension/package,
 `integrations/mujoco/` for the optional backend. The ACT worker, model configuration
-and task caller stay on the consumer side, initially in research experiments. Reusable session mechanics
-must not import LeRobot or prompt libraries. Until consumer packaging is delivered,
-worker experiments stay in the research workspace; do not publish that probe as
-an already supported package. Packaging paths may be refined during implementation
+and task caller stay on the consumer side. The first worker originated in research
+and is now bundled in the external Agent's candidate delivery. Reusable session
+mechanics must not import LeRobot or prompt libraries. The candidate worker pins
+its matching Harness private protocol; it is not a stable standalone plugin.
+Packaging paths may be refined during implementation
 without changing these ownership boundaries.
 
 ## Session interface and data
@@ -119,7 +120,7 @@ it may consume Session directly and need not use a general-purpose coding agent 
 MCP. The ACT worker is an action policy, neither of these task-level consumers.
 An in-process business application and a tool consumer are both valid front ends
 to the same Runtime. No universal Agent framework, backend plugin registry,
-HTTP service or business-agent repository is introduced by this increment.
+HTTP service or business-agent repository is introduced by the MCP module itself.
 
 The initial client operations are `open`, `capabilities`, `observe`, `submit`,
 `status`, `cancel`, `reset` and `close`. These operations are implemented by the experimental `Session` client. `submit` names a registered skill and supported arguments; the host
@@ -275,22 +276,24 @@ The current Runtime/Agent work is organized as M5, with separate delivery stages
 |---|---|---|
 | M5a | Core-backed session, independent host/worker, concrete ACT/MuJoCo connection and repeated trials | Existing foundation; Linux model/render qualification is separate |
 | M5b | Optional MCP module, tutorial, protocol/install checks and an existing Codex consumer | Existing-agent tool integration; no owned embodied business Agent |
-| M5c | First business task design: goal, initial conditions, skills, task predicate, observations, state, budget and allowed recovery | Planned application design; native-condition success cannot silently replace its goal |
-| M5d | Implement that business Agent's normal observation/decision/skill/result loop | Planned; fresh observations must inform an actual task decision, with execution facts and task evaluation distinct |
-| M5e | Public consumer/skill preparation, fixed combination versions, fresh installation and actual Linux model/simulation reproduction | Planned; fixture/backend numeric CI does not qualify model/render execution |
+| M5c | First business task design: goal, initial conditions, skills, task predicate, observations, state, budget and allowed recovery | Task design and bounded native qualification completed; native-condition success cannot silently replace its goal |
+| M5d | Implement that business Agent's normal observation/decision/skill/result loop | Implemented and locally qualified on Mac/MPS seed0; first Agent delivery under PR review, with execution facts and task evaluation distinct |
+| M5e | Public consumer/skill preparation, fixed combination versions, fresh installation and actual Linux model/simulation reproduction | Candidate preparation and pinned versions provided; clean-consumer/Linux qualification pending, and fixture CI does not qualify model/render execution |
 | M5f | Task-relevant faults, comparable native cost/behavior evidence and bounded M5 closeout | Planned; explicit limitations and negative results remain valid outcomes |
 
 [Testing](TESTING.md#first-runtime-slice) owns actual verification coverage; the
 stages are delivery scope, not new authority rules or proof of completion. M5a/b
-can be delivered independently while the business application remains planned.
+were delivered independently; the first implemented business application now has
+its own candidate delivery and qualification limits.
 Packaging, Linux preparation and relevant fault/comparison work can start alongside
 the normal application loop; expanding support claims requires their corresponding
 evidence. M6 then selects one heterogeneous combination to test reuse. Hardware,
 preview preparation and later improvement experiments retain their own prerequisites.
 Public design/API, testing, installation examples and supported scope are updated
 with each applicable implementation increment; private task history stays outside
-this repository. No new Agent repository, model service or simulator is created by
-this stage organization.
+this repository. The business application lives in its separate Agent repository;
+stage organization alone does not call for more repositories, model services or
+simulators.
 
 ## Continuous segments and the first business task
 
@@ -301,7 +304,10 @@ relative cube/gripper pose change, table clearance, and actual simulation progre
 Missing measurements remain unknown. Native reward and Core settlement retain
 their separate meanings. Bounded native qualification supports implementing this
 task. The opt-in continuous profile and deterministic caller are now implemented;
-the business Agent remains planned. Actual qualification is scoped in [Testing](TESTING.md#continuous-handoff-profile).
+the external business Agent also implements the normal visual loop. Runtime
+qualification is scoped in [Testing](TESTING.md#continuous-handoff-profile);
+application qualification belongs to the
+[pinned Agent README](https://github.com/xiao-yang25/robot-agent/blob/7e302440408ddb3290de92d26b8a47d195164815/README.md#acceptance-and-delivery).
 
 The explicitly selected `mujoco-stepped-handoff-v1` profile has two operations:
 
@@ -319,7 +325,7 @@ dm_control continuation and never steps a terminated legacy trial. Core stays
 payload-independent; its binding names the actual `mujoco-host` execution owner,
 with one composite segment capability on the same simulator domain.
 
-The planned business application owns the goal, task stages, memory, budgets and decision
+The implemented business application owns the goal, task stages, budgets and decision
 records. It observes RGB/joints, chooses transfer or help, receives a fresh
 post-transfer observation, then chooses hold or help before the final observation
 and report. That intermediate observation must affect the follow-up decision.
@@ -340,8 +346,12 @@ new episode; it is not physical recovery or a hard bound on blocked native calls
 M5d places the application, model/skill dependencies and task evaluation in an
 independent Agent repository, depending on Harness through its public interfaces.
 Reusable segment/profile mechanisms belong here. A fixed two-repository version
-manifest and public preparation instructions precede M5e's fresh Linux/model/render
-reproduction. The model-backed application and public/Linux combination remain unimplemented.
+combination and public preparation instructions precede M5e's fresh Linux/model/render
+reproduction. Agent PR1 provides the model-backed application and preparation at
+7e30244, pinning Harness3acc9aa. The installed default-worker normal path passed
+with a new skill environment and newly downloaded/migrated weights, reusing the
+qualified Harness installation. Clean-consumer/Linux reproduction and selected
+live failure/comparison cases remain unqualified; the first delivery is under review.
 Continuous-profile acceptance is distinct from the earlier native feasibility
 probe, business-Agent acceptance and Linux/model/render support.
 

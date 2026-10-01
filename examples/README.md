@@ -14,8 +14,10 @@ For robot motion, use the separate [Humble/Gazebo simulation tutorial](../integr
 For Python callers, use the optional [Session example](../bindings/python/README.md).
 For an existing Agent or a deterministic SDK client, follow the
 [MCP tutorial](../integrations/mcp/README.md) and [two-operation caller](mcp_session.py).
-These are distinct consumer paths; no embodied business task policy is implemented
-by those examples.
+The [continuous MuJoCo caller](mujoco_handoff.py) demonstrates transfer then hold
+without reset; its [setup](../integrations/mujoco/README.md#continuous-handoff) needs
+a separately supplied policy worker and checkpoint. These are distinct consumer
+paths; no model-backed business task policy is implemented by those examples.
 
 ## Use Core in your own project
 

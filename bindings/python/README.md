@@ -107,3 +107,49 @@ For the design and remaining Agent boundary, see
 [Runtime slice](../../docs/RUNTIME_SLICE.md). Validation scope and CI status belong
 in [Testing](../../docs/TESTING.md#first-runtime-slice). No policy dependency is
 installed by enabling this option.
+
+
+## Continuous skills
+
+The opt-in MuJoCo configuration `profile: "mujoco-stepped-handoff-v1"` retains one
+episode between two finite skills. `submit` accepts an optional `skill` keyword;
+default fixture/trial calls still use their original skill and10-step default.
+For the new profile, omitted steps select400 for `aloha.transfer_cube_segment`
+or50 for `aloha.hold_current_target`; other counts are refused.
+
+```python
+observation = session.observe()
+submission = session.submit(
+    "transfer", skill="aloha.transfer_cube_segment",
+    expected_observation={"epoch": observation["epoch"], "sequence": observation["sequence"]},
+)
+# Wait for a finished, delivered result and settled receipt, then observe again.
+observation = session.observe()
+submission = session.submit(
+    "hold", skill="aloha.hold_current_target",
+    expected_observation={"epoch": observation["epoch"], "sequence": observation["sequence"]},
+)
+```
+
+This sequence is a deterministic caller, not a model-backed Agent.
+`capabilities()` adds per-skill bounds/availability and `requires_observation` for
+this profile. A required epoch/sequence mismatch is retained as a refused request;
+a new ID is required for a different decision. Optional metadata in the reference
+is ignored. A current reference alone does not grant operation authority.
+
+Transfer completion reports `segment_executed`; hold completion reports
+`hold_executed`. These are native program outcomes, not task success. The episode
+sequence advances0→400→450 while operation steps are400 and50. Transfer must
+settle with accepted output before hold becomes available. Pending inference,
+invalid observations, cancellation, expiry or execution failure block follow-up.
+The Host repeats its saved target for hold without a worker prediction or caller
+raw actions. It does not check contact truth to choose whether a hold is useful.
+After hold or healthy cancellation, explicit reset is required for another task.
+Worker/native failures make the session unavailable; they do not authorize reset
+or automatic recovery.
+
+[MuJoCo setup and example](../../integrations/mujoco/README.md#continuous-handoff)
+provide the consumer paths. The Host keeps the recording open between operations;
+the transfer result's video path names that still-growing recording. Read the
+completed video after hold, reset or close confirms recorder closure. No live-video
+subscription, arbitrary skill registry or physical safety guarantee is introduced.

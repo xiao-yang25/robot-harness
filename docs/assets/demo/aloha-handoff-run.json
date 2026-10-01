@@ -1,0 +1,86 @@
+{
+  "recorded_on": "2026-10-01",
+  "source_run": "m5d-handoff-session-02",
+  "source_version": "Development tree based on 53e65c4 with the continuous-handoff patch delivered in this change",
+  "simulation_only": true,
+  "caller": "deterministic",
+  "profile": "mujoco-stepped-handoff-v1",
+  "seed": 0,
+  "video": {
+    "file": "aloha-handoff.mp4",
+    "frames": 451,
+    "fps": 50,
+    "duration_seconds": 9.02,
+    "size": [
+      640,
+      480
+    ],
+    "edits": "None; original silent recording, simulation-time playback"
+  },
+  "execution_status": "completed",
+  "operations": [
+    {
+      "skill": "aloha.transfer_cube_segment",
+      "operation_id": 1,
+      "epoch": 0,
+      "steps": 400,
+      "receipt": {
+        "dispatch": "submitted",
+        "native_acceptance": "accepted",
+        "native_outcome": "succeeded",
+        "output": "accepted",
+        "settlement": "settled",
+        "authority_disposition": "released",
+        "domain_verdict": "unassessed"
+      }
+    },
+    {
+      "skill": "aloha.hold_current_target",
+      "operation_id": 2,
+      "epoch": 0,
+      "steps": 50,
+      "receipt": {
+        "dispatch": "submitted",
+        "native_acceptance": "accepted",
+        "native_outcome": "succeeded",
+        "output": "accepted",
+        "settlement": "settled",
+        "authority_disposition": "released",
+        "domain_verdict": "unassessed"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "epoch": 0,
+      "sequence": 0,
+      "valid": true
+    },
+    {
+      "epoch": 0,
+      "sequence": 400,
+      "valid": true
+    },
+    {
+      "epoch": 0,
+      "sequence": 450,
+      "valid": true
+    }
+  ],
+  "processes_reaped": true,
+  "task_evaluation": {
+    "profile": "aloha-left-handoff-hold-v1",
+    "verdict": "succeeded",
+    "reason": "bounded_handoff_hold_observed",
+    "simulation_only": true,
+    "metrics": {
+      "window_steps": 50,
+      "window_sim_seconds": 1.000000000000334,
+      "exclusive_bilateral_contacts_all_samples": true,
+      "maximum_relative_translation_m": 2.1073274263004244e-05,
+      "maximum_relative_rotation_degrees": 0.4560554221047304,
+      "minimum_table_clearance_m": 0.27891705506207476
+    }
+  },
+  "scope": "Selected same-run report and evaluator fields; not a full raw trace or a reliability estimate"
+}

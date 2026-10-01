@@ -31,7 +31,8 @@ class Session:
             raise ValueError('invalid startup_timeout')
         parent, child = socket.socketpair()
         self._channel = Channel(parent, binary=mujoco is not None)
-        self._skill = 'aloha.transfer_cube_trial' if mujoco is not None else 'fixture.increment'
+        self._skill = None
+        self._defaults = {}
         self._process = None
         self._sequence = 0
         self._closed = False
@@ -47,6 +48,10 @@ class Session:
                 if status['phase'] == 'ready':
                     self.host_pid = status['host_pid']
                     self.worker_pid = status['worker_pid']
+                    capabilities = self.capabilities()
+                    self._skill = capabilities['skill']
+                    self._defaults = {item['skill']: item['default_steps']
+                                      for item in capabilities.get('skills', [])}
                     break
                 if status['phase'] == 'failed' or time.monotonic() >= deadline:
                     raise SessionError('session startup failed or timed out')
@@ -86,9 +91,14 @@ class Session:
     def observe(self):
         return self._call('observe')
 
-    def submit(self, request_id, *, steps=10, deadline_ms=None):
-        return self._call('submit', request_id=request_id, skill=self._skill,
-                          steps=steps, deadline_ms=deadline_ms)
+    def submit(self, request_id, *, steps=None, deadline_ms=None, skill=None,
+               expected_observation=None):
+        selected = self._skill if skill is None else skill
+        if steps is None:
+            steps = self._defaults.get(selected, 10)
+        return self._call('submit', request_id=request_id, skill=selected,
+                          steps=steps, deadline_ms=deadline_ms,
+                          expected_observation=expected_observation)
 
     def status(self, request_id=None):
         return self._call('status', request_id=request_id)

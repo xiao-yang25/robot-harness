@@ -97,8 +97,10 @@ ARM/CPU normal paths, bounded counterexamples and a comparable native task owner
 Agent `c3b291c` pins Harness `0de9eb0`; this combination passed installed deterministic
 consumption. Earlier real visual results retain their original Harness `3acc9aa`
 scope. The comparison supports responsibility reuse, with no established general
-speed, memory or net development-time advantage. M6 will select one heterogeneous
-combination and test what actually carries over.
+speed, memory or net development-time advantage. Before M6, complete mainline
+delivery of the public evaluator/regressions and
+[installed combination CI](docs/TESTING.md#installed-agent-combination). M6 then
+selects one heterogeneous combination and tests what actually carries over.
 Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
 one reproducible task at a time. Simulation work can proceed independently of
 physical-device availability; hardware validation retains its own prerequisites.

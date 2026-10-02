@@ -160,6 +160,13 @@ not consulted. Cancelled/expired/failed transfer never enables hold, even when i
 last physical step already returned. Every hold submission checks Core again.
 A late prediction cannot populate another operation's queue or supply a hold target.
 
+Before accepting a candidate, the Host matches every consumed pending identity
+field by JSON type and value, including nested authority and observation fields.
+Boolean or floating-point aliases of integer counters are invalid. Unrelated
+optional metadata may be added without changing those fields. A mismatch leaves
+the pending prediction and action queue untouched; the session loop then records
+worker failure, revokes authority and resolves worker ownership before settlement.
+
 Observation sequence counts the whole episode, while operation steps count each
 segment. A submission carries expected epoch/sequence, compared at the single-writer
 admission boundary. Idempotency includes skill, step budget, deadline and that

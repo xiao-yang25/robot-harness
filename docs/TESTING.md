@@ -1759,8 +1759,41 @@ qualification. No automatic recovery, broad reliability, Owner restart/persisten
 hard stopping latency, GPU/other-body support or physical-robot validation is
 established. Execution facts, visual interpretation and physical evaluation remain
 separate. Licensing/preview and external reproduction remain open project work.
-The next integration phase selects one heterogeneous combination and qualifies
-its native task before changing Runtime or claiming reuse.
+Full M5 engineering closeout also requires the publicly packaged independent
+task evaluator/regressions and pinned cross-repository combination CI. These
+follow-up changes are locally prepared; their hosted/mainline delivery is still
+pending. The next integration phase then selects one heterogeneous combination
+and qualifies its native task before changing Runtime or claiming reuse.
+
+<a id="installed-agent-combination"></a>
+### Installed Agent compatibility check
+
+[Installed Agent compatibility](../.github/workflows/agent-combination.yml) calls
+one reusable test workflow maintained by
+[Robot Agent](https://github.com/xiao-yang25/robot-agent). It pairs this Harness
+push/PR candidate (`github.sha`, including the PR merge commit) with fixed Agent
+`52ae39d795544a69ae9e8b5a661dea9e3947b6dc`. Publish and qualify that Agent
+workflow commit before pushing the Harness caller; do not substitute a moving
+branch for the fixed revision. Agent's own PR workflow tests its candidate against
+the one Harness commit in `workspace.repos`; paired changes may be checked through
+its explicit full-commit inputs.
+
+Both Python packages are installed into fresh prefixes and consumed outside source
+trees. The actual public Session launches the real Host/Core and a separate worker;
+only environment/recording/policy providers are explicit no-physics fixtures.
+Three cases check normal400+50 effects/held target and distinct settled receipts,
+help without hold, and a stale answer without hold, with process exit checks.
+No ACT, model, MuJoCo dynamics, recording or physical-success qualification follows.
+This workflow is read-only, inherits no secrets, and adds no model/Agent dependency
+to the Core package. The compatibility test implementation remains in Agent;
+Harness does not copy it or introduce reverse runtime dependencies.
+
+Local macOS and Ubuntu22.04 ARM64/Python3.12.14 installed-boundary checks each
+passed all three cases against runtime pin `0de9eb0`; the current Harness changes
+only CI/docs. Agent's30 unchanged checks plus11 evaluation regressions passed;
+the final resource fix reran the affected11 in both environments. Hosted
+Ubuntu x86_64/Python3.10 results and delivery of both batches remain unverified.
+
 
 ### Previously delivered simulation evidence
 

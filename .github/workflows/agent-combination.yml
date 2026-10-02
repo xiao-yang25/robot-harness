@@ -1,0 +1,16 @@
+name: Installed Agent compatibility
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-agent:
+    uses: xiao-yang25/robot-agent/.github/workflows/combination.yml@52ae39d795544a69ae9e8b5a661dea9e3947b6dc
+    with:
+      agent_ref: 52ae39d795544a69ae9e8b5a661dea9e3947b6dc
+      harness_ref: ${{ github.sha }}

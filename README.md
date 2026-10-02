@@ -75,8 +75,8 @@ to watch navigation, cancellation and replacement.
 | Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
 | Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
 
-[M4 simulation scope is complete](docs/TESTING.md#m4-closeout). The next
-[Runtime slice](docs/RUNTIME_SLICE.md) specifies a session host, policy worker and
+[M4 simulation scope is complete](docs/TESTING.md#m4-closeout). The
+[Runtime slice](docs/RUNTIME_SLICE.md) provides a session host, policy worker and
 Python/Core bridge, with an [external Agent consumer](docs/DESIGN.md#agent-consumer-and-repository-organization)
 developed alongside it. The optional [Python session](bindings/python/README.md)
 now runs a deterministic fixture and optional [MuJoCo/ACT profiles](integrations/mujoco/README.md)
@@ -86,13 +86,19 @@ The optional [local MCP integration](integrations/mcp/README.md) lets existing a
 such as Codex consume this session. Its tool path is separate from an embodied
 business Agent's task state, perception interpretation and recovery; that application
 may use Runtime directly. The first
-[Robot Agent application](https://github.com/xiao-yang25/robot-agent/pull/1)
+[Robot Agent application](https://github.com/xiao-yang25/robot-agent/tree/c3b291c5d39c5ce32df472acfc071a457f509b77)
 uses camera/joints to choose transfer and a subsequent hold. Its
-[pinned skill setup](https://github.com/xiao-yang25/robot-agent/blob/3a5a4d44d8404cbd5ffa47776219b5c7c197f090/skills/aloha/README.md)
-includes the external worker, dependencies and weight preparation; local qualification
-is macOS/MPS seed0. The first Agent delivery is merged as06cbee4, with the
-Harness runtime pinned at3acc9aa. Linux consumer reproduction and broader
-business-agent tasks have separate qualification scopes.
+[pinned skill setup](https://github.com/xiao-yang25/robot-agent/blob/c3b291c5d39c5ce32df472acfc071a457f509b77/skills/aloha/README.md)
+provides the worker, dependencies and weight preparation.
+
+[M5's selected scope is delivered](docs/TESTING.md#m5-closeout): one ALOHA
+business task, public two-repository preparation, Mac/MPS and selected Linux
+ARM/CPU normal paths, bounded counterexamples and a comparable native task owner.
+Agent `c3b291c` pins Harness `0de9eb0`; this combination passed installed deterministic
+consumption. Earlier real visual results retain their original Harness `3acc9aa`
+scope. The comparison supports responsibility reuse, with no established general
+speed, memory or net development-time advantage. M6 will select one heterogeneous
+combination and test what actually carries over.
 Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
 one reproducible task at a time. Simulation work can proceed independently of
 physical-device availability; hardware validation retains its own prerequisites.

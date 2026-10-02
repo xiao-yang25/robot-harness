@@ -163,3 +163,5 @@ install(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/RobotHarnessConfig.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/RobotHarnessConfigVersion.cmake
   DESTINATION ${robot_harness_package_dir})
+install(FILES LICENSE LICENSE-MIT LICENSE-APACHE
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/RobotHarness)

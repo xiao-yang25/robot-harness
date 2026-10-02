@@ -70,7 +70,7 @@ Retained limits and follow-up triggers:
   and the matching native fixture remain prerequisites. Owner death, full drive/link
   loss, hard stop bounds, durable recovery, arbitrary task loops and physical safety
   are not established. Missing evidence must continue to prevent fresh authority.
-- Licensing/contribution terms, actual unfamiliar-contributor feedback, release
+- Actual unfamiliar-contributor feedback, release
   packaging and stable API/ABI are separate adoption work. This milestone is not a
   versioned release or a claim of mature-project readiness.
 
@@ -1758,7 +1758,9 @@ Harness `3acc9aa` combination; this deterministic pin check does not renew visua
 qualification. No automatic recovery, broad reliability, Owner restart/persistence,
 hard stopping latency, GPU/other-body support or physical-robot validation is
 established. Execution facts, visual interpretation and physical evaluation remain
-separate. Licensing/preview and external reproduction remain open project work.
+separate. A versioned preview and external reproduction remain open project work;
+the [MIT OR Apache-2.0 licensing and contribution terms](../CONTRIBUTING.md#licensing-status)
+are specified separately from runtime qualification.
 Full M5 engineering closeout also requires the publicly packaged independent
 task evaluator/regressions and pinned cross-repository combination CI. These
 follow-up changes are locally prepared; their hosted/mainline delivery is still

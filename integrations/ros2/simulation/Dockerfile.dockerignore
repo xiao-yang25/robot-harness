@@ -1,5 +1,8 @@
 **
 !CMakeLists.txt
+!LICENSE
+!LICENSE-MIT
+!LICENSE-APACHE
 !cmake/**
 !include/**
 !src/**

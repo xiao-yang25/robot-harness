@@ -118,8 +118,9 @@ ctest --test-dir build-nav2 -R '^nav2_' --output-on-failure --no-tests=error
 
 The message-only `m4_drive_probe` package allows a clean compile without Gazebo.
 It supplies no native server, driver, simulator or settlement guarantees; do not
-install it alongside a different package of the same name. Licensing remains
-undecided for the project. These experimental fixture interfaces are not a stable
+install it alongside a different package of the same name. The fixture uses the
+project's [MIT OR Apache-2.0 terms](../../../README.md#license), installed with
+the package under `share/m4_drive_probe/licenses`. These interfaces are not a stable
 public robot API. The isolated research deployment supplies matching service
 implementations, fixed producer bindings and one-use native task contexts.
 

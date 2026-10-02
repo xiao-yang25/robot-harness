@@ -17,7 +17,9 @@ def on_config(config):
     config.extra['source_revision'] = revision
     config.copyright = (
         f'Experimental · <a href="{REPOSITORY}/tree/{quote(revision, safe="")}">'
-        f'Source {html.escape(revision[:7])}</a> · Licensing pending')
+        f'Source {html.escape(revision[:7])}</a> · '
+        f'<a href="{REPOSITORY}/blob/{quote(revision, safe="")}/LICENSE">'
+        'MIT OR Apache-2.0</a>')
     return config
 
 

@@ -132,8 +132,10 @@ package remain independent of Python. This does not install compute/recovery or
 ROS adapters through the Core package.
 
 The package version follows the existing project version with exact-version
-matching only. It does not promise stable SDK/API/ABI compatibility or authorize
-redistribution; licensing remains pending. The independent
+matching only. It does not promise stable SDK/API/ABI compatibility. The project
+[license declaration and texts](../README.md#license) are installed under
+`share/licenses/RobotHarness` (or the configured CMake data directory); license
+permissions do not imply a support or compatibility guarantee. The independent
 [consumer example](../examples/installed_core/README.md) and
 [relocation check](TESTING.md#installed-core-consumer) exercise this boundary.
 

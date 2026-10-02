@@ -8,4 +8,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CloseMotionScope.srv" "srv/OpenMotionScope.srv" "srv/CloseScopedMotion.srv"
   "msg/ScopedTwist.msg" DEPENDENCIES geometry_msgs)
 ament_export_dependencies(rosidl_default_runtime)
+install(FILES ../../../LICENSE ../../../LICENSE-MIT ../../../LICENSE-APACHE
+  DESTINATION share/${PROJECT_NAME}/licenses)
 ament_package()

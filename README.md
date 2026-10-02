@@ -105,7 +105,7 @@ Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-a
 one reproducible task at a time. Simulation work can proceed independently of
 physical-device availability; hardware validation retains its own prerequisites.
 [Preview and adoption preparation](CONTRIBUTING.md#adoption-stages) proceeds alongside
-integration work; licensing and a versioned preview remain pending.
+integration work; a versioned preview and external reproduction remain pending.
 
 **Early-stage software and simulation.** No physical-robot integration or hard stop
 guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation
@@ -131,5 +131,8 @@ is our preview identity and may evolve.
 
 ## License
 
-License and patch contribution terms are pending. See the
-[licensing status](CONTRIBUTING.md#licensing-status) before submitting patches or adopting the code.
+Except for third-party material with its own notices, Robot Harness is licensed
+under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE), at your option.
+See the [license declaration](LICENSE),
+[contribution terms](CONTRIBUTING.md#licensing-status) and
+[simulation third-party notices](integrations/ros2/simulation/THIRD_PARTY_NOTICES.md).

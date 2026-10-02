@@ -270,4 +270,6 @@ immediate replacement from cancelling a thread before its spin loop starts;
 service discovery alone is insufficient. The bounded query submits no goal and
 does not provide task completion or settlement evidence.
 See [third-party notices](THIRD_PARTY_NOTICES.md) for the derived drive source;
-the project's licensing decision remains pending.
+these BSD notices remain separate from the project's
+[MIT OR Apache-2.0 declaration](../../../README.md#license). New image builds
+include the project declaration and both license texts in `/source`.

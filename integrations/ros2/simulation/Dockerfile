@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /source
 COPY CMakeLists.txt ./
+COPY LICENSE LICENSE-MIT LICENSE-APACHE ./
 COPY cmake cmake
 COPY include include
 COPY src src

@@ -43,11 +43,13 @@ containing `RobotHarnessConfig.cmake`. Use matching architecture and compatible
 C++ toolchains for the library and consumer. Do not mix sanitizer-instrumented
 libraries with an uninstrumented link command.
 
-Only `authority_gate.hpp`, the static Core library and CMake package files are
-installed. Compute, sample fixtures, workers, recovery and ROS support remain
+The install contains `authority_gate.hpp`, the static Core library, CMake package
+files and the project license declaration/texts under `share/licenses/RobotHarness`
+(or the configured CMake data directory). Compute, sample fixtures, workers,
+recovery and ROS support remain
 source-tree integrations. Preview version checks accept only the same version;
-this is not an SDK/API/ABI stability promise or a release. Licensing remains
-[pending](../../CONTRIBUTING.md#licensing-status).
+this is not an SDK/API/ABI stability promise or a release. See the
+[MIT OR Apache-2.0 terms](../../README.md#license).
 
 The [installation check](../../docs/TESTING.md#installed-core-consumer) builds a
 fresh Core, relocates the prefix and copies this consumer outside the source tree.

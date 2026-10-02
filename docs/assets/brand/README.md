@@ -16,8 +16,9 @@ details are delicate at 16 pixels; a dedicated small icon and favicon remain
 future refinements. No custom wordmark or full brand system is implied.
 
 The SVG geometry was created for this project; no third-party logo assets or
-fonts are bundled. The project's [licensing status](../../../CONTRIBUTING.md#licensing-status)
-remains unchanged. Preview publication does not establish separate reuse terms.
+fonts are bundled. These original assets follow the project's
+[MIT OR Apache-2.0 licensing](../../../README.md#license); the preview mark does
+not have a separate asset license.
 
 The [social preview](social-preview.png) pairs the mark with the project name and
 positioning for link sharing. This is separate from the repository owner's

@@ -2,11 +2,18 @@
 
 ## Licensing status
 
-Licensing and code contribution terms are not yet finalized. This guide records
-the development workflow; it does not grant a license or establish contribution
-terms. Bug reports and design discussion can proceed, but confirm contribution
-terms with the maintainer before submitting code or documentation patches. See
-the [current licensing status](README.md#license).
+Except for third-party material with its own notices, Robot Harness is licensed
+under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE), at your option; see the
+[project declaration](LICENSE).
+
+By intentionally submitting a contribution for inclusion in this project, you
+agree to license it under the same `MIT OR Apache-2.0` terms, without additional
+terms. You retain your copyright; no copyright assignment or separate CLA is
+required. You must have the right to provide the contribution under these terms.
+Identify third-party material and preserve its original notices; discuss material
+with different terms before inclusion. The existing
+[Gazebo-derived sources](integrations/ros2/simulation/THIRD_PARTY_NOTICES.md)
+retain their BSD terms.
 
 ## Where to start
 
@@ -17,7 +24,7 @@ relevant contract before proposing a change. Start with the path that fits:
 |---|---|
 | Report a build, runtime or documentation problem | [Bug report](https://github.com/xiao-yang25/robot-harness/issues/new?template=bug_report.md) |
 | Discuss a robot/backend integration or design change | [Proposal or integration question](https://github.com/xiao-yang25/robot-harness/issues/new?template=proposal.md) |
-| Prepare a patch after contribution terms are agreed | [Build and test](#build-and-test), then [pull requests and review](#pull-requests-and-review) |
+| Prepare a patch | [Build and test](#build-and-test), then [pull requests and review](#pull-requests-and-review) |
 
 For a bug, include the revision, environment, minimal reproduction, expected
 behavior and actual result. For a documentation issue, identify the page and the
@@ -26,16 +33,17 @@ and how completion, stopping and resource cleanup can be observed. Discuss
 significant API or architecture changes before implementing them.
 
 Keep discussion respectful and focused on the technical issue. The project has
-no response-time commitment. Once contribution terms are settled, focused tests,
-clearer examples and documentation are useful small patches.
+no response-time commitment. Focused tests, clearer examples and documentation
+are useful small patches.
 
 ## Adoption stages
 
 The current experimental simulation results and documentation can support
 technical discussion and feedback. A developer preview needs explicit licensing
 and contribution terms, a pinned version, reproducible installation/tutorials,
-known limitations and a feedback route. Those terms and a versioned release remain
-pending; this plan does not announce a release or expand support.
+known limitations and a feedback route. Licensing and contribution terms are now
+specified above; a versioned preview and actual external reproduction remain
+pending. This guide does not announce a release or expand support.
 
 Preview preparation can proceed alongside the next embodiment/backend integration.
 Invite initial reproduction attempts when the preview is ready; use their actual

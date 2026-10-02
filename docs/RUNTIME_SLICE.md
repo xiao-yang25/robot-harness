@@ -281,12 +281,12 @@ The current Runtime/Agent work is organized as M5, with separate delivery stages
 | M5c | First business task design: goal, initial conditions, skills, task predicate, observations, state, budget and allowed recovery | Task design and bounded native qualification completed; native-condition success cannot silently replace its goal |
 | M5d | Implement that business Agent's normal observation/decision/skill/result loop | Implemented and locally qualified on Mac/MPS seed0; first Agent delivery merged as06cbee4, with execution facts and task evaluation distinct |
 | M5e | Public consumer/skill preparation, fixed combination versions, fresh installation and actual Linux model/simulation reproduction | Selected consumer scope delivered: fresh Linux ARM/CPU deterministic and installed visual normal paths qualified; Agent PR3 merged asf19531f and Harness PR30 asb3d93e7, with merged-tree/mainline-CI/documentation-deployment checks passed. Fixture CI does not qualify model/render execution |
-| M5f | Task-relevant faults, comparable native cost/behavior evidence and bounded M5 closeout | Selected cube-disturbance and mixed-caller cancellation/late-proposal checks recorded; comparable native evidence and overall closeout remain pending. Explicit limitations and negative results remain valid outcomes |
+| M5f | Task-relevant faults, comparable native cost/behavior evidence and bounded M5 closeout | Selected scope delivered: cube-disturbance and mixed-caller temporal boundaries, matched native comparison and the new pinned installed combination; [closeout](TESTING.md#m5-closeout) preserves version-specific evidence and remaining limits. No general performance or net engineering-time benefit established |
 
 [Testing](TESTING.md#first-runtime-slice) owns actual verification coverage; the
 stages are delivery scope, not new authority rules or proof of completion. M5a/b
 were delivered independently; the first implemented business application now has
-its own candidate delivery and qualification limits.
+its own merged delivery and qualification limits.
 Packaging, Linux preparation and relevant fault/comparison work can start alongside
 the normal application loop; expanding support claims requires their corresponding
 evidence. M6 then selects one heterogeneous combination to test reuse. Hardware,
@@ -357,9 +357,9 @@ Harness build/install passed the deterministic normal path, full recording,
 bounded physical evaluation and native process reaping. A separate installed Linux
 visual-Agent run then completed three actual decisions and the same bounded task,
 with its own recording, physical evaluation and process-exit evidence. The Mac and selected Linux normal deliveries are merged, including the visual
-tutorial. One research cube-disturbance counterexample is recorded in
-[Testing](TESTING.md#first-runtime-slice); broader failure/comparison cases remain
-unqualified.
+tutorial. Selected task counterexamples, matched native comparison and the later
+installed pin are recorded in [M5 closeout](TESTING.md#m5-closeout). Broader fault
+coverage, reliability and heterogeneous reuse remain unqualified.
 Continuous-profile acceptance is distinct from the earlier native feasibility
 probe, business-Agent acceptance and Linux/model/render support.
 

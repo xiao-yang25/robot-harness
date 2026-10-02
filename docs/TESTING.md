@@ -1675,15 +1675,16 @@ The final patch passed12 handoff checks on Mac/Python3.12, and15 optional backen
 checks plus23 ordinary Session checks on Ubuntu22.04 ARM64/Python3.12 through its
 installed package. These are explicit no-physics fixtures. The existing Ubuntu
 Core workflow discovers the new regressions in `integrations/mujoco/tests`;
-no workflow expansion is needed. Hosted CI for this patch has not yet run.
+no workflow expansion is needed. The patch merged through Harness PR32 as
+`0de9eb0`; main Core/Python, Humble and documentation/deployment checks passed.
 
 <a id="m5f-task-owner-comparison"></a>
 ### Selected task owner comparison (2026-10-02)
 
 A research-only native owner/ACT worker was compared with the installed Harness
-candidate containing the identity fix above and Agent3482858. The published
-Agent manifest still pins Harness3acc9aa; these results do not silently qualify
-a new published combination. Native owns its own framing, scene, queue and
+candidate containing the identity fix above and Agent3482858. At measurement time,
+the published Agent manifest pinned Harness3acc9aa. The later installed-combination
+check below is separate from these measurements. Native owns its own framing, scene, queue and
 shutdown path; its completion facts are not Core receipts.
 
 Both used Ubuntu22.04 ARM64, Python3.12.14, CPU ACT/OSMesa, seed0,
@@ -1729,10 +1730,42 @@ net engineering time saving is claimed. Independent focused implementation and
 evidence reviews approved this bounded comparison. It does not qualify visual
 decisions, Owner death/recovery, hard physical stops, other bodies or GPU paths.
 
+<a id="m5-closeout"></a>
+### M5 selected scope delivered (2026-10-02)
+
+Agent PR5 merged as `c3b291c`, with a file tree identical to reviewed `8f38cd0`;
+its [manifest](https://github.com/xiao-yang25/robot-agent/blob/c3b291c5d39c5ce32df472acfc071a457f509b77/workspace.repos)
+pins Harness `0de9eb0`. Both implementation deliveries are on main, and applicable
+main CI passed. Agent Ubuntu22.04/Python3.10 ran all30 task/preparation/subprocess
+checks and installed command entry points. This does not run the model/simulator.
+
+The new pin was separately consumed through a fresh public Harness checkout,
+Release build/install and an installed Agent/default ACT worker outside source
+checkouts. In offline Ubuntu22.04 ARM64 CPU/OSMesa, seed0 deterministic proposals
+completed observations0/400/450 in epoch0,400+50 steps, two accepted/settled/released
+operations,451 decoded640×480 frames and observed process cleanup. The single
+same-run fixed evaluator passed the bounded one-second hold; `task_verdict` stayed
+`unassessed`. Its38.853-second wall time is a consumption result, not another paired
+measurement. Mac and installed Linux application suites each passed30 tests.
+Fresh-context independent review approved the pin/worker compatibility and the
+scoped normal consumption evidence.
+
+M5 delivers the Core-backed Session, separate existing-agent MCP path, one embodied
+business application, public skill/model preparation, selected Mac/Linux normal
+qualification, bounded task counterexamples and the comparison above. Real visual
+normal/cube-disturbance and mixed-caller temporal results retain their recorded
+Harness `3acc9aa` combination; this deterministic pin check does not renew visual
+qualification. No automatic recovery, broad reliability, Owner restart/persistence,
+hard stopping latency, GPU/other-body support or physical-robot validation is
+established. Execution facts, visual interpretation and physical evaluation remain
+separate. Licensing/preview and external reproduction remain open project work.
+The next integration phase selects one heterogeneous combination and qualifies
+its native task before changing Runtime or claiming reuse.
+
 ### Previously delivered simulation evidence
 
-The opt-in `mujoco-stepped-handoff-v1` implementation has a deterministic caller;
-the model-backed business Agent remains unimplemented. Local Mac/MPS execution
+At the first M5d batch, the opt-in `mujoco-stepped-handoff-v1` implementation had
+a deterministic caller; the model-backed business Agent was not yet implemented. Local Mac/MPS execution
 completed400 transfer steps plus50 saved-target hold steps in the same epoch,
 with two distinct Core operations and accepted output/settlement. Observations
 progressed0→400→450, a stale post-transfer reference was refused, explicit reset

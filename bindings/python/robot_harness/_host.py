@@ -10,21 +10,16 @@ import time
 import uuid
 
 from . import _core
+from ._execution import ExecutionCoordinator, accepted
 from ._fixture import IncrementBackend
 from ._transport import Channel, identifier, integer
 from .session import child_environment
 
-MAX_RECORDS = 64
 MAX_STEPS = 400
 
 
 def now():
     return time.monotonic_ns()
-
-
-def accepted(disposition):
-    if disposition != 'accepted':
-        raise RuntimeError(f'Core rejected evidence: {disposition}')
 
 
 def matches_identity(actual, expected):
@@ -46,7 +41,7 @@ class Host:
         self.worker_channel = None
         self.worker = None
         self.startup_timeout = startup_timeout
-        self.backend = self.gate = None
+        self.backend = self.gate = self.execution = None
         parent = child = None
         try:
             if mujoco is None:
@@ -63,8 +58,7 @@ class Host:
                                    self.backend.capability, self.backend.profile, MAX_STEPS, now())
             self.session_id = uuid.uuid4().hex
             self.phase = 'starting'
-            self.records = {}
-            self.active = None
+            self.execution = ExecutionCoordinator(self.gate, lambda: now())
             self.queue = deque()
             self.prediction = None
             self.last_action = None
@@ -106,6 +100,14 @@ class Host:
             if child is not None:
                 child.close()
 
+    @property
+    def records(self):
+        return self.execution.records
+
+    @property
+    def active(self):
+        return self.execution.active
+
     def refresh_capability(self, available):
         stamp = now()
         accepted(self.gate.capabilities(available, stamp, stamp + 60_000_000_000))
@@ -127,9 +129,8 @@ class Host:
         self.phase = 'ready'
 
     def snapshot(self, record):
-        result = {key: value for key, value in record.items() if key != 'arguments'}
+        result = self.execution.snapshot(record)
         if self.active is record:
-            result['receipt'] = self.gate.receipt(record['operation_id'])
             result['steps'] = self.backend.steps
             result['queue_remaining'] = len(self.queue)
             result['prediction_pending'] = self.prediction is not None
@@ -193,8 +194,7 @@ class Host:
                 result = self.backend.observe()
             elif command == 'cancel':
                 record = self.records[identifier(message.get('request_id'), 'request_id')]
-                if record is self.active:
-                    self.gate.cancel(record['operation_id'], now())
+                if self.execution.cancel(record):
                     self.queue.clear()
                     record['revoked_at_step'] = self.backend.steps
                 result = self.snapshot(record)
@@ -217,17 +217,11 @@ class Host:
             expected = (integer(expected.get('epoch'), 'epoch', 0, 2**31 - 1),
                         integer(expected.get('sequence'), 'sequence', 0, 2**53))
         arguments = (message.get('skill'), steps, deadline_ms, expected)
-        if reference in self.records:
-            record = self.records[reference]
-            if record['arguments'] != arguments:
-                raise ValueError('request ID reused with different arguments')
+        record, is_new = self.execution.reserve(
+            reference, arguments,
+            lambda: {'steps': 0, 'skill': arguments[0], 'epoch': self.backend.observe()['epoch']})
+        if not is_new:
             return self.snapshot(record)
-        if len(self.records) >= MAX_RECORDS:
-            raise ValueError('session record capacity reached; open a new session')
-        record = {'request_id': reference, 'arguments': arguments, 'state': 'rejected',
-                  'operation_id': None, 'steps': 0, 'result': None, 'receipt': None,
-                  'skill': arguments[0], 'epoch': self.backend.observe()['epoch']}
-        self.records[reference] = record
         if not isinstance(arguments[0], str) or arguments[0] not in self.backend.skills:
             record['reason'] = 'unsupported_skill'
             return self.snapshot(record)
@@ -249,12 +243,9 @@ class Host:
             return self.snapshot(record)
         stamp = now()
         deadline = None if deadline_ms is None else stamp + deadline_ms * 1_000_000
-        decision = self.gate.admit(reference, steps, deadline, stamp)
-        record['reason'] = decision['status']
+        decision = self.execution.admit(record, steps, deadline, stamp)
         if decision['status'] != 'admitted':
             return self.snapshot(record)
-        record.update(operation_id=decision['operation_id'], state='running')
-        self.active = record
         self.phase = 'running'
         try:
             # Preparation creates no native work. Even an expired/non-submitted
@@ -266,14 +257,14 @@ class Host:
                 raise ValueError('hold target unavailable')
         except Exception as error:
             self.fail_worker(f'backend operation start error: {error}')
-            accepted(self.gate.non_submission(record['operation_id'], now()))
+            accepted(self.execution.non_submission(record))
             self.finish('worker_error', native=False)
             return self.snapshot(record)
-        if not self.gate.dispatch(record['operation_id'], now()):
-            accepted(self.gate.non_submission(record['operation_id'], now()))
+        if not self.execution.dispatch(record):
+            accepted(self.execution.non_submission(record))
             self.finish('not_submitted', native=False)
         else:
-            accepted(self.gate.native(record['operation_id'], 'accepted', now()))
+            accepted(self.execution.native(record, 'accepted'))
         return self.snapshot(record)
 
     def identity(self):
@@ -300,16 +291,14 @@ class Host:
     def advance(self):
         if self.active is None:
             return
-        operation = self.active['operation_id']
-        self.gate.tick(operation, now())
-        receipt = self.gate.receipt(operation)
+        receipt = self.execution.tick()
         if receipt['authority_disposition'] != 'current':
             self.queue.clear()
             if self.prediction is None:
                 self.finish('worker_error' if self.failure else 'cancelled')
             return
         if not self.gate.supports(self.active['arguments'][1], now()):
-            self.gate.cancel(operation, now())
+            self.execution.cancel(self.active)
             self.queue.clear()
             self.active['revoked_at_step'] = self.backend.steps
             return
@@ -334,7 +323,7 @@ class Host:
             return
         self.last_action = action
         if self.backend.steps == 1:
-            accepted(self.gate.native(operation, 'started', now()))
+            accepted(self.execution.native(self.active, 'started'))
         self.next_step = time.monotonic() + self.backend.step_interval
         reason = self.backend.completion(self.active['arguments'][1])
         if reason is not None:
@@ -344,8 +333,7 @@ class Host:
         if self.prediction is not None:
             raise RuntimeError('cannot settle with unresolved prediction')
         record = self.active
-        operation = record['operation_id']
-        self.gate.tick(operation, now())
+        self.execution.tick()
         self.queue.clear()
         if self.closing_at is None:
             self.refresh_capability(False)
@@ -353,35 +341,19 @@ class Host:
         record['execution'] = summary
         if native:
             outcome = 'succeeded' if reason == 'completed' else ('failed' if reason in ('worker_error', 'step_limit', 'native_failure') else 'cancelled')
-            accepted(self.gate.native(operation, outcome, now()))
+            accepted(self.execution.native(record, outcome))
         record['reason'] = reason
-        if reason == 'completed' and self.gate.can_deliver(operation):
-            # The actual bounded in-memory record is the declared result sink.
-            record['result'] = summary
-            disposition = self.gate.output(operation, 'accepted', record['request_id'], now())
-            if disposition != 'accepted':
-                # No client can observe this staged value while the owner is here.
-                # Expiry can occur between the permission check and evidence time.
-                record['result'] = None
-                record['diagnostic'] = self.backend.observe()
-                self.gate.tick(operation, now())
-                if self.gate.can_deliver(operation):
-                    accepted(disposition)
-                accepted(self.gate.output(operation, 'authority_revoked', record['request_id'], now()))
-        else:
-            record['diagnostic'] = self.backend.observe()
-            disposition = 'authority_revoked' if reason == 'completed' else 'no_output'
-            reference = record['request_id'] if reason == 'completed' else ''
-            accepted(self.gate.output(operation, disposition, reference, now()))
-        accepted(self.gate.settle(operation, now()))
-        record.update(state='finished', steps=self.backend.steps, receipt=self.gate.receipt(operation))
+        self.execution.dispose_result(record, summary if reason == 'completed' else None,
+                                      self.backend.observe)
+        self.execution.settle(record)
+        record['steps'] = self.backend.steps
         receipt = record['receipt']
         delivered = (reason == 'completed' and record['result'] is not None and
                      receipt['authority_disposition'] == 'released' and
                      receipt['output'] == 'accepted' and self.failure is None and
                      self.closing_at is None and self.worker.poll() is None)
         continuation = self.backend.after_settlement(delivered)
-        self.active = None
+        self.execution.release(record)
         self.fixed_action = None
         self.phase = 'failed' if self.failure else ('closing' if self.closing_at else
                                                    ('ready' if continuation else 'needs_reset'))
@@ -393,7 +365,7 @@ class Host:
             self.failure = str(error)
             self.refresh_capability(False)
             if self.active:
-                self.gate.cancel(self.active['operation_id'], now())
+                self.execution.cancel(self.active)
                 self.active['revoked_at_step'] = self.backend.steps
             self.queue.clear()
             self.phase = 'failed'
@@ -402,7 +374,7 @@ class Host:
         if self.closing_at is None:
             self.closing_at = time.monotonic()
             if self.active:
-                self.gate.cancel(self.active['operation_id'], now())
+                self.execution.cancel(self.active)
             self.queue.clear()
             self.gate.close()
             self.phase = 'closing'

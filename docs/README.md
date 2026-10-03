@@ -19,6 +19,9 @@ These software paths need no model or robot. For a failed command, start with
 [example troubleshooting](../examples/README.md#if-a-command-fails).
 
 For signatures and the installed/source-tree boundary, use the [API entry points](API.md).
+Before adopting example code, read the
+[user-component and example classification](DESIGN.md#user-components-task-examples-and-internal-mechanisms).
+It distinguishes installable entries, profile-specific integrations and private prototypes.
 
 ## Understand the architecture
 

@@ -1,5 +1,14 @@
 # Experimental Python session
 
+The optional install also contains the separate
+[navigation request client](../../docs/API.md#navigation-requests-to-a-prepared-owner).
+`NavigationSession` connects to a prepared trusted owner's Unix endpoint; the
+client needs only Python's standard library, while the owner needs the compiled
+Core and its declared driver dependencies. It does not start ROS or a simulator.
+The install also contains the optional [bounded Nav2 owner](../../integrations/ros2/nav2_session/README.md).
+Only starting that owner imports ROS. The counter/MuJoCo `Session` below retains
+its constructor and behavior.
+
 An optional POSIX package connects a Python session host to the **existing C++
 Core**. The default backend is a deterministic counter. An optional
 [MuJoCo backend](../../integrations/mujoco/README.md) now runs the qualified ALOHA

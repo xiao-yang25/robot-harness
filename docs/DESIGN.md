@@ -83,6 +83,104 @@ handling to survive a stalled model call or failed caller needs an explicitly
 validated deployment for that requirement; adding a process alone is not evidence
 that it is met. The current profile limits remain unchanged.
 
+### User components, task examples and internal mechanisms
+
+The following classification describes what exists today. Installation does not
+make a component a general robot framework, and a public source-tree header does
+not imply an installed or stable SDK. All interfaces remain preview interfaces.
+
+| Component | User-facing role and availability | Scope |
+|---|---|---|
+| [Core](../include/robot_harness/authority_gate.hpp) | Independently installed `RobotHarness::core` and authority header | Reusable operation governance; host-driven, one configured effect domain per Gate; not a task engine or physical controller |
+| [Python Session](../bindings/python/README.md) | Optional build/install; caller operations for declared profiles | Experimental reusable session entry; one active operation and bounded in-memory records, no reconnect or durable task recovery |
+| [Navigation request client](API.md#navigation-requests-to-a-prepared-owner) | Optional Python install; connects to an already prepared trusted Unix owner | Registered-site/issued-observation requests and retained Core receipts; does not launch ROS or own the process; the installed bounded owner and startup example have local normal/cancel/EOF evidence for one scoped Humble simulation profile; public pairing, broader profiles and hardware remain pending |
+| [MCP integration](../integrations/mcp/README.md) | Optional installed source; separate SDK dependencies | Session tools for cooperating existing agents; not business task logic or a robot-operation cancel inferred from MCP request cancellation |
+| [MuJoCo backend](../integrations/mujoco/README.md) | Optional installed source; environment/model dependencies supplied separately | Runnable ALOHA-specific trial and transfer/hold profiles; stepped physics, not an arbitrary robot adapter or general Skill SDK |
+| [Compute host](../include/robot_harness/compute_execution.hpp) | Public source-tree interface; worker deployment required; not installed by the default package | Local compute integration with a declared worker protocol; not a generic CPU/GPU scheduler |
+| [Sample host](../include/robot_harness/sample_execution.hpp) and [task examples](../examples/README.md) | Runnable source-tree teaching/verification callers | Deterministic effects and finite application policies; example-local task interfaces are not Harness APIs |
+| [Nav2 integration](../integrations/ros2/nav2_observation/README.md) and [simulation](../integrations/ros2/simulation/README.md) | Public, separately built Humble/Gazebo example and reproducible tutorial | Fixed navigation/closure scenarios and scoped simulation producer/drive fixtures; not a general navigation service or production Motion Kernel |
+| [Linux recovery prototype](../examples/README.md#host-recovery-on-linux) | Private protocol exercised by a source-tree example | Surviving-Owner recovery only; not a public recovery SDK or persistent mission recovery |
+| `_host`, `_core`, candidate `_transport` and native process protocols | Internal implementation, even where files are installed with a package | Callers use documented entry points; the current ACT consumer pins its private candidate protocol, which is not a stable extension API |
+
+The separate Robot Agent delivers a runnable ALOHA business application and a
+task-specific evaluator. Those are useful consumer artifacts, not evidence of a
+general planning framework. Its task decisions do not belong in Core or the
+Session's private Host.
+
+### Evolution toward reusable task execution
+
+The next design increment should test a heterogeneous task through a shared
+execution entry rather than merely adding another demonstration backend. Extract
+call correlation, execution progress and cancellation coordination only where
+the second consumer exposes repeated work. Keep business goals, skill selection
+and business retries on the Agent/caller side. Retain the existing ALOHA entry and
+profile regressions while evaluating a goal/parameter/progress/result interface;
+no new interface is promised by this documentation.
+
+Choose the new task for a meaningful goal, observation/action or lifecycle
+difference, and identify shared mechanics alongside profile-specific behavior.
+Qualify its business Agent using actual permitted observations and post-execution
+feedback, alongside a deterministic caller. Select its own domain predicate;
+neither the old ALOHA evaluator nor a settled receipt proves the new goal.
+Preserve the declared direct-Session and existing MCP behavior when interfaces
+change. Whether the new task is exposed through MCP is a separate scope choice.
+Correlated progress and errors should identify inference, native execution and
+cleanup waits without depending on a new monitoring framework.
+
+Core operation admission and a device outlet's control grant are different facts.
+A future Runtime must correlate them; it must not compete with the outlet for
+final command authority. An existing execution engine may own task progression
+by explicit delegation, with only one owner driving a step.
+
+For a continuously evolving environment, define observation age/clock/frame,
+goal revision and action consumption validity instead of copying the stepped
+profile's exact observation-sequence checks. Cancellation intent, outlet
+revocation, device stop/handoff and software cleanup remain distinct. Partial
+resource handoff requires resource-specific closure evidence; it cannot be
+implemented by prematurely marking the current aggregate receipt settled.
+
+Continuous actuation needs its applicable outlet and native device protections
+validated before admission to that profile. Current Owner-dependent checks and
+simulation acknowledgements establish neither Host-death protection nor a hard
+stop deadline. Durable task storage and restart reconciliation remain conditional
+future work; unknown external effects must not be automatically replayed. No
+database, ROS, task-graph framework or new repository is required by this direction.
+Accepted Core semantics and current installed interfaces remain unchanged.
+The concrete [navigation/shared execution design](RUNTIME_SLICE.md#navigation-and-shared-execution-increment-design-only)
+defines the next consumer and continuous outlet prerequisites. It is planned;
+the normal native research result is not navigation Session or stop qualification.
+
+### Model and algorithm provider roles
+
+The planned Runtime scope includes more than language-model calls. Functional
+roles do not imply new architecture layers, required model families or current
+support for each family:
+
+| Role | Responsibility |
+|---|---|
+| Business decisions, LLM/VLM | Agent/caller interprets goals and permitted observations, selects skills and decides business retries or assistance |
+| VLA and learned skill policies | A policy supplies candidate actions or trajectories matched to the embodiment; a skill owns their execution semantics, and prediction does not grant command authority |
+| Perception and state estimation | Providers supply sensor-derived observations with applicable time, frame, quality and invalidity; Agent, skills or native stacks consume them according to their roles |
+| Navigation and avoidance | Native algorithms, learned models or combinations provide planning and local behavior; applicable profiles define stale/missing-input handling and final motion authority |
+| Speech and audio | ASR supplies input for intent interpretation and TTS supplies feedback; transcripts do not grant motion authority, and voice stop cannot be the sole device emergency-stop mechanism |
+
+Model-specific inference and transformations belong to providers supplied by an
+application, skill or native stack. Runtime coordination should cover readiness,
+invocation correlation, result validity, resource budgets and shutdown where
+actual consumers need it. Persistent perception streams and individual policy
+calls can have different lifecycles; neither every observation nor every control
+tick requires a Core operation. Core remains model- and payload-independent.
+Observation input and audio playback do not automatically require a motion grant;
+each effect declares its own lifecycle, while motion retains its outlet checks.
+
+Select only the capabilities required by the task. Declare versions, I/O limits,
+deployment, update/trigger timing, freshness and resource needs, then qualify
+native behavior and the composed task. A late policy output or old voice intent
+must not revive cancelled motion; unavailable obstacle information is not proof
+of a clear path. Retain native device control and protections for initial hardware
+qualification. These are design considerations, not a new provider API or an
+expansion of the delivered Codex/ACT and simulation profiles.
+
 ### Source modules and public headers
 
 Implementation directories follow the existing build targets and responsibilities:
@@ -714,7 +812,8 @@ simulation or tooling repository only when independent consumers, maintenance or
 release needs justify it. A GitHub organization is not a runtime prerequisite.
 
 Retain the existing Gazebo/Humble regression path, qualify a manipulator/MuJoCo
-candidate for the first slice, then use a concrete Isaac combination to test reuse.
+candidate for the first slice, then qualify a heterogeneous task to test reuse.
+Isaac is a candidate; choose the actual backend from task and native feasibility.
 Each delivered combination needs reproducible setup, task outcomes, a recording,
 relevant failure checks and its actual environment/version limits. Simulator,
 policy and model dependencies remain optional to the installed Core. No Agent
@@ -1626,3 +1725,13 @@ caller condition cannot substitute for native closure, fresh quiet or context
 readiness. A is settled once; B has a new identity and revisits the original
 navigation target. Restoring perception never reinstates A's revoked authority.
 The finite single-recovery policy belongs to the optional example, not Core.
+
+The bounded navigation owner also distinguishes caller think time from native
+execution time. Default idle waits are 15 seconds before each admission and
+10 seconds before final close. An explicit finite `--caller-wait-seconds` in
+`(0, 60]` configures both waits while continuing the existing polling/EOF/cancel
+path. The local 30-second model proposal consumer chooses 45 seconds, accounting
+for up to three 5-second public RPC waits; it does not alter execution deadlines,
+observation freshness or physical closure predicates. Idle expiry still aborts
+and preserves unknown/pending facts. This is a bounded simulation-profile setting,
+not a hard-stop or owner recovery mechanism.

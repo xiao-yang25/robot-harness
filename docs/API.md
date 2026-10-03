@@ -5,6 +5,11 @@ CMake target is `RobotHarness::core`; the public header is
 [`robot_harness/authority_gate.hpp`](../include/robot_harness/authority_gate.hpp).
 These are evolving C++17 interfaces, not a stable SDK or a physical safety layer.
 
+Use the [component classification](DESIGN.md#user-components-task-examples-and-internal-mechanisms)
+to distinguish reusable user entry points, profile-specific integrations,
+application examples and private mechanisms. Installing Python source does not
+make its underscored modules a public extension API.
+
 ## Core: authority and evidence
 
 `AuthorityGate` is a passive state machine driven by one host-owned logical
@@ -55,3 +60,48 @@ backend. The first independent consumer checks packaging and refusal without
 readiness; it is not a complete adapter. Private recovery and ROS fixtures are
 not installed APIs. Version, licensing and deployment limits remain in the
 [project scope](../README.md#interfaces-and-compatibility).
+
+## Navigation requests to a prepared owner
+
+The optional Python install now includes `robot_harness.NavigationSession`. It
+connects to a private Unix endpoint supplied by a prepared, trusted navigation
+owner. It does not start ROS, launch a simulator or own the remote process. The
+existing stepped `Session` and MCP tools retain their interfaces.
+
+| Call | Meaning |
+| --- | --- |
+| `capabilities()` | Registered sites, fixed map/frame/profile and current availability |
+| `observe()` | Permitted owner observations and a bounded issued reference |
+| `submit(id, site=..., expected_observation=...)` | Request a registered site using the reference, with a bounded deadline; an identical retry reads the retained decision |
+| `status(id)` | Retained request, native UUID, scope/generation, output and Core settlement |
+| `cancel(id)` | Revoke that current request and schedule driver closure; old cancellation cannot select newer work |
+| `close()` | Request owner shutdown and close the local channel; return intent/closure unknown, without claiming owner reaping or robot stop |
+
+Pass `observe()['reference']` as `expected_observation`. References are owner-issued,
+session/epoch/map/frame bound, valid for at most one second and retained up to 64
+observations. Current invalid input still refuses admission. New observations evict
+the oldest reference; already retained requests remain queryable and replayable.
+Reusing an ID with different arguments fails. Capacity is 64 retained requests;
+unsettled active work blocks admission. A request timeout is an unknown outcome:
+query that ID before resubmitting and retain the original proposal for an exact retry.
+The default deadline is 147000 ms; a prepared profile may advertise a lower maximum.
+
+The [caller example](../examples/navigation_requests.py) demonstrates fixed A→B
+requests for a prepared owner that registers those two sites; A must settle before
+B, while final B may stay pending. Owner-side `robot_harness.navigation.NavigationRequests` borrows the shared
+coordinator, fixed sites and trusted driver callbacks. Its `command(message)`
+returns a result; the owner transports RPC replies, continuously progresses native
+work/Core time, and handles EOF by requesting the same shutdown. Stop scheduling
+must return promptly; failure must reach the owner's closure path. Only the driver
+can provide native and physical closure facts. This is not a plugin-loading API.
+
+Local installed-client normal A→B consumption is verified with the optional
+[installed bounded owner](../integrations/ros2/nav2_session/README.md). The fixed
+simulation profile and standalone host-launcher normal route are locally verified;
+finite cancellation during B rotation and disconnection during B translation
+have local physical protection evidence. Abort still reports stop unknown and
+settlement pending. Installed navigation business-Agent normal consumption has
+[local candidate evidence](TESTING.md#m6b-navigation-business-agent); paired public
+version delivery remains pending.
+See [the request boundary](RUNTIME_SLICE.md#navigation-request-entry-increment)
+and [validation](TESTING.md#navigation-request-entry).

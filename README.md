@@ -97,15 +97,28 @@ ARM/CPU normal paths, bounded counterexamples and a comparable native task owner
 Agent `c3b291c` pins Harness `0de9eb0`; this combination passed installed deterministic
 consumption. Earlier real visual results retain their original Harness `3acc9aa`
 scope. The comparison supports responsibility reuse, with no established general
-speed, memory or net development-time advantage. Before M6, complete mainline
-delivery of the public evaluator/regressions and
-[installed combination CI](docs/TESTING.md#installed-agent-combination). M6 then
-selects one heterogeneous combination and tests what actually carries over.
+speed, memory or net development-time advantage. The public evaluator/regressions
+and [installed combination CI](docs/TESTING.md#installed-agent-combination) are
+delivered. The local M6 candidate has [installed ALOHA and navigation consumers](docs/TESTING.md#m6b-shared-consumers)
+using the shared execution coordinator; installed navigation business-Agent normal
+consumption has also passed locally. See
+[component roles](docs/DESIGN.md#user-components-task-examples-and-internal-mechanisms)
+and [evolution direction](docs/DESIGN.md#evolution-toward-reusable-task-execution).
 Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
 one reproducible task at a time. Simulation work can proceed independently of
 physical-device availability; hardware validation retains its own prerequisites.
 [Preview and adoption preparation](CONTRIBUTING.md#adoption-stages) proceeds alongside
 integration work; a versioned preview and external reproduction remain pending.
+
+The optional Python package also includes a
+[navigation request client](docs/API.md#navigation-requests-to-a-prepared-owner)
+for a prepared local owner. The optional [bounded Nav2 owner](integrations/ros2/nav2_session/README.md)
+is now installable and has completed an independent-client A→B simulation through
+the shared Core coordinator. The fixed native heading profile also completed the
+standalone launcher route. Public cancellation during B rotation and actual client
+loss during B translation have local, finite physical protection evidence.
+The owner still reports stop unknown/settlement pending on abort; navigation
+business-Agent normal consumption has [local candidate evidence](docs/TESTING.md#m6b-navigation-business-agent); paired delivery remains pending.
 
 **Early-stage software and simulation.** No physical-robot integration or hard stop
 guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation

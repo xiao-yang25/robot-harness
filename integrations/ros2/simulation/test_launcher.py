@@ -12,13 +12,18 @@ import simulate
 
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
-                 output_links=False, blocked_record=False):
+                 output_links=False, blocked_record=False, session=False):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
             calls = []
             outside = Path(directory) / 'outside-output'
             outside.write_text('untouched')
+            prefix = Path(directory) / 'install'
+            marker = prefix / 'lib/robot-harness/python/robot_harness_nav2/__main__.py'
+            marker.parent.mkdir(parents=True)
+            marker.write_text('')
+            case = 'installed-nav2-session' if session else 'normal'
 
             def docker(command, **_kwargs):
                 calls.append(command)
@@ -30,7 +35,7 @@ class LauncherTest(unittest.TestCase):
                     # host container is removed, even with a custom image.
                     (output / 'container.cid').write_text('not-owned-container')
                     if verification:
-                        (output / 'verification.json').write_text('{"case":"normal","passed":true}')
+                        (output / 'verification.json').write_text(json.dumps(dict(case=case, passed=True)))
                 if command[1] == 'inspect':
                     if blocked_record:
                         (output / 'container.cid').unlink()
@@ -51,11 +56,25 @@ class LauncherTest(unittest.TestCase):
             attached.poll.return_value = 0
             with patch.object(simulate.subprocess, 'run', side_effect=docker), \
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
-                code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case='normal'))
+                code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
+                    session=session, python_prefix=str(prefix)))
             status = json.loads((output / 'run.json').read_text())
             self.assertIn(['docker', 'rm', '--force', container], calls)
             self.assertEqual(outside.read_text(), 'untouched')
+            if session:
+                command = next(call for call in calls if call[1] == 'create')
+                self.assertEqual(command[-2:], ['image-id', '/simulation/navigation_session.sh'])
+                self.assertIn('none', command)
+                self.assertIn('M6_NATIVE_ISOLATED=1', command)
+                self.assertTrue(any('target=/installed,readonly' in part for part in command))
+                self.assertTrue(any('target=/navigation-example.py,readonly' in part for part in command))
+                self.assertFalse(any('target=/simulation/navigation_requests.py' in part for part in command))
             return code, status
+
+    def test_installed_session_launch_has_separate_readonly_example_mount(self):
+        code, status = self.exercise(session=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(status['container_removed'])
 
     def test_natural_exit_and_checker_pass(self):
         code, status = self.exercise()

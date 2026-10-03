@@ -33,3 +33,14 @@ foreach(robot_harness_mcp_source IN LISTS robot_harness_mcp_sources)
 endforeach()
 install(FILES ${robot_harness_mcp_sources}
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/robot-harness/python/robot_harness_mcp")
+
+# Optional bounded ROS owner. Importing Core/Session does not import ROS.
+file(GLOB robot_harness_nav2_sources CONFIGURE_DEPENDS
+  "${PROJECT_SOURCE_DIR}/integrations/ros2/nav2_session/robot_harness_nav2/*.py")
+foreach(robot_harness_nav2_source IN LISTS robot_harness_nav2_sources)
+  get_filename_component(robot_harness_nav2_name "${robot_harness_nav2_source}" NAME)
+  configure_file("${robot_harness_nav2_source}"
+    "${CMAKE_BINARY_DIR}/python/robot_harness_nav2/${robot_harness_nav2_name}" COPYONLY)
+endforeach()
+install(FILES ${robot_harness_nav2_sources}
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/robot-harness/python/robot_harness_nav2")

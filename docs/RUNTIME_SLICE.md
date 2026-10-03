@@ -1,5 +1,11 @@
 # First Runtime / Agent slice
 
+This page owns the implemented first slice, not a universal task/Skill framework.
+See [component roles](DESIGN.md#user-components-task-examples-and-internal-mechanisms)
+and [evolution direction](DESIGN.md#evolution-toward-reusable-task-execution)
+for the distinction between reusable entries, ALOHA-specific behavior and future
+extraction. The current trial/transfer/hold and cancellation contracts remain unchanged.
+
 The optional [Python session](../bindings/python/README.md) implements both the
 deterministic fixture and the [MuJoCo backend](../integrations/mujoco/README.md).
 A research ACT worker now supplies real candidates to the same Core-backed host;
@@ -363,6 +369,311 @@ coverage, reliability and heterogeneous reuse remain unqualified.
 Continuous-profile acceptance is distinct from the earlier native feasibility
 probe, business-Agent acceptance and Linux/model/render support.
 
+## Navigation and shared execution increment (design only)
+
+The full ROS navigation Session/Skill SDK remains a design. The prepared-owner
+request client implemented below is a smaller public boundary.
+The first private coordinator extraction below is implemented in the existing Host.
+The bounded research navigation driver below now consumes that same coordinator;
+its scope does not change the planned public interface into an available SDK.
+The existing Session signatures, ALOHA profiles, direct and MCP consumers remain
+the supported interfaces. A separate research caller has qualified normal native
+two-stop navigation; that does not qualify continuous Runtime admission or stops.
+
+**Selected boundary.** Add one site-visit Skill over Humble Nav2, alongside the
+existing stepped ALOHA Skills. The application chooses A, confirms the visit from
+new online feedback, then chooses B. It owns ordering, business retries and help
+requests. Nav2 owns planning, local control and Action progression. The navigation
+Skill translates a registered site into one `NavigateToPose` goal, associates its
+feedback and terminal result, and interprets navigation-specific observations.
+The shared Runtime owns admission, dispatch coordination, retained request records,
+revocation, bounded progress and closure. It uses the existing C++ Core for authority;
+neither the Skill nor the Agent implements another authority state machine.
+
+Keep the first increment to one trusted backend per Session, one active operation
+and one configured effect domain. The same coordinator should serve separate ALOHA
+and navigation sessions; it need not switch live backends or coordinate a fleet.
+Extract only mechanics both actually consume. ALOHA keeps its action queue and
+step boundary; navigation keeps its ROS Action client and continuous outlet.
+Simulator stepping, ROS callbacks and domain assessment do not become generic
+coordinator responsibilities. Blocking model work remains outside its progress loop.
+
+**Candidate consumer shape.** These are design requirements, not callable examples
+or a frozen wire schema. Choose exact API changes with the two M6b consumers.
+
+| Operation | Required navigation behavior |
+|---|---|
+| Discover | Advertise `navigation.visit_site` only for the configured map/site table and qualified continuous profile. Report supported parameters and readiness; registered sites resolve to finite map-frame targets and a heading. Callers cannot replace the map, frame, executable, controller or protection policy |
+| Observe | Return permitted localization pose, frame/map identity, clock/observation epoch, sample/receive times, localization quality and sensor health. Include bounded native progress when available. Simulator ground truth remains evaluator-only |
+| Submit | Associate an immutable request ID, Skill and `site` parameter with the observation reference used for the decision. Navigation checks epoch/map identity and profile-specific age/quality using current observations; advancing sensor sequences alone do not reject a valid proposal. Recheck readiness before dispatch. Stale proposals are refused, never silently updated into a different goal |
+| Status | Retain request-to-Core-operation, native UUID and outlet scope/generation correlation. Report acceptance/dispatch uncertainty, execution or inference wait, native terminal reason, domain assessment, outlet closure, stop observations and resource closure separately. Native remaining distance is an estimate, not a task completion percentage |
+| Cancel | Target that request's operation and immutable native/outlet identities. Return receipt of intent separately from applied revocation and closure. Repeated cancellation is idempotent; cancelling an old request must not cancel the current visit |
+| Close | Stop admission and resolve owned operations, ROS clients and task producers. Report unresolved obligations rather than replacing the Session or claiming cleanup from channel EOF |
+
+Identical request retries read the retained decision; conflicting reuse fails.
+An uncertain submission must be queried by its ID, not submitted under a new ID.
+Preserve the existing bounded record store and refuse work when it cannot retain
+the previous receipt. Session-wide sensors/localization may remain resident, but
+that lifetime is distinct from the visit's native handle and producer obligations.
+Do not advertise readiness for B merely because the server is still running.
+
+**Dispatch and late replies.** The owner progresses asynchronous ROS requests
+with finite waits while continuing control, expiry and observation checks. Do not
+call a blocking navigation convenience method from that loop. Existing example
+closure helpers must also be adapted into progressing requests, rather than
+copied as synchronous waits inside the shared coordinator. Reserve the native
+UUID and producer identity before sending. A lost or delayed goal acknowledgement
+after possible transmission means submission is unknown. Keep its outlet closed
+after revocation, retain the pending request, and cancel the exact handle if it
+arrives later. A timed-out future, cancelled Python wait or rejected late callback
+does not prove native non-submission or terminal completion. Only proof that no
+native goal/lane was created permits the existing non-submission path, for example
+a pre-send failure or a correlated authoritative rejection. Closing an already
+opened outlet remains required in either case. Late
+feedback may complete that operation's diagnostics; it cannot authorize another
+operation, deliver a revoked success payload or reopen its outlet.
+
+**Continuous outlet prerequisite.** The initial profile is exclusive simulation
+with a live, progressing owner. Reuse the scoped-drive mechanism as a candidate,
+then qualify the actual new path. Bind each controller/smoother producer channel
+immutably to the visit's scope/generation before starting it. A relay that stamps
+all unscoped traffic with the currently open generation is prohibited: an old
+producer would become new authorized work. If the selected native stack cannot
+provide this distinction, it must not receive this profile. Initially use separate
+task-bound producer contexts; keep shared map/localization resident and measure
+startup/closure cost before promising native-stack reuse.
+
+For the bounded two-visit profile, prepare both immutable native contexts while
+the outlet is initially sealed, then require native readiness and current input
+before the first opening attempt. Initial preparation has a finite budget; it
+cannot be re-entered after any motion admission attempt to suppress input expiry
+or restore execution authority. This does not prescribe unbounded prewarming or
+prove per-visit process reclamation. Other profiles must qualify their own
+preparation and resource costs.
+
+The outlet starts closed. A valid Core dispatch and current profile observations
+permit opening the matching scope before submitting the native goal. If opening
+or dispatch becomes uncertain, retain the obligation to close it. Revocation first
+invalidates execution/result authority and schedules closure of that exact outlet;
+it also requests native cancellation without waiting for either response to start
+the other. Continue processing both paths. Closing clears stored commands and
+rejects late commands at the actual wheel-write boundary. A service response says
+closure was accepted; a correlated simulation-update acknowledgement says zero
+wheel targets were applied. Neither observation alone proves physical rest.
+
+On native success, withdraw new admission and close the visit's outlet/producer
+lane without fabricating cancellation or revoking an otherwise valid result.
+Evaluate online arrival using relevant post-result localization; report success,
+failure or unknown with its source. Deliver successful payloads only through the
+existing Core result authority/sink path; failures and unknowns remain diagnostics.
+Business arrival, fresh quiet-motion observations, native completion and producer
+closure are distinct facts. Before conflicting reuse, require this profile's native
+terminal/child-closure observations, outlet-applied acknowledgement and fresh quiet
+motion interval. Match the acknowledgement to this scope/generation and its actual
+applying simulation update; quiet samples must advance beyond both that update
+and the newest odometry already cached when it was received. Replayed or merely
+clock-aligned old samples cannot start the window. Keep the aggregate operation unresolved until all required output
+and resource obligations are resolved. This increment does not add partial-resource
+handoff or reuse the old producer by changing its identity.
+
+Observation expiry, clock reset, localization invalidity or loss of a required
+capability closes admission and revokes active work through the same closure path;
+it never automatically advances to B. Loss of stop observations remains unknown.
+If closure service/acknowledgement or native completion is unavailable, keep the
+domain blocked and report the missing fact. An experiment watchdog may remove its
+owned container for cleanup; removal is not evidence of a qualified robot stop.
+This profile supplies no owner-death protection, hard stopping deadline, controller
+lease, persistent recovery or real-device guarantee. Those requirements need a
+different supported profile and native protection before admission.
+
+**Verification before integration.** Qualify the actual producer/outlet route,
+not only Action success: normal A/close/B; revoke during motion with late old
+commands; stale cancel after a later generation opens; required observation loss;
+and withheld closure feedback that must block reuse. Include cancellation while
+the goal acknowledgement is pending. Use real sensor/physical observations and
+correlated native closure facts where claimed. Set quiet thresholds and observation
+windows before running; retain failures rather than loosening them. M6b then proves
+actual shared coordinator use, retained ALOHA behavior and a live navigation business
+Agent. MCP exposure, broader fault comparison and installed navigation delivery
+remain separate decisions/work; the existing MCP tools are unchanged.
+
+### First binding increment and shared-coordinator extraction
+
+The first M6b support change is deliberately smaller than a navigation Session.
+The private Python bridge now permits an explicit fourth native-identity argument
+to its owner-only `Gate.native` call. The existing three-argument call continues
+to synthesize `episode-<operation_id>`. The optional value uses the bridge's
+existing non-empty UTF-8 text validation; it is not a ROS UUID parser or a public
+extension API. A navigation owner must reserve its actual goal UUID before transmission,
+retain it with the request and outlet scope, and supply it on every correlated
+native event. Core already refuses a different identity once acceptance or
+rejection has established it; this does not require changing Core or permitting
+events from a different operation. An explicit identity is an observation from
+the trusted owner, not caller authority or a substitute for ROS correlation.
+
+Missing acknowledgement remains pending. After revocation, a late correlated
+acceptance may establish the old native identity and support its cancellation;
+it cannot restore result authority or settle the operation. The bridge must not
+fill an unknown identity from the current visit, report synthetic acceptance, or
+infer closure from a cancelled wait. Existing ALOHA/MCP calls retain their
+episode identity and current behavior. This bridge support alone advertises no
+navigation capability and supplies no new stop guarantee.
+
+The next implementation slice extracts the request/operation retention and Core
+admission, dispatch, expiry/cancel and result-disposition coordination currently
+embedded in `_host.Host`. Keep the single writer and bounded retained records;
+move actual callers to the shared code rather than adding a parallel coordinator
+which they do not use. Host-specific worker prediction/queues and MuJoCo stepping
+stay in the stepped driver. The navigation driver owns asynchronous goal/close
+requests, callbacks, fresh input checks and profile-specific closure facts.
+It must keep progressing both outlet closure and exact native cancellation.
+Native success can precede complete closure; publish/retain domain feedback
+separately and report Core settlement only after every required obligation is
+observed. A diagnostic `closed` flag is not sufficient evidence.
+
+The first extraction uses a private `ExecutionCoordinator` in the existing Python
+package. It borrows the Host-owned Gate, retains the bounded request records and
+one active record, and centralizes admission/dispatch, expiry/cancellation, native
+facts, result disposition and explicit settlement. Core remains the authority
+state machine. The Host still owns startup/readiness, backend-specific argument
+and observation checks, prediction queues, physical submission, termination and
+reaping. The coordinator creates no worker, ROS callback, thread or sensor loop;
+its caller remains the existing single writer. Keep old Session signatures,
+receipts, record capacity and default profiles unchanged.
+
+Native terminal observation, result disposition and settlement are separate
+coordinator calls. Drivers supply actual correlated native facts; only after
+their profile's unresolved work and closure obligations are resolved may they
+submit settlement evidence. Keep the active slot until the driver's existing
+post-settlement handling completes. Retained old requests are readable, but
+cancelling one cannot select the current operation. The coordinator does not
+know how to stop a robot or how to turn an ambiguous future into non-submission.
+ALOHA retains its current preparation-failure and pending-inference paths;
+navigation must implement its own asynchronous cancellation/outlet closure.
+
+Verify actual Host use through the existing Session, lightweight ALOHA and MCP
+consumers, plus focused real-Core checks for retained/refused requests, old
+cancellation, delayed native facts and expiry during result publication. This
+first extraction is a single-consumer foundation; heterogeneous reuse is still
+unproven until a real navigation driver uses it. Deferring extraction until that
+driver is fully written would preserve duplicated ownership mechanics, while
+copying the entire Host would also copy stepped execution assumptions. This
+bounded extraction changes neither the public profile nor native protection.
+
+The private module is now consumed by the existing Host. Local real-Core,
+Session/backend/MCP and relocated installed-package checks pass; details and
+limitations are in [Testing](TESTING.md#shared-execution-coordinator-extraction).
+The first bounded research navigation consumer now uses the same module. The
+prepared-owner request increment below adds installed client consumption; full
+ROS driver/startup packaging remains a subsequent increment.
+
+### First scoped navigation consumption
+
+Use a bounded research driver to exercise the actual private coordinator and
+compiled Core on the already qualified scoped Humble route before designing a
+public navigation Session. The driver retains the send future and caller-reserved
+UUID, records accepted/terminal facts from the matching Action handle, and checks
+current Core authority immediately before the native send. All waits continue
+single-writer Core time/input maintenance; neither a future timeout nor container
+removal supplies non-submission or settlement evidence. This is a deterministic
+consumer, without a new public API, Agent or externally routable cancel command.
+
+The trusted bridge gains an optional settlement-scope configuration, retaining
+the existing episode default. A scope name declares the owner's closure obligation;
+it does not verify physical evidence. The navigation driver must actually observe
+matching child/BT closure, manager PAUSE, outlet-applied acknowledgement and the
+existing fresh quiet interval before publishing closure evidence. Preserve the
+same budgets and physical evaluator. The existing reference route supplies these
+observations; the coordinator does not contain ROS or motion predicates.
+
+For this finite two-context profile, only A may settle/release, after its closure
+and a fresh, still-ready B context are confirmed. B may publish its native result
+and close physically, but stays active with settlement pending because there is
+no prepared C. Reject further admission rather than inventing an unlimited pool
+of contexts. Report B's terminal/closure and pending aggregate receipt separately.
+Failure revokes Core authority, requests exact native cancellation and outlet
+closure independently, retains possible submission and reports unresolved facts;
+best-effort cleanup cannot qualify a stop. Pre-send expiry does not permit an
+already opened outlet to be forgotten.
+
+Local checks now cover these boundaries with the real Core and synthetic native
+facts, while preserving old Session/backend/MCP behavior. A normal scoped A→B
+simulation consumed the shared code: A settled before B admission, retained old
+cancellation left B unchanged, and B closed with settlement pending. Review also
+added checks after potentially blocking reservation/readiness logging, before
+native submission or settlement. See [Testing](TESTING.md#scoped-navigation-research-consumption)
+for the tested versions and retained failed run.
+This proves only the bounded research consumption path. Public navigation transport,
+general cancellation/late-future qualification, actual ALOHA/Nav2 business consumers,
+installation/CI combinations and the live navigation Agent remain separate work.
+
+### Navigation request entry increment
+
+This implemented slice adds a local `NavigationSession` client for an already prepared,
+trusted navigation owner. It connects to an exclusive local Unix endpoint; it
+does not launch ROS, select executable paths or own the remote process. Closing
+the client requests owner shutdown and reports unresolved closure separately from
+connection cleanup. The existing stepped `Session` remains unchanged.
+
+An owner-side `NavigationRequests` helper borrows the real shared coordinator and
+the prepared driver's observation/readiness/context callbacks. It validates
+`navigation.visit_site` proposals against a fixed map-frame site table, retains
+request IDs and issued observation references, and admits one unit of native work.
+It does not implement another authority state machine or a native execution loop.
+Driver context identity is chosen by the trusted owner, never by the client.
+The driver continues progressing asynchronous native work, input freshness and
+Core time while servicing client requests. Models must not occupy that loop.
+
+Capabilities report registered sites and current readiness. Observe supplies only
+permitted localization/sensor observations with an owner-issued, bounded reference;
+Gazebo ground truth is excluded. Submit takes a request ID, registered site and
+that reference. Repeated identical submissions return the retained decision even
+after the observation expires; conflicting reuse fails. New stale/foreign/unknown
+references are refused. A newer sensor sequence alone does not invalidate a still
+fresh reference, but a changed epoch/map/frame or invalid current input does.
+The fixed reference age and existing driver freshness predicates both apply.
+
+Status preserves request/Core/native/outlet association and pending settlement.
+Cancel targets the retained request, first revokes current Core authority and then
+schedules exact driver cancellation/outlet closure without awaiting either. A
+receipt of cancellation intent is not a stop acknowledgement. Old-request cancel
+cannot select current work. Close withdraws admission and requests driver closure;
+EOF requests the same owner shutdown without asserting that native work stopped.
+The endpoint is for one cooperating local caller, with bounded records/observations
+and the existing framed transport; it is not a network or multi-tenant service.
+
+This first request slice is consumed by the bounded research navigation
+owner and an installed client outside the product source tree. Keep the native
+driver/launch/physical evaluator in research until its production packaging and
+new request-path protection qualifications are complete. This is a usable request
+boundary over a prepared owner, not a turnkey ROS SDK or hardware profile.
+Compare against simply extending stepped Session parameters (which would retain
+step/reset and worker assumptions) and publishing the research script directly
+(which would expose fixed paths and imperative task ordering). Verify real-Core
+request replay/conflict, stale observations, busy/pending refusal and old cancel;
+actual local client/owner normal A→B, retained A receipt, B pending and process
+cleanup; retain existing Session/backend/MCP checks. Normal native success does
+not qualify the new cancellation or disconnected-owner physical path.
+
+Local normal consumption and focused request/connection checks passed, including
+actual driver methods for EOF/close scheduling with synthetic ROS edges.
+Independent design and final implementation review approved this limited slice.
+See [Testing](TESTING.md#navigation-request-entry) for environment, failed startup
+and the distinction between scheduling and physical stop qualifications.
+
+Both installed deterministic business consumers now use the same current shared
+coordinator source: retained ACT/ALOHA through `Session` / `HandoffTask`, and
+scoped Nav2 through `NavigationSession`. See the [candidate consumption check](TESTING.md#m6b-shared-consumers).
+This establishes finite cross-task consumption, with separate native builds and
+profile-specific settlement. Installed navigation business-Agent normal consumption
+has subsequently [passed locally](TESTING.md#m6b-navigation-business-agent); delivery
+and applicable further failure qualifications remain separate.
+First verify the bridge with real C++ Core identity/revocation checks and ordinary
+Session regression. Subsequent extraction needs the affected continuous ALOHA,
+direct/MCP and navigation integration checks. Unit tests of a future driver do
+not replace actual producer/outlet qualification. Installed combination pins,
+new model selection and navigation MCP exposure remain their own delivery work.
+
 ## Alternatives and next implementation batches
 
 An in-process policy loop is the smallest native baseline, but its measured first
@@ -395,3 +706,152 @@ stale/malformed replies, caller loss, observation invalidation and cleanup failu
 Keep Gazebo/Humble unchanged; Linux and a later concrete Isaac combination need
 separate qualification. Build the public interface from real consumer needs and
 measured costs, not a generic plugin system or additional approval/hash layers.
+## Installed bounded Nav2 owner
+
+This M6b increment packages the qualified two-context driver as optional
+`robot_harness_nav2`, with an owner-only `python -m robot_harness_nav2` entry.
+The external caller retains the existing `NavigationSession` request API. The
+owner creates no Agent or client process. Its endpoint lives in a private local
+directory; one client connection is consumed and EOF closes admission.
+
+This profile requires the isolated Humble/Nav2 simulation, custom scoped native
+workers and drive outlet, exclusive motion domain, fixed A/B sites and a live,
+continuously polled owner. It does not accept arbitrary ROS installations or
+hardware. A has a prepared B successor; B still cannot release without C.
+
+The implementation separates ROS observations, scoped native closure, and the
+Core/request owner. ROS imports are deferred until launch. No runtime imports
+research files or consumes evaluator capture markers or Gazebo ground truth.
+Actual goal identity is retained before submission and used for closure.
+Normal arrival uses post-result TF; physical evaluation remains independent.
+
+The simulation launcher owns the initial scene and the independent example
+client; the owner owns B's launch process, Core, ROS clients and private endpoint.
+Every wait pumps the same owner. Cancel, close and EOF revoke authority and
+schedule native cancellation and exact outlet closure independently. Cleanup
+is bounded, retains late acceptance, and reports unknown stop/pending settlement.
+No cleanup path creates fresh authority or marks an aborted task settled.
+
+Keeping research imports would prevent installed deployment; exposing a generic
+ROS driver would exceed the qualified profile. Packaging the existing scoped
+profile preserves the tested numeric predicates while removing those imports.
+Revisit the finite context model when replenishment is actually implemented.
+
+Acceptance requires an installed import without ROS, isolated startup rejection,
+endpoint/EOF and cancellation scheduling checks, and a real installed owner plus
+independent client A→B run with physical observations and exact container removal.
+Moving cancellation/EOF through this installed route require separate physical
+qualification before broader Agent consumption. Packaging alone does not
+complete M6b.
+
+The installed owner and independent public example passed one observed A→B run.
+Final focused cleanup checks and independent implementation review passed.
+The first public host-CLI run with bare DWB launched both processes but B's native controller
+failed its progress check; abort kept authority revoked and settlement pending.
+The explicit heading policy below subsequently completed standalone normal
+reproduction. Keep the earlier failure. Do not hide it
+with a task retry, a longer progress budget or a capture barrier in runtime.
+
+### Native heading policy for the fixed navigation profile
+
+With bare DWB, the first standalone run failed the native progress check: accepted B produced tiny
+translation and alternating low angular commands until the unchanged 10-second
+progress check failed. A diagnostic run with raw odometry/TF completed normally;
+its success does not identify the exact DWB scoring cause or resolve reliability.
+The specific critic/timing cause remains uncertain.
+
+For the fixed differential-drive/NavFn scene, explicitly align to the new path
+before DWB tracking, using the already installed Nav2 1.1.20 Rotation Shim. The
+[upstream versioned description](https://github.com/ros-navigation/navigation2/blob/1.1.20/nav2_rotation_shim_controller/README.md)
+identifies large initial heading changes as a use case. This is a native controller
+policy choice, not an Agent decision or an additional Harness action/worker.
+Use a new profile ID, `scoped-two-context-nav2-shim-v1`, and retain the original DWB
+parameters and all authority, observation, goal, progress and closure limits.
+Rotation is bounded by the existing controller/action waits; the shim's target
+angular velocity is 0.8 rad/s with maximum angular acceleration 3.2 rad/s².
+DWB's original 1.0 rad/s limit remains; 0.8 is not a physical or whole-route limit.
+Native collision simulation is retained. On its normal path, the shim delegates
+within 0.785 rad of the path heading; native collision/TF/path errors can cause
+earlier fallback to DWB, as defined by the
+[versioned implementation](https://github.com/ros-navigation/navigation2/blob/1.1.20/nav2_rotation_shim_controller/src/nav2_rotation_shim_controller.cpp). No dependency or image is added.
+
+A pure profile module holds the ID and the parameter transformation consumed by
+both launcher and owner. The module imports no ROS. Only the installed fixed
+simulation route changes; sealed earlier DWB evidence remains scoped to its old
+profile. Do not copy earlier moving-cancel or input-loss qualifications onto the
+new controller policy.
+
+Alternative: retain bare DWB and collect further scoring traces; this preserves
+the original profile but leaves the known task unable to reproduce consistently.
+Changing critics speculatively or extending progress time would not establish a
+cause. The selected shim makes the intended initial heading behavior explicit;
+it is a scoped policy adaptation, not a claim to fix every DWB failure.
+
+Acceptance requires unchanged safety/observation predicates, actual new-profile
+installation and native plugin load, physical normal A/B plus raw initial B
+rotation-to-translation observations, standalone public CLI completion, exact
+closure/settlement ordering and bounded process cleanup. Explicit heading control
+must be observed on a nearly reversed B path. Without those results, this remains
+an unqualified candidate. The implemented profile passed one independently observed
+physical A/B run and a separate standalone public CLI run. Physical B started
+2.92 rad from its target direction, rotated nearly in place, then translated over
+0.5 m within 5.4 simulated seconds; both native contexts loaded the shim and DWB.
+Original arrival and closure checks passed; A settled/released before B admission,
+and final B remained pending. Separate public motion-time protection evidence is
+described below; it does not establish a native reuse certificate.
+
+### Public motion-time protection qualification
+
+Qualify the installed shim profile using two external fault consumers: explicit
+`NavigationSession.cancel` during B's initial rotation, and SIGKILL of the actual
+connected client during B translation, with no preceding cancel/close and no
+connection retained by its parent. Each first visits/settles A through the public API,
+then submits B with a new issued observation. A separate read-only ROS observer
+triggers the fault only after native B is accepted and actual motion is fresh
+(rotation: angular speed over 0.6 rad/s with translation under 0.02 m/s;
+translation: speed over 0.05 m/s and displacement over 0.5 m).
+
+The external consumer supervisor retains the scene for the observation window;
+it never keeps execution authority alive or delays owner cleanup. An independent
+bounded producer sends nonzero old B commands (linear.x=0.2, angular.z=0) through the fixed smoothed topic after the
+exact B outlet application ACK. External Gazebo snapshots and fresh odometry
+must show a quiet window while the bridge forwards these commands and the drive
+rejects them throughout both snapshots and the complete quiet interval. Existing 0.01 m/0.02 rad drift, 0.01 m/s/0.02 rad/s speed, 10 samples
+over one simulated second, freshness and 0.25-second injection coverage limits
+remain. No observer marker is consumed by the installed owner.
+
+One offline evaluator correlates request/native UUID, B scope/generation, actual
+motion, Core revocation, independent native cancellation request and applied
+outlet seal, command rejection, physical quiet and no extra admission/reopen.
+The host separately removes and checks the exact owned container, recording
+that boundary result. The caller supervisor owns/reaps only its child;
+the product launcher/container boundary owns final native OS release.
+Preserve all failed attempts. Missing observations block qualification; do not
+extend runtime cancellation waits or alter shutdown to obtain a pass.
+
+Abort currently pumps cancellation and outlet closure for two seconds, then
+reports stop unknown and keeps settlement pending. It does not assemble a native
+closure/quiet certificate or permit reuse. External physical evidence cannot
+upgrade that receipt to settled or confirmed stop. Native goal status and worker
+logs may show later facts, but missing native termination remains unknown.
+These probes qualify only the observed isolated live-owner protection path,
+not owner death, lost outlet, a hard stop deadline or arbitrary robotics stacks.
+
+Both finite probes completed with the installed owner and actual independent
+public client processes. B rotation cancel had 33 fresh quiet samples over 3.196
+simulated seconds; B translation EOF had 34 over 3.298 seconds. Fixed nonzero old
+B input reached the bridge and was rejected through each complete physical window.
+Core was revoked before exact native cancellation scheduling; correlated applied
+outlet sealing and external quiet were observed. The installed owner correctly
+retained result/output pending, settlement pending and stop unknown. No production
+wait, cleanup or predicate changed to obtain these results.
+
+
+The bounded navigation owner has an explicit caller idle-wait option:
+`--caller-wait-seconds`, finite and at most 60 seconds. Unconfigured admission
+waits remain 15 seconds and final-close wait remains 10 seconds. A model
+consumer must configure compatible bounded waits; the local 30-second proposal
+consumer uses 45 seconds including public RPC allowance. The owner continues
+polling and handling EOF/cancel; expiry still aborts. This is caller think-time
+configuration, not a larger execution deadline, freshness TTL or physical stop
+budget. [Owner setup](../integrations/ros2/nav2_session/README.md) owns the command.

@@ -101,7 +101,8 @@ simulation profile and standalone host-launcher normal route are locally verifie
 finite cancellation during B rotation and disconnection during B translation
 have local physical protection evidence. Abort still reports stop unknown and
 settlement pending. Installed navigation business-Agent normal consumption has
-[local candidate evidence](TESTING.md#m6b-navigation-business-agent); paired public
-version delivery remains pending.
+[recorded simulation evidence](TESTING.md#m6b-navigation-business-agent); the paired
+public versions and hosted checks are listed under
+[M6b delivery CI coverage](TESTING.md#m6b-delivery-ci-coverage).
 See [the request boundary](RUNTIME_SLICE.md#navigation-request-entry-increment)
 and [validation](TESTING.md#navigation-request-entry).

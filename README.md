@@ -28,22 +28,16 @@ Applications choose goals; robot stacks retain control and device protection.
 
 ## See it move
 
-<p align="center">
-  <a href="https://xiao-yang25.github.io/robot-harness/#demo"><img src="docs/assets/demo/aloha-handoff-poster.png" width="45%" alt="Watch ALOHA transfer and hold in MuJoCo"></a>
-  <a href="https://xiao-yang25.github.io/robot-harness/#navigation-demo"><img src="docs/assets/demo/replace-poster.png" width="45%" alt="Watch TurtleBot3 moving cancellation and handoff in Nav2"></a>
-</p>
+**Observe → decide → act → observe again.** Robot Agent makes three actual model
+proposals to visit A, visit B and assess completion through Harness and Nav2.
 
-**[Manipulation: transfer → hold](https://xiao-yang25.github.io/robot-harness/#demo).**
-ACT supplies 400 transfer steps; Runtime admits a separate 50-step hold in the
-same scene. The complete nine-second clip follows simulation time, omitting
-inference waits. A deterministic caller selects the skills.
+https://github.com/user-attachments/assets/91a164f6-653c-41e2-ae12-b494489ea3b4
 
-**[Navigation: cancel → hand off](https://xiao-yang25.github.io/robot-harness/#navigation-demo).**
-TurtleBot3 moves, A is cancelled, and B starts after A settles. A companion clip
-shows stopping with settlement still pending.
+*Local M6 candidate · Gazebo simulation · 70.9 seconds at original speed.*
+A releases before B starts; B settlement remains pending at the end.
 
-Click a cover to watch. Actual scripted simulations; original recordings and
-same-run evidence are in the [recording notes](docs/assets/demo/README.md).
+[More demos: manipulation, cancellation and handoff](https://xiao-yang25.github.io/robot-harness/#more-demos)
+· [Recording notes and same-run evidence](docs/assets/demo/README.md)
 
 ## Build
 

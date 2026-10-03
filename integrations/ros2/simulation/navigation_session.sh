@@ -5,6 +5,7 @@ mkdir /output/session-started
 mkdir -p "$HOME"
 source /opt/ros/humble/setup.bash
 source /drive/share/m4_drive_probe/local_setup.bash
+source /simulation/navigation_startup.sh
 export PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}"
 export M4_ISOLATED_SIMULATION=1
 export M4_WORK_SCOPE_CASE=normal
@@ -104,12 +105,8 @@ fi
 python3 -m robot_harness_nav2 "${owner_options[@]}" > /output/caller.log 2>&1 &
 owner_pid=$!
 # Readiness only exposes the owner endpoint; it cannot create Core authority.
-until=$((SECONDS+160))
-while [[ ! -f /output/navigation-endpoint.json ]]; do
-  kill -0 "$owner_pid" "$launch_pid" "$bridge_pid"
-  (( SECONDS < until )) || exit 1
-  sleep .1
- done
+wait_navigation_endpoint /output/navigation-endpoint.json 160 \
+  owner "$owner_pid" scene "$launch_pid" bridge "$bridge_pid"
 endpoint=$(python3 -c 'import json; print(json.load(open("/output/navigation-endpoint.json"))["endpoint"])')
 python3 /navigation-example.py "$endpoint" > /output/request-client.log 2>&1 &
 client_pid=$!
@@ -120,7 +117,7 @@ with open('/output/caller.jsonl', 'a') as stream:
     stream.write(json.dumps(dict(event='request_client_exit', returncode=0, steady=time.monotonic()))+'\n')
 PYCLIENT
 wait "$owner_pid"
-kill -0 "$launch_pid" "$bridge_pid"
+navigation_processes_alive scene "$launch_pid" bridge "$bridge_pid"
 python3 - <<'PYSTATUS'
 # Process completion only. Physical/Core qualification is outside the launcher.
 import json

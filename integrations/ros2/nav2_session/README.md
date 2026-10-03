@@ -44,6 +44,16 @@ linux/amd64, no external network. The existing image must contain `/native` and
 `/drive` from the scoped simulation build. This command checks process completion;
 physical task qualification uses a separate external observer/evaluator.
 
+Readiness checks the owner, scene and bridge processes individually, including
+when an endpoint file has just appeared. If any child exits, the supervisor
+reports its role, PID and exit status and enters its existing cleanup path;
+another live child cannot hide the failure until the 160-second endpoint deadline.
+The child logs remain in the result directory. A B-preparation service failure
+also records `context_preparation_failure` in `caller.jsonl`, with the service,
+discovery or response phase, stage budget, elapsed time and native context exit
+status. These diagnostics preserve the original exception and 5-second service /
+70-second context budgets. They locate the failed wait, not its underlying cause.
+
 Within that isolated scene, after sourcing Humble and the custom drive interface
 setup, the owner can also be started directly. Preserve their Python search paths:
 

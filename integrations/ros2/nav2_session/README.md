@@ -59,6 +59,11 @@ launcher's existing exact-container cleanup; a zero exit still establishes only
 process completion. The [business tutorial](https://github.com/xiao-yang25/robot-agent)
 owns task strategy and its declared provider, rather than this launcher.
 
+B context startup first waits for its native action endpoint within the existing
+70-second preparation deadline, then queries lifecycle services with the existing
+RPC budgets. This endpoint alone grants no authority; full readiness, fresh input
+and the sealed motion outlet checks remain required before admission.
+
 Readiness checks the owner, scene and bridge processes individually, including
 when an endpoint file has just appeared. If any child exits, the supervisor
 reports its role, PID and exit status and enters its existing cleanup path;

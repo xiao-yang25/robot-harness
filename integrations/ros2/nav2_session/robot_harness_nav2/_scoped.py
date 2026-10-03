@@ -142,6 +142,13 @@ class ScopedDriver(Observations):
         namespace = self.contexts['B']['namespace']
         self.b_client = ActionClient(self, NavigateToPose, namespace+'/navigate_to_pose')
         ready_until = time.monotonic()+70
+        # Like A readiness, await the startup endpoint before querying lifecycle
+        # services. A process may still be loading when its first RPC is created.
+        self.wait(lambda: self.context_process.poll() is not None or self.b_client.server_is_ready(),
+                  ready_until-time.monotonic())
+        if self.context_process.poll() is not None:
+            raise RuntimeError('B context exited before startup endpoint readiness')
+        emit('context_startup_endpoint_ready', stage='B', scope_id=self.contexts['B']['scope_id'])
         for name in ('bt_navigator', 'planner_server', 'controller_server', 'velocity_smoother'):
             while True:
                 remaining = ready_until-time.monotonic()

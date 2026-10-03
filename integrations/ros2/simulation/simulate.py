@@ -76,7 +76,18 @@ def run_case(args):
                    '--mount', f'type=bind,source={output},target=/output',
                    '-e', 'M4_ISOLATED_SIMULATION=1', '-e', f'M4_FRESH_NAV2_RUN={run_id}',
                    '-e', f'M4_CONTEXT_CASE={args.case}',
-                   '-e', f'M4_VISUAL={int(getattr(args, "visual", False))}', image]
+                   '-e', f'M4_VISUAL={int(getattr(args, "visual", False))}']
+        if getattr(args, 'session', False):
+            prefix = Path(args.python_prefix).expanduser().resolve(strict=True)
+            if not (prefix / 'lib/robot-harness/python/robot_harness_nav2/__main__.py').is_file():
+                raise ValueError('prefix does not contain the installed Nav2 owner')
+            command.extend(['--mount', f'type=bind,source={prefix},target=/installed,readonly',
+                            '--mount', f'type=bind,source={ROOT / "integrations/ros2/simulation"},target=/simulation,readonly',
+                            '--mount', f'type=bind,source={ROOT / "examples/navigation_requests.py"},target=/navigation-example.py,readonly',
+                            '-e', 'M6_NATIVE_ISOLATED=1', '--entrypoint', 'bash'])
+        command.append(image)
+        if getattr(args, 'session', False):
+            command.append('/simulation/navigation_session.sh')
         create_attempted = True
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, timeout=60)
         container = cidfile.read_text().strip()
@@ -86,7 +97,7 @@ def run_case(args):
         with (output / 'container.log').open('w') as log:
             attached = subprocess.Popen(['docker', 'start', '--attach', container],
                                         stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + 330
+            deadline = time.monotonic() + (420 if getattr(args, 'session', False) else 330)
             while attached.poll() is None and not interrupted and time.monotonic() < deadline:
                 time.sleep(0.2)
             if interrupted:
@@ -172,7 +183,15 @@ def main():
     run.add_argument('--image')
     run.add_argument('--visual', action='store_true', help='capture actual RViz frames')
     run.add_argument('--output', required=True, help='new directory; existing paths are rejected')
+    session = commands.add_parser('session', help='run the installed bounded Nav2 owner and independent A/B example')
+    session.add_argument('--python-prefix', required=True, help='Linux install prefix with optional Python bridge')
+    session.add_argument('--image', required=True, help='qualified local scoped Humble/Nav2 image')
+    session.add_argument('--output', required=True, help='new result directory')
     args = parser.parse_args()
+    args.session = args.command == 'session'
+    if args.session:
+        args.case = 'installed-nav2-session'
+        args.visual = False
     args.image = args.image or (VISUAL_IMAGE if args.visual else IMAGE)
     if args.command == 'build':
         command = ['docker', 'build', '--platform', 'linux/amd64',

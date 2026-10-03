@@ -1,5 +1,13 @@
 # Runnable examples
 
+For a prepared local navigation owner, see the
+[navigation request client](navigation_requests.py) and
+[API requirements](../docs/API.md#navigation-requests-to-a-prepared-owner).
+It needs the optional Python install and an owner-provided Unix endpoint;
+it does not launch ROS or provide a turnkey navigation environment.
+The example uses registered A/B, waits for A settlement before B and prints B's
+pending receipt without claiming further reuse.
+
 For an architecture or backend-integration reading path, use the
 [documentation entry](../docs/README.md).
 
@@ -146,3 +154,10 @@ live, polled Owner; it is not durable task recovery or an installed recovery API
   A timeout is not proof of cleanup or permission to retry work.
 - Compiler/SDK mismatch on macOS: follow [SDK selection](../docs/TESTING.md#macos-sdk-selection)
   and use a fresh build directory for the corrected toolchain.
+
+The navigation caller can use the optional [installed bounded owner](../integrations/ros2/nav2_session/README.md).
+Its launcher runs the example as a separate process in the isolated simulation;
+the fixed heading profile completed this normal launcher route locally. Moving
+cancel/EOF have finite local protection evidence for B rotation/translation;
+installed business-Agent normal consumption also has local candidate evidence.
+Broader task behavior and public version pairing still require further qualification.

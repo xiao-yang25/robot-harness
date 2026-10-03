@@ -273,3 +273,12 @@ See [third-party notices](THIRD_PARTY_NOTICES.md) for the derived drive source;
 these BSD notices remain separate from the project's
 [MIT OR Apache-2.0 declaration](../../../README.md#license). New image builds
 include the project declaration and both license texts in `/source`.
+
+## Installed navigation Session example
+
+The optional [bounded Nav2 owner](../nav2_session/README.md) adds a `session`
+command to this launcher. It mounts a Linux install prefix and current product
+simulation source, then starts the owner and the independent public A/B example.
+It checks process completion, while physical task evaluation remains external.
+The fixed heading profile completed standalone normal reproduction locally; see the owner README
+and [Testing](../../../docs/TESTING.md#navigation-request-entry) for current limits.

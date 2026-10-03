@@ -1847,3 +1847,362 @@ consumers and continuous-backend import also verify package consumption.
 Independent review of the repaired patch and its final normal/cancellation evidence
 concluded APPROVE. This qualification is local and uncommitted; hosted CI/mainline
 delivery, the business Agent and Linux/model/render support remain separate.
+
+## Native identity bridge support
+
+The private Python bridge accepts a trusted owner's explicit native identity while
+retaining the legacy three-argument episode identity. Seven focused checks use the
+real compiled C++ Core: legacy completion, explicit identity retention and wrong
+identity refusal, pending acceptance, late acceptance/cancellation and late success
+after revocation, old-operation isolation, text validation, and owner-thread refusal.
+Acceptance or a terminal event does not itself settle an operation; a late success
+cannot publish a revoked result.
+
+Local macOS ARM64/Python3.12 checks pass: the ordinary Session suite plus the seven
+checks (30 total), 15 lightweight MuJoCo backend checks and the existing MCP suite.
+These are bridge/consumer regressions, without a new model, renderer, navigation
+Session or robot stop qualification. The Ubuntu workflow already discovers Python
+tests in `bindings/python/tests`; no job change is needed for these new checks.
+Hosted CI and installed navigation consumption have not run for this increment.
+
+## Shared execution coordinator extraction
+
+The private `robot_harness._execution.ExecutionCoordinator` is now consumed by
+the existing Host. Seven focused tests use the real compiled Core to check
+retained/refused requests, replay/conflict/capacity, pending native facts, explicit
+settlement and later driver release, old cancellation, late acceptance after
+revocation, expiry during publication and required output disposition. Native
+completion, output and settlement remain distinct; an unknown business verdict
+does not waive Core's result-disposition requirements.
+
+Local macOS ARM64/Python3.12 checks pass: 37 Session/Core tests, 15 lightweight
+MuJoCo backend tests, 15 MCP tests, and a relocated installed-package consumer
+performing two tasks and reading the first retained receipt. Existing Session
+signatures, profiles and prior test assertions are preserved. The installed
+package includes the new private module. The existing Ubuntu discovery and install
+consumer commands cover it without a new CI job; hosted CI has not run.
+
+These checks validate the extraction with the existing Host, without a new model
+or renderer run. Independent implementation review approved the extraction and
+reran the seven focused coordinator checks. At that extraction checkpoint, actual navigation driver consumption, heterogeneous ALOHA/Nav2
+reuse, navigation-Agent behavior and the new physical closure profile remain
+unqualified. See [the extraction boundary](RUNTIME_SLICE.md#first-binding-increment-and-shared-coordinator-extraction).
+
+## Scoped navigation research consumption
+
+The private bridge now accepts an optional settlement scope, preserving its
+six-argument constructor and episode default. Three additional real-Core tests
+verify actual scoped settlement, unresolved-native refusal and configuration
+validation. Local macOS ARM64/Python3.12 checks pass: 40 Session/Core tests,
+15 lightweight backend tests and 15 MCP tests. The existing Ubuntu test discovery
+includes the new scope tests; hosted CI has not run for this uncommitted increment.
+
+A bounded, deterministic Humble/Nav2 research driver consumes the compiled C++
+Core and the same private coordinator used by the existing Host. Six real-Core
+transport checks and three evaluator checks pass. Three further checks execute
+actual driver methods under the existing Linux/ROS environment with synthetic
+edges: expiry during reservation blocks submission, native cancellation errors
+do not block outlet-close requests, and readiness lost during recording prevents
+settlement. These are boundary tests, not physical cancellation qualifications.
+
+The normal Linux/amd64 simulation used the existing image without network,
+2 CPUs and 4 GiB. It passed in 55.293 seconds: independently observed target errors
+were 0.214737 m at A and 0.154156 m at B. Actual native/child/BT closure, manager
+PAUSE, matching outlet acknowledgement and fresh quiet observations preceded
+closure publication. A rechecked B readiness before settling and releasing;
+B finished and closed with its Core settlement pending because no C context
+was prepared. A retained old cancellation left B unchanged. The container exited
+successfully without OOM and was removed.
+
+The preceding run failed when B's native planner acknowledgement timed out;
+its failed/pending/unknown diagnostics are retained. The successful run does not
+establish that root cause was fixed. The evaluator's linkage checks were tightened
+during the successful run; the initial evaluation was retained and the final
+evaluator checked that same new evidence once. The final post-readiness-log guard
+was added afterward and verified by the actual-driver boundary test, without
+repeating the complete physical run. Independent review approved this limited
+research path and independently checked its receipts and ordering.
+
+This is neither an installed public navigation Session nor a live business Agent.
+Real ALOHA/Nav2 business consumption, externally routable navigation cancellation,
+general late-future qualification, installation/CI combinations and hardware
+remain separate work. The coordinator and C++ Core behavior were not changed.
+
+## Navigation request entry
+
+The optional Python package installs the new public `NavigationSession` client
+and trusted-owner `NavigationRequests` support. The client uses the existing
+bounded local framing and connects to an already prepared Unix endpoint; it
+does not launch ROS or own the owner process. The helper borrows the shared
+coordinator and never supplies native/physical settlement facts itself.
+
+Nine additional checks pass with the compiled real Core or actual Unix transport:
+registered-site requests, advancing observations, retained replay/conflicting ID,
+expired/foreign/changed-epoch/invalid-issued references, delay inside a context
+callback, active pending/busy/capacity refusal, old cancellation, failed stop
+scheduling and repeated shutdown, timeout/late RPC correlation, EOF and client
+cleanup. Final macOS ARM64/Python3.12 totals are 49 Session/Core tests, 15 lightweight
+backend tests and 15 MCP tests. The first transport attempt hit the local sandbox's
+Unix bind restriction; the final suite ran with the required local socket permission,
+without skipping tests. Existing Ubuntu discovery includes the new tests; hosted
+CI has not run for this uncommitted increment.
+
+Linux/amd64/Python3.10 build and install succeeded in the existing offline Humble
+image. A separate client process imported only the public request API from the
+installed prefix, outside the source tree; the owner continued servicing requests
+and progressing native/Core work. Its final normal run passed in 55.545 seconds,
+2 CPUs/4 GiB, without OOM. Independent target errors were 0.241817 m and 0.140541 m.
+The single evaluator checked physical/native closure, A settlement before B
+admission, public observation/request/native identity association, request replay,
+old cancellation, retained A receipt and B's pending settlement. The client exited
+with code0 and the owned container was removed. Close afterward revoked B and
+kept settlement pending; connection cleanup was not called physical closure.
+
+The first startup attempt failed at socket chmod in Docker Desktop's shared output
+directory, before any native goal. The endpoint was moved into an owner-created
+private directory on the container filesystem, with socket mode0600. Failed logs
+were preserved. The directory is released after client reaping and socket closure.
+Two checks execute final actual owner RPC/abort methods with real Core and synthetic
+ROS edges: EOF and close revoke and schedule the matching native UUID and exact
+scope/generation outlet request, retain pending and report unknown. These confirm
+request scheduling, not physical stop after disconnect or motion-time cancellation.
+
+Independent design and final implementation review approved this limited slice.
+The bounded installed owner is available as described below. The new heading profile
+completed standalone normal reproduction. New request-path physical qualifications, live navigation
+Agent, installed two-business-task consumption and hosted CI remain pending. No new dependency, image, model call, hardware action or Agent pin was added.
+
+
+### Installed bounded Nav2 owner checks
+
+The optional [owner package](../integrations/ros2/nav2_session/README.md) installs
+with the Python bridge. Final macOS ARM64/Python3.12 regression: 56 tests, including
+private endpoint modes, batched replies, EOF, malformed RPC, partial socket startup,
+and package/startup isolation checks without ROS. Existing Ubuntu test discovery
+includes the endpoint/package additions and two native profile checks. The host launcher has 12 focused checks; its Session
+case verifies separate readonly source/prefix/example mounts. No hosted CI run is
+claimed for this uncommitted increment.
+
+Linux/amd64/Python3.10 build/install succeeded in the retained Humble image. Ten
+checks exercise installed actual driver methods with real Core and synthetic ROS
+edges: dispatch and settlement rechecks, independent native/outlet scheduling,
+late acceptance after outlet failure, logging failure cleanup, idle close, partial
+resource cleanup, B preparation failure with an actual OS child reaped, and
+actual endpoint close/EOF revocation plus exact native/outlet scheduling. These
+are not physical cancellation/EOF stop evidence. The first check invocation
+incorrectly replaced the sourced ROS Python path; preserving that path fixed the
+invocation without changing predicates. Nine existing research checks also passed.
+Unchanged lightweight backend/MCP checks retain their preceding 15/15 evidence.
+
+A real installed owner plus independent public example passed normal A→B in
+62.412 seconds, 2 CPU/4 GiB, no OOM. External target errors were 0.243104 m and
+0.198024 m. One evaluator checked native/physical closure, request/reference/native
+identity association, A settled/released before B admission and B pending. The
+runtime consumed no evaluator capture markers. The research supervisor supplied
+only bounded container ownership and a separate external observer. Both client
+and container exited 0, and the owned container was removed. An earlier attempt
+failed before startup when Docker tried creating a child file mount in a readonly
+parent mount; the example now mounts at a separate root path. Failed logs remain.
+
+The separate public `simulate.py session` invocation started the same installed
+owner and independent example without research mounts. A settled successfully;
+B was accepted and the bridge produced nonzero commands, but Nav2's controller
+reported `Failed to make progress` under its original 10-second progress check.
+Native outcome was failed; output stayed pending, abort revoked authority and
+kept stop unknown/settlement pending. Container exit1/no OOM and removal were
+observed. The exact controller cause is unresolved. This old-profile run was a
+normal-reproduction failure, not a successful CLI qualification or proof
+that the earlier planner-ack failures share a cause. Do not silently retry tasks
+or widen Nav2 limits to make this evidence pass.
+
+The current installed profile is `scoped-two-context-nav2-shim-v1`: native Nav2
+1.1.20 Rotation Shim wraps unchanged DWB. No dependency or image was added.
+The original progress (0.5 m/10 s), goal, observation, quiet and closure gates
+remain. Shim desired angular speed 0.8 rad/s is not a whole-route physical cap;
+native fallback can delegate early. This is explicit heading policy, not a proven
+root-cause fix. A read-only observer run of the old profile also passed; observer
+timing effects and exact DWB/smoother/input causes remain unresolved.
+
+The new profile's installed physical normal run passed in 61.748 seconds under
+the same 2 CPU/4 GiB budget. A/B target errors were 0.236923/0.173668 m. B's initial
+heading error was 2.919885 rad, nearly stationary rotation was observed, and
+translation exceeded 0.5 m after 5.4 simulated seconds. Native logs show actual
+shim and DWB load in both contexts; one evaluator checked the original physical
+and Core predicates plus this initial motion. A released/settled before B
+admission; B remained pending. Client/container exited 0, no OOM, container removed.
+
+A separate public `simulate.py session` run with that installed candidate,
+without research mounts or an observer, completed in about 61.4 seconds: exit0,
+no OOM and exact container removal. Its verification checks process completion,
+not independent physical arrival or stop. Failed and diagnostic old-profile
+evidence is preserved; no automatic task retry or progress-budget extension was used.
+
+Independent implementation review approved this fixed normal heading profile,
+including versioned native semantics and raw runtime/installed-source evidence.
+Separate finite public moving cancel/EOF evidence follows below; next consume
+actual ALOHA/navigation business tasks. General ROS, hardware, owner restart,
+context replenishment and hard stop limits remain outside this profile.
+
+### Public motion-time protection checks
+
+Two external public-API consumers used the same installed shim-profile owner:
+each settled/released A before submitting B. Public cancel was issued during B
+rotation (0.623704 rad/s, 0.001036 m/s); abrupt EOF used SIGKILL of the actual
+connected child during B translation (0.259627 m/s, 0.513473 m displacement from
+B's initial position, child return code -9). The parent held no socket. The
+cancel child kept its connection open through the external physical window,
+so EOF/close did not substitute for the explicit cancel trigger.
+
+Both showed actual current Core revocation before exact retained native UUID
+cancellation scheduling, matching B scope/generation applied outlet sealing,
+and no further admission or reopening. A separate bounded producer then sent
+nonzero old B smoothed commands through the existing fixed bridge. Sustained
+injection, forwarding and drive rejection each covered both Gazebo snapshots
+and the whole fresh quiet interval, with the original 0.25-second coverage gap.
+
+Cancellation: 33 quiet samples/3.196 simulated seconds, 84 injected/84 forwarded/
+106 rejected commands; external drift 0.000003162 m and yaw change 0.000087 rad.
+EOF: 34 samples/3.298 simulated seconds, 87 injected/87 forwarded/109 rejected;
+drift 0.000053935 m and yaw change 0.00208 rad. Original 0.01 m/0.02 rad drift,
+0.01 m/s/0.02 rad/s speed, at least 10 samples/one simulated second and fresh
+observation predicates were retained. These were fixed observation intervals,
+not quiet intervals selected after looking at the data.
+
+Runtime/container completion was exit0/no OOM in 47.305/50.131 seconds under
+the same 2 CPU/4 GiB isolated Linux budget. Both initial offline readers stopped
+on mixed JSON/ROS stderr, before semantic evaluation; failure records remain.
+The final reader strictly parses JSON records and retains optional diagnostic
+text without treating it as coverage. Each recorded run then had its first
+complete semantic evaluation, without a physical rerun or repeated full adjudication.
+Four focused anti-vacuity checks passed. The host independently removed and
+checked each exact container. Independent final review approved this finite scope.
+
+The owner kept result/output pending, settlement pending and stop unknown.
+The configured native callback tail was still running after the two-second abort
+report; later worker-return facts do not constitute a complete native closure
+certificate. External quiet does not upgrade the receipt to confirmed stop or
+permit reuse. Product runtime code, API, waits and cleanup were unchanged in this
+increment; prior 56/10/12 checks retain their earlier scope, not a new run here.
+No new image, dependency, model call, hardware action or hosted CI was added.
+The consumer parent preserved the scene while the owner independently aborted:
+this qualifies a live-owner fault path, not direct launcher teardown, owner death,
+outlet failure, a hard stop bound or an arbitrary robot installation.
+
+
+<a id="m6b-shared-consumers"></a>
+## Current candidate: installed ALOHA and navigation consumption
+
+The current local Harness candidate preserves the existing installed Agent's
+public `Session` / `HandoffTask` consumption. A Linux ARM64/Python 3.12.14 run
+used the retained pinned ACT environment, CPU and OSMesa under 6 CPU/6 GiB,
+network disabled and a 240-second experiment budget. It completed in 38.824
+seconds: observations 0/400/450 in epoch0, distinct transfer400/hold50 operations,
+accepted output and settled/released receipts. All 451 frames decoded at 640×480;
+the final control target remained fixed for the 50 hold steps. The sampled caller,
+owner, worker and recorder exited, with no matching process identities remaining.
+This is finite observed cleanup, not a hard stop guarantee or complete transient
+process census.
+
+The installed Agent used deterministic proposals and its real default ACT worker.
+The existing fixed evaluator ran once after closure and reported a one-second
+hold success: maximum relative translation 0.0254mm, rotation 0.346 degrees and
+minimum table clearance 0.2799m. Agent/Core `task_verdict` remained `unassessed`.
+No live visual-model request was made; earlier visual qualification retains its
+original version.
+
+The retained [installed navigation normal run](#installed-bounded-nav2-owner-checks) uses the
+same current shared coordinator source, compiled separately for Linux amd64 /
+Python 3.10. Direct comparison of 18 installed modules in both prefixes matched
+current source. This increment did not alter runtime code and reused navigation's
+existing evaluation, without re-adjudicating it. Navigation A settled before B
+admission; B output was accepted but settlement remained pending without a next
+context. Separate profile-specific native closure conditions remain necessary.
+
+Fresh ARM64 checks passed 56 Session/Core, 41 Agent and three installed combination
+cases. The latter use no-physics providers and do not replace the actual ACT run.
+Four bounded experiment containers and the read-only preflight were removed;
+retained images, models and useful candidate build/install evidence remain.
+No new image, dependency, model download, hardware action or hosted CI run was added.
+A fresh independent read-only review checked installed equivalence and focused
+raw receipt/ownership facts, approving this finite scope. It did not rerun the
+physical evaluator or inherit other qualifications.
+This is local candidate compatibility, not a released combination: the Agent
+manifest still pins `0de9eb0`. Subsequent navigation Agent normal consumption is
+recorded below; public paired delivery remains pending.
+
+
+<a id="m6b-navigation-business-agent"></a>
+## Installed navigation business Agent normal consumption
+
+A fresh installed Agent candidate consumed this same qualified Nav2 owner/client
+through the public `NavigationSession`. The application owns its A→B goal, bounded
+proposals and waiting; Harness owns native execution/Core/outlet closure. Three
+actual host Codex text proposals used only public map feedback, with tools disabled.
+Original proposal references were retained, then fresh references revalidated at
+submission; the owner still enforced its one-second admission reference lifetime.
+No simulator ground truth or physical evaluator output drove the application.
+
+The final isolated Ubuntu22.04/Humble amd64 run completed in 87.722 seconds under
+2 CPU/4 GiB, network disabled and a 420-second host budget. The single independent
+physical evaluator confirmed A/B distances 0.205273/0.173651m. A was settled and
+released before B admission. B output was accepted but settlement remained pending;
+local connection close and native abort did not fabricate release. The Agent kept
+its task verdict unassessed and native cleanup unknown. All three proposal children
+and the host model server exited/reaped; the container exited0/no OOM and was removed.
+
+The first run's initial model proposal exceeded30 seconds before any admission;
+its failed logs and unknown close outcome are retained. A same-input/same-budget
+proxy-path diagnostic returned in 8.945 seconds without submitting a robot task,
+then a new isolated task passed. The exact original timeout cause remains unknown.
+There was no change to Core, owner/controller policy, freshness gates or native waits.
+The host proposal relay is research setup, not a product remote-provider interface.
+
+Final Agent checks passed 56 on macOS and installed Linux ARM64, plus three installed
+ALOHA combination cases. New navigation checks enter the existing Agent test discovery
+and CLI-help CI step; hosted CI has not run for this uncommitted candidate. No new
+image, dependency, model download or hardware qualification was added. This normal
+case does not qualify model errors during real motion, general navigation/obstacles,
+owner loss or hard stop/resource limits. Public pairing still needs delivery; the
+Agent manifest remains on its previously published ALOHA dependency.
+
+### Caller budget compatibility and recorded model consumption
+
+A new recording exposed a genuine caller/owner budget mismatch: after B, the
+owner's default 10-second final-close wait expired while a roughly10.03-second
+proposal returned under the application's unchanged 30-second limit. The report
+remained needs-help with unknown operation outcome/native cleanup after connection
+reset; the local connection closed. No successful video was
+published from that failed run. The owner now accepts explicit finite caller
+idle waits in `(0, 60]`, keeping the default15/10-second behavior. Four regression
+checks cover defaults, final12-second failure under the old default and success
+under explicit45, expiry above45 with abort, and invalid values before ROS startup.
+The new Linux installed candidate passed60 Python/Core checks and10 focused owner
+checks;12 launcher checks also passed. Existing discovery includes the new tests;
+these uncommitted changes have no fresh hosted CI result.
+
+A separate recorded run configured45 seconds of caller idle wait, retained the
+30-second proposal budget and existing native deadlines, freshness and physical
+predicates, and completed in107.642 seconds.
+Three actual Codex/GPT text proposals visited A, visited B and assessed completion.
+The same-run evaluator ran once, observing A/B distances0.192253/0.166768m; A
+settled/released before B, final B accepted/pending. Agent task verdict stayed
+unassessed and native cleanup unknown. Recorder completed cleanly, all three
+proposal children/model server exited and were reaped, and the exact scene
+container was removed without OOM. The 70.9-second same-run recording
+retains model waits and original speed; trim/crop/captions/final hold are declared.
+It demonstrates one normal loop, not broader model reliability or hardware safety.
+
+
+## M6b delivery CI coverage
+
+The Core workflow's existing `python_session` discovery includes the shared
+coordinator, native identity, navigation requests, local endpoint and caller-budget
+regressions. Lightweight MuJoCo and MCP checks, relocated Session/MCP consumers
+and Core ordinary/sanitizer/installed checks retain their existing entries.
+The Humble workflow now also builds and installs the optional Python bridge,
+relocates its prefix, then runs the installed Nav2 owner CLI help and ten focused
+owner checks outside the source directory. It preserves sourced ROS/interface
+Python paths. The checks exercise real Core and owner methods with synthetic ROS
+edges; they do not run Gazebo, models or certify physical stop. Existing Humble
+observation and simulation-launcher checks remain. Hosted results must be tied
+to the delivered revision; prior local qualifications do not establish a new CI pass.

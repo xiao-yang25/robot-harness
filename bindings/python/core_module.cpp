@@ -30,12 +30,14 @@ constexpr const char* kSettlementScope = "python-episode-lane";
 struct GateState {
   GateState(rh::AuthorityGateConfig config, std::string profile, std::uint64_t maximum)
       : binding(config.binding), capability(config.capability_id), profile(std::move(profile)),
-        maximum_units(maximum), gate(std::move(config)), owner_thread(PyThread_get_thread_ident()) {
+        settlement_scope(config.settlement_scope), maximum_units(maximum), gate(std::move(config)),
+        owner_thread(PyThread_get_thread_ident()) {
   }
 
   rh::BindingIdentity binding;
   std::string capability;
   std::string profile;
+  std::string settlement_scope;
   std::uint64_t maximum_units;
   rh::AuthorityGate gate;
   unsigned long owner_thread;
@@ -388,10 +390,12 @@ int gate_init(GateObject* self, PyObject* args, PyObject* kwargs) noexcept {
     PyObject* profile;
     PyObject* maximum;
     PyObject* now;
-    static const char* keywords[] = {"provider",      "domain", "capability", "profile",
-                                     "maximum_units", "now",    nullptr};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOOOOO:Gate", const_cast<char**>(keywords),
-                                     &provider, &domain, &capability, &profile, &maximum, &now)) {
+    PyObject* scope = nullptr;
+    static const char* keywords[] = {"provider",      "domain", "capability",       "profile",
+                                     "maximum_units", "now",    "settlement_scope", nullptr};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOOOOO|O:Gate", const_cast<char**>(keywords),
+                                     &provider, &domain, &capability, &profile, &maximum, &now,
+                                     &scope)) {
       return -1;
     }
     rh::AuthorityGateConfig config;
@@ -411,6 +415,9 @@ int gate_init(GateObject* self, PyObject* args, PyObject* kwargs) noexcept {
     config.native_evidence_source = kNativeSource;
     config.settlement_evidence_source = kSettlementSource;
     config.settlement_scope = kSettlementScope;
+    if (scope && !text_value(scope, config.settlement_scope)) {
+      return -1;
+    }
     config.execution_capability_observer = kCapabilitySource;
     self->state = new GateState(std::move(config), std::move(profile_text), maximum_units);
     return 0;
@@ -556,7 +563,7 @@ PyObject* gate_non_submission(GateObject* self, PyObject* args) {
 PyObject* gate_settle(GateObject* self, PyObject* args) {
   return operation_time(self, args, [](GateState& state, std::uint64_t now) {
     return PyUnicode_FromString(name(state.gate.observe_settlement(
-        {*state.authority, kSettlementScope, true, state.record(kSettlementSource, now)})));
+        {*state.authority, state.settlement_scope, true, state.record(kSettlementSource, now)})));
   });
 }
 
@@ -595,13 +602,26 @@ PyObject* gate_supports(GateObject* self, PyObject* args) {
 }
 
 PyObject* gate_native(GateObject* self, PyObject* args) {
-  return boundary(self, args, 3, [&](GateState& state) -> PyObject* {
+  const auto count = PyTuple_GET_SIZE(args);
+  if (count != 3 && count != 4) {
+    PyErr_SetString(PyExc_TypeError, "expected 3 or 4 positional arguments");
+    return nullptr;
+  }
+  return boundary(self, args, count, [&](GateState& state) -> PyObject* {
     std::string kind;
+    std::string native_identity;
     std::uint64_t now;
     if (!operation_value(state, PyTuple_GET_ITEM(args, 0)) ||
         !text_value(PyTuple_GET_ITEM(args, 1), kind) ||
         !unsigned_value(PyTuple_GET_ITEM(args, 2), now)) {
       return nullptr;
+    }
+    if (count == 4) {
+      if (!text_value(PyTuple_GET_ITEM(args, 3), native_identity)) {
+        return nullptr;
+      }
+    } else {
+      native_identity = "episode-" + std::to_string(state.authority->operation_id);
     }
     rh::NativeEventKind event;
     if (kind == "accepted") {
@@ -621,8 +641,7 @@ PyObject* gate_native(GateObject* self, PyObject* args) {
       return nullptr;
     }
     return PyUnicode_FromString(name(state.gate.observe_native(
-        {*state.authority, "episode-" + std::to_string(state.authority->operation_id), event,
-         state.record(kNativeSource, now)})));
+        {*state.authority, native_identity, event, state.record(kNativeSource, now)})));
   });
 }
 

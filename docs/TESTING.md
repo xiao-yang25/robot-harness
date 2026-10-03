@@ -2232,6 +2232,11 @@ to the delivered revision; prior local qualifications do not establish a new CI 
 
 ## Final proposal cancellation candidate
 
+This section records the pre-delivery validation. The fix is delivered in
+Harness `ea7b1eb`, paired by Agent `ffad065`; the
+[published recording](assets/demo/README.md#final-proposal-expiry) preserves that
+run's scope. Later delivery does not repeat its physics qualification.
+
 Native A/B completion leaves final B pending in Core. The local owner candidate
 routes explicit cancellation at that point through client shutdown, preserving
 accepted native output and pending settlement. Completed normal close retains its
@@ -2260,7 +2265,7 @@ macOS and three new Linux proposal checks used the prior manifest pin; the real
 simulation used this matching owner fix. These are pre-delivery local results;
 paired delivery requires a fixed Agent dependency and installed verification
 against the delivered Harness revision. Hosted results belong to the exact commit
-in Actions. The local same-run video is unpublished. Controlled
+in Actions. The same-run video was subsequently published as linked above. Controlled
 proposal faults and a live owner do not establish real model faults, Owner restart,
 complete native cleanup, hard stop or hardware safety.
 
@@ -2286,3 +2291,29 @@ It preserves the original exception. In particular, a GetState response timeout
 is not treated as a retry or proof that its underlying cause has been fixed.
 The existing Humble workflow discovers both new supervisor tests and owner
 checks; a specific hosted result is required before delivery is marked passed.
+
+## M6c delivery audit
+
+The selected public-CLI interruption and proposal-failure paths have recorded
+live-owner simulation evidence. The matching final-cancellation fix is delivered
+in `ea7b1eb`, paired by Agent `ffad065`. Same-strategy native normal/late-proposal
+comparisons and a fresh fixed-public-source Linux build/install normal run were
+subsequently completed in research. The fresh consumer used new Core/Agent
+install directories in the existing Humble image, rather than rebuilding that
+entire image. These runs preserve pending settlement, unknown cleanup and the
+independent evaluator's role; they do not establish a performance advantage.
+
+Startup diagnostics are separately delivered in `03a357b`. Its mainline Humble
+checks passed all 14 owner and 44 launcher/diagnostic cases, alongside Core/Python,
+installed old-Agent compatibility and documentation build/deployment. This does
+not move Agent's immutable `ea7b1eb` dependency or migrate recorded qualification.
+GetState preparation-timeout cause remains unresolved.
+
+One usable-delivery gap remains: the public `simulate.py session` command launches
+its deterministic request example, while the business Agent's connection recipe
+requires a prepared owner and proposal executable in that same isolated container.
+The complete business reproduction still used research-only launcher/observation
+tools. A public setup/run/report-check tutorial must connect these existing
+components before the M6 delivery scope can close. A launcher completion marker
+is not a physical task verdict. No general evaluator API, remote model protocol,
+Owner recovery, hard-stop guarantee or hardware support is implied.

@@ -1895,7 +1895,8 @@ six-argument constructor and episode default. Three additional real-Core tests
 verify actual scoped settlement, unresolved-native refusal and configuration
 validation. Local macOS ARM64/Python3.12 checks pass: 40 Session/Core tests,
 15 lightweight backend tests and 15 MCP tests. The existing Ubuntu test discovery
-includes the new scope tests; hosted CI has not run for this uncommitted increment.
+includes the new scope tests. These local checks preceded the hosted
+[delivery checks](#m6b-delivery-ci-coverage).
 
 A bounded, deterministic Humble/Nav2 research driver consumes the compiled C++
 Core and the same private coordinator used by the existing Host. Six real-Core
@@ -1944,8 +1945,8 @@ scheduling and repeated shutdown, timeout/late RPC correlation, EOF and client
 cleanup. Final macOS ARM64/Python3.12 totals are 49 Session/Core tests, 15 lightweight
 backend tests and 15 MCP tests. The first transport attempt hit the local sandbox's
 Unix bind restriction; the final suite ran with the required local socket permission,
-without skipping tests. Existing Ubuntu discovery includes the new tests; hosted
-CI has not run for this uncommitted increment.
+without skipping tests. Existing Ubuntu discovery includes the new tests; these
+local checks preceded the hosted [delivery checks](#m6b-delivery-ci-coverage).
 
 Linux/amd64/Python3.10 build and install succeeded in the existing offline Humble
 image. A separate client process imported only the public request API from the
@@ -1980,8 +1981,8 @@ with the Python bridge. Final macOS ARM64/Python3.12 regression: 56 tests, inclu
 private endpoint modes, batched replies, EOF, malformed RPC, partial socket startup,
 and package/startup isolation checks without ROS. Existing Ubuntu test discovery
 includes the endpoint/package additions and two native profile checks. The host launcher has 12 focused checks; its Session
-case verifies separate readonly source/prefix/example mounts. No hosted CI run is
-claimed for this uncommitted increment.
+case verifies separate readonly source/prefix/example mounts. This records local
+qualification before the hosted [delivery checks](#m6b-delivery-ci-coverage).
 
 Linux/amd64/Python3.10 build/install succeeded in the retained Humble image. Ten
 checks exercise installed actual driver methods with real Core and synthetic ROS

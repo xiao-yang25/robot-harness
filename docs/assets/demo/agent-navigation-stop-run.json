@@ -1,0 +1,37 @@
+{
+  "recorded_date": "2026-10-03",
+  "recorded_qualification": "Harness 6f32578 / Agent runtime 9516daf; controlled proposals and one SIGINT during B motion",
+  "profile": "scoped-two-context-nav2-shim-v1",
+  "controlled_proposals": true,
+  "container_exit_code": 0,
+  "container_removed": true,
+  "oom_killed": false,
+  "single_same_run_evaluation": {
+    "result": "passed",
+    "case": "agent-sigint-moving",
+    "profile": "scoped-two-context-nav2-shim-v1",
+    "physical_drift_m": 8.302409288874772e-05,
+    "physical_yaw_change_rad": 0.00246999999999975,
+    "quiet_samples": 36,
+    "quiet_sim_seconds": 3.5020000000000024,
+    "post_seal_injected": 86,
+    "post_seal_forwarded": 86,
+    "post_seal_rejected": 110,
+    "agent_status": "cancelled",
+    "proposal_count": 2,
+    "stop": "unknown",
+    "settlement": "pending",
+    "scope": "installed public business CLI SIGINT during B motion, synthetic proposals; live owner, no native reuse/hard stop/hardware qualification"
+  },
+  "video_seconds": 30.9,
+  "video_timing": "original speed; startup/view trimmed, approximate event captions, final hold; not a physical timing instrument",
+  "delivery_pair": {
+    "harness": "ea7b1eb1a075cd91ef590475f2496a48d19ca52a",
+    "agent": "ffad065ae81ca9e9b17cba558d471078d657a9b2"
+  },
+  "limits": [
+    "recorded run scope only; delivery does not repeat physical qualification",
+    "live owner; no real model fault, full native cleanup, hard stop or hardware qualification"
+  ],
+  "launcher_wall_seconds": 68.791415709
+}

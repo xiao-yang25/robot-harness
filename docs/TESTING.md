@@ -2090,9 +2090,9 @@ outlet failure, a hard stop bound or an arbitrary robot installation.
 
 
 <a id="m6b-shared-consumers"></a>
-## Current candidate: installed ALOHA and navigation consumption
+## Recorded local qualification: installed ALOHA and navigation consumption
 
-The current local Harness candidate preserves the existing installed Agent's
+The recorded local Harness candidate preserved the existing installed Agent's
 public `Session` / `HandoffTask` consumption. A Linux ARM64/Python 3.12.14 run
 used the retained pinned ACT environment, CPU and OSMesa under 6 CPU/6 GiB,
 network disabled and a 240-second experiment budget. It completed in 38.824
@@ -2126,9 +2126,10 @@ No new image, dependency, model download, hardware action or hosted CI run was a
 A fresh independent read-only review checked installed equivalence and focused
 raw receipt/ownership facts, approving this finite scope. It did not rerun the
 physical evaluator or inherit other qualifications.
-This is local candidate compatibility, not a released combination: the Agent
-manifest still pins `0de9eb0`. Subsequent navigation Agent normal consumption is
-recorded below; public paired delivery remains pending.
+This run established local candidate compatibility. At that time, the published
+Agent manifest still pinned `0de9eb0`. Subsequent navigation Agent consumption is
+recorded below; the later delivered pair and hosted checks are listed under
+[M6b delivery CI coverage](#m6b-delivery-ci-coverage).
 
 
 <a id="m6b-navigation-business-agent"></a>
@@ -2158,12 +2159,12 @@ There was no change to Core, owner/controller policy, freshness gates or native 
 The host proposal relay is research setup, not a product remote-provider interface.
 
 Final Agent checks passed 56 on macOS and installed Linux ARM64, plus three installed
-ALOHA combination cases. New navigation checks enter the existing Agent test discovery
-and CLI-help CI step; hosted CI has not run for this uncommitted candidate. No new
+ALOHA combination cases. New navigation checks entered the existing Agent test discovery
+and CLI-help CI step; this qualification preceded the candidate's hosted CI. No new
 image, dependency, model download or hardware qualification was added. This normal
 case does not qualify model errors during real motion, general navigation/obstacles,
-owner loss or hard stop/resource limits. Public pairing still needs delivery; the
-Agent manifest remains on its previously published ALOHA dependency.
+owner loss or hard stop/resource limits. The subsequent public pairing and hosted
+CI do not expand this recorded simulation scope.
 
 ### Caller budget compatibility and recorded model consumption
 
@@ -2178,7 +2179,7 @@ checks cover defaults, final12-second failure under the old default and success
 under explicit45, expiry above45 with abort, and invalid values before ROS startup.
 The new Linux installed candidate passed60 Python/Core checks and10 focused owner
 checks;12 launcher checks also passed. Existing discovery includes the new tests;
-these uncommitted changes have no fresh hosted CI result.
+these local checks preceded delivery and are distinct from the hosted results below.
 
 A separate recorded run configured45 seconds of caller idle wait, retained the
 30-second proposal budget and existing native deadlines, freshness and physical
@@ -2194,6 +2195,27 @@ It demonstrates one normal loop, not broader model reliability or hardware safet
 
 
 ## M6b delivery CI coverage
+
+The runtime changes are delivered in Harness
+[`6f32578`](https://github.com/xiao-yang25/robot-harness/commit/6f32578f8d9157fa7c26c1f4e2ece13e05ec6211).
+Agent [`9516daf`](https://github.com/xiao-yang25/robot-agent/commit/9516dafb13d5df8e64c0491d9c8f01cce54a4ff8)
+pins that Harness revision. Its Ubuntu22.04/Python3.10 mainline
+[application workflow](https://github.com/xiao-yang25/robot-agent/actions/runs/37107518275)
+passed 56 checks and installed CLI validation; its
+[installed combination workflow](https://github.com/xiao-yang25/robot-agent/actions/runs/37107518308)
+passed five cases: three retained ALOHA cases and two navigation cases. The latter
+consume real Session/Requests/coordinator/Core with controlled native and model
+providers; they do not run ROS physics or qualify model reliability.
+
+The [presentation update](https://github.com/xiao-yang25/robot-harness/commit/6394da08f3c9b9f91707c6f21396f7a0d8b99c17)
+is also merged. Its Harness mainline
+[Core/Python](https://github.com/xiao-yang25/robot-harness/actions/runs/37109841581),
+[Humble](https://github.com/xiao-yang25/robot-harness/actions/runs/37109841649),
+[fixed older Agent compatibility](https://github.com/xiao-yang25/robot-harness/actions/runs/37109841989)
+and [documentation build/deploy](https://github.com/xiao-yang25/robot-harness/actions/runs/37109841546)
+all passed. The Harness compatibility workflow retains its earlier Agent pin;
+the new navigation pair is checked by the Agent workflow above. Presentation
+does not change the dependency pin or the recorded physical qualification.
 
 The Core workflow's existing `python_session` discovery includes the shared
 coordinator, native identity, navigation requests, local endpoint and caller-budget

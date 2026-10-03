@@ -108,7 +108,8 @@ owner_pid=$!
 wait_navigation_endpoint /output/navigation-endpoint.json 160 \
   owner "$owner_pid" scene "$launch_pid" bridge "$bridge_pid"
 endpoint=$(python3 -c 'import json; print(json.load(open("/output/navigation-endpoint.json"))["endpoint"])')
-python3 /navigation-example.py "$endpoint" > /output/request-client.log 2>&1 &
+PYTHONPATH="${M6_CLIENT_PREFIX:+${M6_CLIENT_PREFIX}:}${PYTHONPATH:-}" \
+  python3 /navigation-example.py "$endpoint" > /output/request-client.log 2>&1 &
 client_pid=$!
 wait "$client_pid"
 python3 - <<'PYCLIENT'

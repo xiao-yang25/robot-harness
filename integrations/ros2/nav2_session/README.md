@@ -44,6 +44,21 @@ linux/amd64, no external network. The existing image must contain `/native` and
 `/drive` from the scoped simulation build. This command checks process completion;
 physical task qualification uses a separate external observer/evaluator.
 
+To run another trusted local Python client, `session` accepts `--client-script`
+and an optional `--client-prefix`. The script receives the endpoint as its only
+argument, runs in the same container and can write its report under `/output`.
+Both inputs are mounted read-only; the prefix is available at `/client-prefix`
+and is added to that client's Python path only, not to the owner or ROS processes.
+These are executable operator-supplied components, not a sandbox or backend plugin.
+Docker bind paths containing commas are refused.
+
+`--caller-wait-seconds 45` explicitly forwards the existing owner idle setting.
+Values must be finite and in `(0, 60]`. Omitting all three options preserves the
+default request example and owner waits. Client failure propagates to the
+launcher's existing exact-container cleanup; a zero exit still establishes only
+process completion. The [business tutorial](https://github.com/xiao-yang25/robot-agent)
+owns task strategy and its declared provider, rather than this launcher.
+
 Readiness checks the owner, scene and bridge processes individually, including
 when an endpoint file has just appeared. If any child exits, the supervisor
 reports its role, PID and exit status and enters its existing cleanup path;

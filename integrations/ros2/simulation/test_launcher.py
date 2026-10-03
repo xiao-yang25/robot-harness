@@ -12,7 +12,7 @@ import simulate
 
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
-                 output_links=False, blocked_record=False, session=False):
+                 output_links=False, blocked_record=False, session=False, custom_client=False):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -24,6 +24,10 @@ class LauncherTest(unittest.TestCase):
             marker.parent.mkdir(parents=True)
             marker.write_text('')
             case = 'installed-nav2-session' if session else 'normal'
+            client = Path(directory) / 'custom-client.py'
+            client.write_text('raise SystemExit(0)')
+            client_prefix = Path(directory) / 'client-install'
+            client_prefix.mkdir()
 
             def docker(command, **_kwargs):
                 calls.append(command)
@@ -57,7 +61,10 @@ class LauncherTest(unittest.TestCase):
             with patch.object(simulate.subprocess, 'run', side_effect=docker), \
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
                 code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
-                    session=session, python_prefix=str(prefix)))
+                    session=session, python_prefix=str(prefix),
+                    client_script=str(client) if custom_client else None,
+                    client_prefix=str(client_prefix) if custom_client else None,
+                    caller_wait_seconds=45 if custom_client else None))
             status = json.loads((output / 'run.json').read_text())
             self.assertIn(['docker', 'rm', '--force', container], calls)
             self.assertEqual(outside.read_text(), 'untouched')
@@ -69,12 +76,42 @@ class LauncherTest(unittest.TestCase):
                 self.assertTrue(any('target=/installed,readonly' in part for part in command))
                 self.assertTrue(any('target=/navigation-example.py,readonly' in part for part in command))
                 self.assertFalse(any('target=/simulation/navigation_requests.py' in part for part in command))
+                if custom_client:
+                    self.assertIn(f'type=bind,source={client.resolve()},target=/navigation-example.py,readonly', command)
+                    self.assertIn(f'type=bind,source={client_prefix.resolve()},target=/client-prefix,readonly', command)
+                    self.assertIn('M6_CLIENT_PREFIX=/client-prefix', command)
+                    self.assertIn('M6_CALLER_WAIT_SECONDS=45', command)
+                else:
+                    self.assertNotIn('M6_CLIENT_PREFIX=/client-prefix', command)
+                    self.assertFalse(any(part.startswith('M6_CALLER_WAIT_SECONDS=') for part in command))
             return code, status
 
     def test_installed_session_launch_has_separate_readonly_example_mount(self):
         code, status = self.exercise(session=True)
         self.assertEqual(code, 0)
         self.assertTrue(status['container_removed'])
+
+    def test_external_client_is_readonly_with_explicit_idle_budget(self):
+        code, status = self.exercise(session=True, custom_client=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(status['container_removed'])
+
+    def test_external_client_failure_preserves_exit_and_exact_cleanup(self):
+        code, status = self.exercise(session=True, custom_client=True, exit_code=7)
+        self.assertEqual(code, 7)
+        self.assertEqual(status['result'], 'failed')
+        self.assertTrue(status['container_removed'])
+
+    def test_invalid_client_configuration_cannot_create_a_container(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(simulate.subprocess, 'run') as docker:
+            with self.assertRaisesRegex(ValueError, 'requires --client-script'):
+                simulate.session_client(argparse.Namespace(client_prefix=directory))
+            for value in (float('nan'), 0, 61):
+                with self.subTest(wait=value), self.assertRaisesRegex(ValueError, 'caller wait'):
+                    simulate.session_client(argparse.Namespace(caller_wait_seconds=value))
+            with self.assertRaises(FileNotFoundError):
+                simulate.session_client(argparse.Namespace(client_script=directory+'/absent.py'))
+            docker.assert_not_called()
 
     def test_natural_exit_and_checker_pass(self):
         code, status = self.exercise()

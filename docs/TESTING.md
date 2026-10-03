@@ -2317,3 +2317,14 @@ tools. A public setup/run/report-check tutorial must connect these existing
 components before the M6 delivery scope can close. A launcher completion marker
 is not a physical task verdict. No general evaluator API, remote model protocol,
 Owner recovery, hard-stop guarantee or hardware support is implied.
+
+### Trusted external session client
+
+The session launcher now accepts a local `--client-script`, optional read-only
+`--client-prefix`, and explicit `--caller-wait-seconds`. Defaults retain the
+independent request example. Only the client's Python path sees the additional
+prefix; no Agent strategy or provider is imported by the owner. Three added
+launcher checks cover read-only mounting/idle forwarding, failed-client exit and
+exact cleanup, plus rejection of unusable client configuration. Existing
+simulation discovery includes these checks; qualification belongs to the final
+installed run and corresponding hosted revision, not the presence of options.

@@ -2,6 +2,7 @@
 """Build and run a disposable, network-isolated Humble navigation simulation."""
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -23,6 +24,26 @@ CASES = ('normal', 'cancel-moving', 'replace-moving',
          'runtime-odometry-loss', 'runtime-odometry-replay',
          'runtime-odometry-resume', 'runtime-clock-loss',
          'runtime-stop-unreachable', 'runtime-stop-unreachable-withhold-drive-ack')
+
+
+def session_client(args):
+    """Select trusted local client code, never an execution/backend policy."""
+    script = getattr(args, 'client_script', None)
+    prefix = getattr(args, 'client_prefix', None)
+    wait = getattr(args, 'caller_wait_seconds', None)
+    if prefix and not script:
+        raise ValueError('--client-prefix requires --client-script')
+    script = Path(script).expanduser().resolve(strict=True) if script else ROOT / 'examples/navigation_requests.py'
+    if not script.is_file():
+        raise ValueError('client script must be a file')
+    prefix = Path(prefix).expanduser().resolve(strict=True) if prefix else None
+    if prefix is not None and not prefix.is_dir():
+        raise ValueError('client prefix must be a directory')
+    if any(',' in str(path) for path in (script, prefix) if path is not None):
+        raise ValueError('Docker bind paths must not contain commas')
+    if wait is not None and (not math.isfinite(wait) or not 0 < wait <= 60):
+        raise ValueError('caller wait must be finite and in (0, 60]')
+    return script, prefix, wait
 
 
 def write_host_record(path, text):
@@ -78,13 +99,19 @@ def run_case(args):
                    '-e', f'M4_CONTEXT_CASE={args.case}',
                    '-e', f'M4_VISUAL={int(getattr(args, "visual", False))}']
         if getattr(args, 'session', False):
+            client, client_prefix, caller_wait = session_client(args)
             prefix = Path(args.python_prefix).expanduser().resolve(strict=True)
             if not (prefix / 'lib/robot-harness/python/robot_harness_nav2/__main__.py').is_file():
                 raise ValueError('prefix does not contain the installed Nav2 owner')
             command.extend(['--mount', f'type=bind,source={prefix},target=/installed,readonly',
                             '--mount', f'type=bind,source={ROOT / "integrations/ros2/simulation"},target=/simulation,readonly',
-                            '--mount', f'type=bind,source={ROOT / "examples/navigation_requests.py"},target=/navigation-example.py,readonly',
+                            '--mount', f'type=bind,source={client},target=/navigation-example.py,readonly',
                             '-e', 'M6_NATIVE_ISOLATED=1', '--entrypoint', 'bash'])
+            if client_prefix is not None:
+                command.extend(['--mount', f'type=bind,source={client_prefix},target=/client-prefix,readonly',
+                                '-e', 'M6_CLIENT_PREFIX=/client-prefix'])
+            if caller_wait is not None:
+                command.extend(['-e', f'M6_CALLER_WAIT_SECONDS={caller_wait}'])
         command.append(image)
         if getattr(args, 'session', False):
             command.append('/simulation/navigation_session.sh')
@@ -187,6 +214,9 @@ def main():
     session.add_argument('--python-prefix', required=True, help='Linux install prefix with optional Python bridge')
     session.add_argument('--image', required=True, help='qualified local scoped Humble/Nav2 image')
     session.add_argument('--output', required=True, help='new result directory')
+    session.add_argument('--client-script', help='trusted Python client receiving the endpoint as its only argument')
+    session.add_argument('--client-prefix', help='optional read-only Python packages for that client only')
+    session.add_argument('--caller-wait-seconds', type=float, help='explicit owner idle wait in (0, 60], not an operation deadline')
     args = parser.parse_args()
     args.session = args.command == 'session'
     if args.session:

@@ -2,7 +2,7 @@
 
 [Watch on the project website](https://xiao-yang25.github.io/robot-harness/#demo).
 The gallery contains actual ALOHA / MuJoCo and TurtleBot3 / Gazebo Classic
-recordings. All are silent, scripted simulation scenarios. Video shows motion;
+recordings. Each silent clip identifies model-guided or deterministic decisions. Video shows motion;
 the corresponding observations and receipts establish execution and settlement.
 It does not establish a physical stopping guarantee.
 
@@ -38,7 +38,7 @@ profile patch delivered with these assets. This is locally qualified on macOS
 arm64/MPS; see the [backend version and dependency scope](../../../integrations/mujoco/README.md).
 Reproduction requires the external worker and migrated checkpoint described
 there; they are not installed or shipped with the Core package. Linux ACT/render
-reproduction remains unqualified. This single-seed demonstration is not a
+qualification is recorded separately; this Mac video does not establish it. This single-seed demonstration is not a
 reliability estimate, an autonomous business Agent, self-improvement, or a
 physical grasp/stop guarantee. It does not demonstrate the separate cancellation
 checks. Raw experiment records and unsuccessful runs remain retained separately.
@@ -150,3 +150,71 @@ Current behavior and validation are documented in
 provides a source build, bounded scenarios and an optional live viewer.
 This historical recording does not demonstrate those later capabilities;
 the cancellation and handoff recordings above cover their own later scope.
+
+
+## Adding a major feature recording
+
+Each major user-visible feature should include an actual-run demonstration. The
+project homepage embeds a video player; setup and full-evidence links supplement
+it. Record the implementing application and runtime together, identify model or
+deterministic decisions, preserve pending/unknown states and label any trimming,
+speed changes or held frames. A demonstration is presentation evidence for its
+stated run, not a replacement for tests, physical evaluation or hardware safety.
+Small fixes do not require a new recording unless the displayed behavior changes.
+
+
+## Model-guided navigation (local candidate)
+
+[Watch in the homepage player](https://xiao-yang25.github.io/robot-harness/#demo) ·
+[Complete task excerpt](model-navigation.mp4) · [Same-run summary](model-navigation-run.json) ·
+[Owner setup](../../../integrations/ros2/nav2_session/README.md) ·
+[Agent application](https://github.com/xiao-yang25/robot-agent/tree/9516dafb13d5df8e64c0491d9c8f01cce54a4ff8)
+
+Recorded on 2026-10-03 from a local Harness candidate based on `a145364` and
+Agent candidate based on `5e8b63b`. The corresponding runtime and application are
+now delivered in Harness `6f32578` and Agent `9516daf`; this recording retains its
+original local candidate scope. In isolated Ubuntu22.04/Humble amd64 Gazebo simulation, the installed
+business Agent consumed public NavigationSession feedback. Host Codex0.159.0
+requested `gpt-6-sol` / high and supplied three actual text proposals: visit A,
+visit B, observed complete. Model input was task context and public navigation
+pose/time/health; external Gazebo truth and evaluation did not drive decisions.
+The model ran on the host; the 2 CPU/4 GiB, network-disabled simulation received
+no credentials. Each proposal remained bounded at 30 seconds; the owner was
+explicitly configured for 45 seconds of caller idle time.
+
+The scene ran 107.642 seconds. A/B same-run physical distances were
+0.192253/0.166768m under the existing separate evaluator. A settled/released
+before B admission; B output was accepted with settlement pending. Agent
+assessment was observed complete, while task verdict stayed unassessed and
+native cleanup unknown. Local connection close or container removal does not
+invent a native reuse certificate. This single normal run does not establish
+model reliability, model motion cancellation, owner recovery or hardware safety.
+
+The H264 video is 1280×800, 10fps and 70.9 seconds, silent. Startup is trimmed;
+the RViz scene is cropped/resized, same-run event captions are added, and the
+final frame is held for two seconds. There are no internal cuts or speed changes;
+model waits remain visible. Caption timing uses approximate monotonic event
+alignment with recorder startup latency retained, not a stopping-time instrument.
+The poster is a frame four seconds after A admission from this same final video.
+The summary selects retained facts without private prompts or operator paths;
+it is not a second task evaluation.
+
+A prior recording failed after B: the owner's default 10-second final-close
+wait expired while a roughly10.03-second model proposal was returning. Its
+needs-help/unknown report and clean recorder/container cleanup remain retained
+separately. An explicit bounded caller wait resolves that budget incompatibility;
+no native deadline, freshness TTL, physical predicate or model budget was widened.
+Setup uses the paired commits above; the Agent manifest pins Harness `6f32578`.
+Their installed combination checks preserve ALOHA and navigation consumption,
+without repeating this physical/model qualification. See
+[Testing](../../TESTING.md#m6b-navigation-business-agent).
+
+### Presentation layout
+
+The project README features the model-guided navigation recording through a
+GitHub video attachment, so readers can play it inline. It is the current local
+candidate with the most complete observation, decision and execution loop.
+The website keeps a featured player and three smaller players for ACT transfer,
+moving handoff and cancellation. These recordings remain separate: their callers,
+time scales and qualification scopes differ. Original MP4 files and evidence
+remain available here; attachment URLs are presentation copies, not evidence IDs.

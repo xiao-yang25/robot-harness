@@ -1,0 +1,53 @@
+{
+  "recorded_date": "2026-10-03",
+  "scope": "installed navigation business Agent, live host text Codex proposals, isolated Nav2 normal A/B only",
+  "status": "recorded local candidate; paired runtime/application now delivered",
+  "harness_base": "a145364",
+  "agent_base": "5e8b63b",
+  "profile": "scoped-two-context-nav2-shim-v1",
+  "model_requested": "gpt-6-sol",
+  "reasoning_effort_requested": "high",
+  "codex_version": "0.159.0",
+  "proposals": [
+    "visit_a",
+    "visit_b",
+    "observed_complete"
+  ],
+  "world": "Gazebo Classic / TurtleBot3 waffle / ROS 2 Humble",
+  "platform": "linux/amd64",
+  "resources": {
+    "cpus": 2,
+    "memory_gib": 4,
+    "network": "none"
+  },
+  "caller_idle_wait_seconds": 45,
+  "proposal_budget_seconds": 30,
+  "task_budget_seconds": 240,
+  "elapsed_seconds": 107.6416845000058,
+  "physical_distance_m": {
+    "A": 0.1922527571401773,
+    "B": 0.16676776854356481
+  },
+  "task_verdict": "unassessed",
+  "A": {
+    "output": "accepted",
+    "settlement": "settled",
+    "authority": "released"
+  },
+  "B": {
+    "output": "accepted",
+    "settlement": "pending"
+  },
+  "native_cleanup": "unknown",
+  "video": {
+    "width": 1280,
+    "height": 800,
+    "seconds": 70.9,
+    "playback": "original speed; startup trimmed; scene cropped; captions added; final frame held for two seconds",
+    "caption_timing": "approximate same-run monotonic event captions; capture startup latency remains; not a physical timing instrument"
+  },
+  "limits": [
+    "one normal simulation only",
+    "no general reliability, hardware safety or hard-stop claim"
+  ]
+}

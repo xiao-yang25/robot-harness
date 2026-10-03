@@ -2188,7 +2188,7 @@ The same-run evaluator ran once, observing A/B distances0.192253/0.166768m; A
 settled/released before B, final B accepted/pending. Agent task verdict stayed
 unassessed and native cleanup unknown. Recorder completed cleanly, all three
 proposal children/model server exited and were reaped, and the exact scene
-container was removed without OOM. The 70.9-second same-run recording
+container was removed without OOM. The [70.9-second recording](assets/demo/README.md#model-guided-navigation-local-candidate)
 retains model waits and original speed; trim/crop/captions/final hold are declared.
 It demonstrates one normal loop, not broader model reliability or hardware safety.
 

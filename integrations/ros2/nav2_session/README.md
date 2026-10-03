@@ -80,6 +80,12 @@ Cleanup reports unknown stop and retains pending settlement. Final process-tree
 release belongs to the launcher/container boundary. Owner restart, general site
 configuration, context replenishment and a hard stop limit are not implemented.
 
+Finishing the native A/B sequence does not settle final B. An explicit final
+cancel enters client shutdown handling even after the native result was accepted;
+the successful result remains accepted while authority is revoked and settlement
+stays pending. A normal close already received can still finish the terminal
+wait. Neither path promotes an intent response to complete native cleanup.
+
 Pure endpoint/package checks run with the Python test suite. With Humble and the
 custom drive interfaces available, run the focused actual owner methods:
 

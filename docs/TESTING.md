@@ -2229,3 +2229,37 @@ Python paths. The checks exercise real Core and owner methods with synthetic ROS
 edges; they do not run Gazebo, models or certify physical stop. Existing Humble
 observation and simulation-launcher checks remain. Hosted results must be tied
 to the delivered revision; prior local qualifications do not establish a new CI pass.
+
+## Final proposal cancellation candidate
+
+Native A/B completion leaves final B pending in Core. The local owner candidate
+routes explicit cancellation at that point through client shutdown, preserving
+accepted native output and pending settlement. Completed normal close retains its
+existing terminal wait path; neither path creates a task verdict or native cleanup
+evidence. The focused cancellation regression failed against the prior installed
+owner and passed after the fix. All 12 focused owner checks then passed against a
+separate installed candidate in the retained Ubuntu 22.04 / Humble environment.
+Existing Humble workflow discovery runs this entire check file; no workflow change
+is needed, and these local results are not new hosted qualification.
+
+A controlled-provider installed Agent simulation first exposed the defect, then
+a new Gazebo run passed one offline evaluation in 108.362 seconds. Actual A/B
+visits and scoped closure were retained, with independent distances
+0.198780/0.159009 m; A released before B admission. The final proposal exceeded the
+unchanged 30-second deadline and produced a valid answer while terminating, but
+was not accepted. Exact B cancellation revoked authority while its native result
+remained succeeded/output accepted with settlement pending. The Agent reported
+needs_help/unassessed/native cleanup unknown and exited 1; owner/container exited
+0, without OOM, and the container and child processes were removed or reaped.
+Status/close connection errors remain explicit. The first failed run is retained.
+
+The optional Python package was installed from current sources into a separate
+prefix using the retained Core build; this was not a fresh full Core build.
+Agent runtime is unchanged. Its nine synthetic installed combination checks on
+macOS and three new Linux proposal checks used the prior manifest pin; the real
+simulation used this matching owner fix. These are pre-delivery local results;
+paired delivery requires a fixed Agent dependency and installed verification
+against the delivered Harness revision. Hosted results belong to the exact commit
+in Actions. The local same-run video is unpublished. Controlled
+proposal faults and a live owner do not establish real model faults, Owner restart,
+complete native cleanup, hard stop or hardware safety.

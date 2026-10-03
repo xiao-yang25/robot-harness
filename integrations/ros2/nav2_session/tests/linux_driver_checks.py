@@ -189,6 +189,48 @@ class DriverChecks(unittest.TestCase):
         self.assertFalse(replies[0]['result']['owner_reaped'])
         self.assert_requested_cleanup()
 
+    def completed_connection(self):
+        caller = self.request_connection()
+        record = self.execution.active
+        record['goal_id'] = self.goal
+        self.execution.native(record, 'accepted', self.goal)
+        self.execution.native(record, 'succeeded', self.goal)
+        self.execution.dispose_result(record, {'goal_id': self.goal, 'stage': 'A'}, lambda: {})
+        # A generic terminal record represents the end-of-sequence condition;
+        # the actual two-site profile reaches this condition after native B.
+        self.owner.completed = True
+        return caller
+
+    def test_completed_native_cancel_uses_client_shutdown_and_preserves_result(self):
+        caller = self.completed_connection()
+        caller.queue(dict(rpc=1, command='cancel', request_id='A'))
+        caller.pump()
+        with patch.object(driver.ScopedDriver, 'tick'):
+            with self.assertRaises(driver.ClientClosed):
+                self.owner.tick()
+        response = caller.pump()[0]['result']
+        self.assertTrue(response['affected_current'])
+        self.assertFalse(self.owner.requests.closing)
+        receipt = response['record']['receipt']
+        self.assertEqual(receipt['authority_disposition'], 'revoked')
+        self.assertEqual(receipt['native_outcome'], 'succeeded')
+        self.assertEqual(receipt['output'], 'accepted')
+        self.assertEqual(receipt['settlement'], 'pending')
+        self.assertEqual(response['record']['result']['goal_id'], self.goal)
+
+    def test_completed_native_close_keeps_the_normal_terminal_wait_path(self):
+        caller = self.completed_connection()
+        caller.queue(dict(rpc=1, command='close'))
+        caller.pump()
+        with patch.object(driver.ScopedDriver, 'tick'):
+            self.owner.tick()
+        response = caller.pump()[0]['result']
+        self.assertEqual(response['closure'], 'unknown')
+        self.assertTrue(self.owner.requests.closing)
+        self.assertEqual(self.gate.receipt(1)['authority_disposition'], 'revoked')
+        self.assertEqual(self.gate.receipt(1)['output'], 'accepted')
+        self.assertEqual(self.gate.receipt(1)['settlement'], 'pending')
+
     def test_partial_owner_disposal_reaps_process_even_if_endpoint_fails(self):
         from robot_harness_nav2.__main__ import dispose
         calls = []

@@ -214,7 +214,72 @@ without repeating this physical/model qualification. See
 The project README features the model-guided navigation recording through a
 GitHub video attachment, so readers can play it inline. It is the current local
 candidate with the most complete observation, decision and execution loop.
-The website keeps a featured player and three smaller players for ACT transfer,
-moving handoff and cancellation. These recordings remain separate: their callers,
+The website keeps a featured player, three smaller players for ACT transfer,
+moving handoff and cancellation, and a separate two-player row for business stop
+and final proposal expiry. These recordings remain separate: their callers,
 time scales and qualification scopes differ. Original MP4 files and evidence
 remain available here; attachment URLs are presentation copies, not evidence IDs.
+
+## Business CLI interruption
+
+[Homepage player](https://xiao-yang25.github.io/robot-harness/#agent-stop-demo) ·
+[Recording](agent-navigation-stop.mp4) · [Same-run summary](agent-navigation-stop-run.json)
+
+Recorded on 2026-10-03 with installed Harness `6f32578` and Agent runtime
+`9516daf`. Controlled executable proposals visit A and B; after A releases and
+B is accepted and moves over 0.5 m, the public Agent CLI receives one SIGINT.
+The Agent explicitly cancels exactly B, without another proposal or admission.
+Core revocation, native cancel scheduling, a scoped drive seal/wheel-zero ACK,
+old-command rejection and a separate quiet/physical window were checked once
+in the same-run evaluation. The fixed physical window had 36 fresh samples over
+3.502 simulated seconds, with endpoint drift about 0.000083 m and 0.00247 rad.
+
+The report stays cancelled/task unassessed/native cleanup unknown/settlement
+pending. Explicit cancel response is retained; subsequent status/close connection
+errors remain visible in the task report. Proposal children and CLI were reaped;
+the scene container exited 0 without OOM and was removed. An earlier recording
+failed native preparation before any admission; that failure is retained separately.
+
+The 1280×800 H264 recording is 30.9 seconds, original speed, with startup and
+view trimmed, approximate event captions and a two-second final hold. The poster
+is from B motion in the same export. It is not a stopping-time instrument.
+
+## Final proposal expiry
+
+[Homepage player](https://xiao-yang25.github.io/robot-harness/#late-proposal-demo) ·
+[Recording](navigation-late-proposal.mp4) · [Same-run summary](navigation-late-proposal-run.json)
+
+Recorded on 2026-10-03 with the owner fix now delivered in Harness `ea7b1eb`
+and unchanged Agent runtime `9516daf`. Controlled executable proposals visit A
+and B. The final child exceeds the original 30-second deadline, then emits a
+valid, matching answer while terminating and exits 0. The expired answer is not
+accepted; the Agent requests help and cancels exactly retained B. Native
+succeeded/output accepted remains alongside authority revoked/settlement pending;
+task verdict remains unassessed and native cleanup unknown. Status/close errors
+are retained. The Agent exits 1; owner/container exit 0, with children reaped
+and container removed without OOM.
+
+One same-run evaluator confirmed A/B physical distances 0.198780/0.159009 m
+and A release before B admission. The first run exposed final cancellation being
+misclassified as an authority error; it is retained separately, without
+reevaluation. The focused regression failed before the fix and all 12 owner
+checks passed afterwards; completed normal close retains its prior wait path.
+
+The 1280×800 H264 recording is 71.7 seconds at original speed, including the
+full proposal wait. Startup/view trimming, approximate event captions and a
+two-second final hold are declared; there are no internal cuts or speed changes.
+The poster is from B motion in this export.
+
+### Delivery and limits
+
+Harness `ea7b1eb1a075cd91ef590475f2496a48d19ca52a` and Agent
+`ffad065ae81ca9e9b17cba558d471078d657a9b2` deliver the matching fixed runtime
+and nine installed combination cases. Agent runtime source is unchanged; pairing
+and presentation do not repeat either recording's physical qualification.
+These clips use controlled proposals and a live owner, not real model failures.
+They do not establish complete native cleanup, Owner loss, restart recovery,
+hard stop deadlines or hardware safety. Both final exports decoded completely
+and their B/wait/final frames were inspected. Summary files select existing facts
+without operator paths or prompts; they are presentation metadata, not another
+evaluation. See [Testing](../../TESTING.md#final-proposal-cancellation-candidate)
+and the [fixed Agent checks](https://github.com/xiao-yang25/robot-agent/blob/ffad065ae81ca9e9b17cba558d471078d657a9b2/docs/TESTING.md#updated-fixed-pairing).

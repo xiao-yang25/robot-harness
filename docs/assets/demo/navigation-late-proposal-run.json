@@ -1,0 +1,37 @@
+{
+  "recorded_date": "2026-10-03",
+  "recorded_qualification": "Harness owner source delivered in ea7b1eb / unchanged Agent runtime 9516daf; controlled final proposal",
+  "profile": "scoped-two-context-nav2-shim-v1",
+  "controlled_proposals": true,
+  "container_exit_code": 0,
+  "container_removed": true,
+  "oom_killed": false,
+  "single_same_run_evaluation": {
+    "result": "passed",
+    "case": "final-late-answer",
+    "physical_distance_m": {
+      "A": 0.19877983831616325,
+      "B": 0.1590093472126718
+    },
+    "proposal_count": 3,
+    "accepted_proposals": 2,
+    "application": "needs_help",
+    "task_verdict": "unassessed",
+    "native_output": "accepted",
+    "authority": "revoked",
+    "settlement": "pending",
+    "native_cleanup": "unknown",
+    "scope": "public CLI controlled final proposal after native A/B; live owner, no remote model/hard stop/hardware qualification"
+  },
+  "video_seconds": 71.7,
+  "video_timing": "original speed; startup/view trimmed, approximate event captions, final hold; not a physical timing instrument",
+  "delivery_pair": {
+    "harness": "ea7b1eb1a075cd91ef590475f2496a48d19ca52a",
+    "agent": "ffad065ae81ca9e9b17cba558d471078d657a9b2"
+  },
+  "limits": [
+    "recorded run scope only; delivery does not repeat physical qualification",
+    "live owner; no real model fault, full native cleanup, hard stop or hardware qualification"
+  ],
+  "launcher_wall_seconds": 108.362247334
+}

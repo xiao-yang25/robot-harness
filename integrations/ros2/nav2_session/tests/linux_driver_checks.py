@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 import socket
-from types import SimpleNamespace
+from types import SimpleNamespace, MethodType
 import unittest
 from unittest.mock import patch
 
@@ -17,9 +17,45 @@ from robot_harness_nav2._requests import RequestEndpoint
 from robot_harness_nav2._native_lane import ObservedClient
 
 from robot_harness_nav2 import _owner as driver
+from robot_harness_nav2 import _scoped as scoped
 
 
 class DriverChecks(unittest.TestCase):
+    def test_preparation_response_timeout_retains_service_phase_and_original_budget(self):
+        owner = scoped.ScopedDriver.__new__(scoped.ScopedDriver)
+        owner.context_process = SimpleNamespace(poll=lambda: None)
+        future = SimpleNamespace(done=lambda: False)
+        failure = TimeoutError('native wait budget expired')
+        owner.service = unittest.mock.Mock(return_value=future)
+        owner.wait = unittest.mock.Mock(side_effect=failure)
+        with patch.object(scoped.time, 'monotonic', return_value=10), patch.object(scoped, 'diagnose') as diagnostic:
+            with self.assertRaises(TimeoutError) as caught:
+                owner.prepare_service('GetState', '/b/controller_server/get_state', 'request', 12)
+        self.assertIs(caught.exception, failure)
+        owner.service.assert_called_once_with('GetState', '/b/controller_server/get_state', 'request', 2, fresh=False)
+        owner.wait.assert_called_once_with(future.done, 2)
+        fields = diagnostic.call_args.kwargs
+        self.assertEqual(fields['service'], '/b/controller_server/get_state')
+        self.assertEqual(fields['phase'], 'response')
+        self.assertEqual(fields['budget_seconds'], 2)
+        self.assertEqual(fields['error'], 'TimeoutError: native wait budget expired')
+        self.assertIsNone(fields['context_returncode'])
+
+    def test_preparation_discovery_failure_does_not_wait_or_mask_original_error(self):
+        owner = scoped.ScopedDriver.__new__(scoped.ScopedDriver)
+        owner.context_process = SimpleNamespace(poll=lambda: 7)
+        failure = TimeoutError('native wait budget expired')
+        owner.service = unittest.mock.Mock(side_effect=failure)
+        owner.wait = unittest.mock.Mock()
+        with patch.object(scoped.time, 'monotonic', return_value=10), patch.object(scoped, 'diagnose') as diagnostic:
+            with self.assertRaises(TimeoutError) as caught:
+                owner.prepare_service('GetState', '/b/bt_navigator/get_state', 'request', 80)
+        self.assertIs(caught.exception, failure)
+        owner.service.assert_called_once_with('GetState', '/b/bt_navigator/get_state', 'request', 5, fresh=False)
+        owner.wait.assert_not_called()
+        self.assertEqual(diagnostic.call_args.kwargs['phase'], 'discovery')
+        self.assertEqual(diagnostic.call_args.kwargs['context_returncode'], 7)
+
     def setUp(self):
         self.stamp = 3
         self.gate = _core.Gate('p', 'd', 'cap', 'nav', 1, 0)
@@ -258,6 +294,7 @@ class DriverChecks(unittest.TestCase):
             def failed_service(*a, **k):
                 raise RuntimeError('B readiness service failed')
             partial.service = failed_service
+            partial.prepare_service = MethodType(_scoped.ScopedDriver.prepare_service, partial)
             with patch.object(_scoped, 'OUT', Path(directory)), patch.object(_scoped, 'emit'), patch.object(
                     _scoped.subprocess, 'Popen', return_value=child), patch.object(_scoped, 'ActionClient'):
                 with self.assertRaisesRegex(RuntimeError, 'B readiness'):

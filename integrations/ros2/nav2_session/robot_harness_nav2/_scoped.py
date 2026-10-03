@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import time
 
-from ._observations import Observations, OUT, emit, seconds
+from ._observations import Observations, OUT, emit, diagnose, seconds
 from ._predicates import quiet_window
 import rclpy
 from rclpy.action import ActionClient
@@ -147,22 +147,38 @@ class ScopedDriver(Observations):
                 remaining = ready_until-time.monotonic()
                 if remaining <= 0 or self.context_process.poll() is not None:
                     raise RuntimeError('B context did not become ready')
-                future = self.service(GetState, namespace+'/'+name+'/get_state', GetState.Request(), min(5, remaining), fresh=False)
-                self.wait(future.done, min(5, ready_until-time.monotonic()))
-                if future.result().current_state.id == 3:
+                response = self.prepare_service(GetState, namespace+'/'+name+'/get_state',
+                                                GetState.Request(), ready_until)
+                if response.current_state.id == 3:
                     break
                 pause_until = time.monotonic()+.2
                 self.wait(lambda: time.monotonic() >= pause_until, min(1, ready_until-time.monotonic()))
         for name in ('controller_transform_ready', 'planner_map_ready'):
-            future = self.service(Trigger, namespace+'/'+name, Trigger.Request(),
-                                  min(5, ready_until-time.monotonic()), fresh=False)
-            self.wait(future.done, min(5, ready_until-time.monotonic()))
-            if future.result().success is not True:
+            response = self.prepare_service(Trigger, namespace+'/'+name, Trigger.Request(), ready_until)
+            if response.success is not True:
                 raise RuntimeError('B native readiness unavailable')
         self.wait(self.b_client.server_is_ready, min(5, ready_until-time.monotonic()))
         self.wait(self.valid_observation, ready_until-time.monotonic())
         emit('context_ready', stage='B', scope_id=self.contexts['B']['scope_id'],
              observation=self.observation())
+
+    def prepare_service(self, kind, name, request, ready_until):
+        """Preserve preparation budgets; diagnose the failing service phase."""
+        started = time.monotonic()
+        phase = 'discovery'
+        budget = min(5, ready_until-started)
+        try:
+            future = self.service(kind, name, request, budget, fresh=False)
+            phase = 'response'
+            budget = min(5, ready_until-time.monotonic())
+            self.wait(future.done, budget)
+            return future.result()
+        except Exception as error:
+            diagnose('context_preparation_failure', stage='B', service=name, phase=phase,
+                budget_seconds=budget, elapsed_seconds=time.monotonic()-started,
+                context_returncode=self.context_process.poll(),
+                error=f'{type(error).__name__}: {error}', stop='unknown')
+            raise
 
     def open_scope(self, stage):
         self.motion_started = True

@@ -2263,3 +2263,26 @@ against the delivered Harness revision. Hosted results belong to the exact commi
 in Actions. The local same-run video is unpublished. Controlled
 proposal faults and a live owner do not establish real model faults, Owner restart,
 complete native cleanup, hard stop or hardware safety.
+
+## Nav2 preparation diagnostics and supervisor failure propagation
+
+The isolated Session launcher checks each owner, scene and bridge child before
+accepting its endpoint file. Any child exit is reported with role, PID and wait
+status and enters the existing cleanup path, even while the other two remain
+alive. The final scene/bridge check also requires both processes to be alive.
+The 160-second endpoint deadline is unchanged.
+
+Three real-child supervisor checks passed on macOS and Linux: each failed role
+is rejected despite live siblings and an existing endpoint file, readiness with
+all children alive succeeds, and a missing endpoint still times out. The focused
+installed Humble owner suite passed 14 checks, adding preparation service
+discovery/response diagnostics without changing its service or context budgets.
+The existing partial-startup OS child-reaping regression remains intact. These
+are process and method checks, not physical stop or general ROS reliability.
+
+`context_preparation_failure` records the failing B service, discovery/response
+phase, stage budget, elapsed time and context exit status in `caller.jsonl`.
+It preserves the original exception. In particular, a GetState response timeout
+is not treated as a retry or proof that its underlying cause has been fixed.
+The existing Humble workflow discovers both new supervisor tests and owner
+checks; a specific hosted result is required before delivery is marked passed.

@@ -2328,3 +2328,16 @@ launcher checks cover read-only mounting/idle forwarding, failed-client exit and
 exact cleanup, plus rejection of unusable client configuration. Existing
 simulation discovery includes these checks; qualification belongs to the final
 installed run and corresponding hosted revision, not the presence of options.
+
+### B context startup ordering
+
+Public tutorial qualification exposed two zero-admission preparation failures:
+B's first lifecycle service was not discovered within the 5-second RPC budget
+while its process was still initializing. B now follows A's startup ordering:
+wait for the native action endpoint inside the existing 70-second context deadline,
+then query lifecycle/readiness services with the unchanged bounded RPC waits.
+The endpoint marker is not full readiness, authority or permission to move.
+A context-process exit prevents service queries; the final lifecycle, transform,
+map and fresh-observation checks still precede admission. Two focused actual-driver
+checks cover ordering/deadline and process-exit rejection. Historical response-time
+failures remain separate; this change does not establish general reliability.

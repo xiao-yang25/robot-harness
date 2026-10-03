@@ -21,6 +21,53 @@ from robot_harness_nav2 import _scoped as scoped
 
 
 class DriverChecks(unittest.TestCase):
+    def test_b_startup_endpoint_precedes_lifecycle_queries_within_context_budget(self):
+        owner = scoped.ScopedDriver.__new__(scoped.ScopedDriver)
+        owner.motion_started = False
+        owner.b_client = None
+        owner.contexts = {'B': dict(scope_id='b'*32, namespace='/b')}
+        owner.observation = lambda: {}
+        owner.valid_observation = lambda: True
+        calls = []
+        process = SimpleNamespace(poll=lambda: None)
+        endpoint = SimpleNamespace(server_is_ready=lambda: True)
+        owner.wait = lambda predicate, budget: calls.append(('wait', budget, predicate()))
+        def service(kind, name, request, until):
+            calls.append(('service', name, until))
+            return SimpleNamespace(current_state=SimpleNamespace(id=3), success=True)
+        owner.prepare_service = service
+        with tempfile.TemporaryDirectory() as directory, patch.object(scoped, 'OUT', Path(directory)), \
+                patch.object(scoped, 'emit'), patch.object(scoped.subprocess, 'Popen', return_value=process), \
+                patch.object(scoped, 'ActionClient', return_value=endpoint), \
+                patch.object(scoped.time, 'monotonic', return_value=10):
+            try:
+                owner.prepare_b_initial()
+            finally:
+                owner.context_log.close()
+        self.assertEqual(calls[0], ('wait', 70, True))
+        self.assertTrue(calls[1][1].endswith('/bt_navigator/get_state'))
+        self.assertTrue(all(c[2] == 80 for c in calls if c[0] == 'service'))
+
+    def test_b_startup_process_exit_prevents_lifecycle_query_and_ready_event(self):
+        owner = scoped.ScopedDriver.__new__(scoped.ScopedDriver)
+        owner.motion_started = False
+        owner.b_client = None
+        owner.contexts = {'B': dict(scope_id='b'*32, namespace='/b')}
+        owner.observation = lambda: {}
+        owner.wait = lambda predicate, budget: self.assertTrue(predicate())
+        owner.prepare_service = unittest.mock.Mock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(scoped, 'OUT', Path(directory)), \
+                patch.object(scoped, 'emit') as events, \
+                patch.object(scoped.subprocess, 'Popen', return_value=SimpleNamespace(poll=lambda: 17)), \
+                patch.object(scoped, 'ActionClient'):
+            try:
+                with self.assertRaisesRegex(RuntimeError, 'exited before startup'):
+                    owner.prepare_b_initial()
+            finally:
+                owner.context_log.close()
+        owner.prepare_service.assert_not_called()
+        self.assertEqual([c.args[0] for c in events.call_args_list], ['context_prepare_requested'])
+
     def test_preparation_response_timeout_retains_service_phase_and_original_budget(self):
         owner = scoped.ScopedDriver.__new__(scoped.ScopedDriver)
         owner.context_process = SimpleNamespace(poll=lambda: None)
@@ -293,6 +340,7 @@ class DriverChecks(unittest.TestCase):
                 observation=lambda: {}, context_process=None, context_log=None)
             def failed_service(*a, **k):
                 raise RuntimeError('B readiness service failed')
+            partial.wait = lambda *a, **k: None
             partial.service = failed_service
             partial.prepare_service = MethodType(_scoped.ScopedDriver.prepare_service, partial)
             with patch.object(_scoped, 'OUT', Path(directory)), patch.object(_scoped, 'emit'), patch.object(

@@ -94,7 +94,11 @@ class NavigationOwner(ScopedDriver):
         super().tick()
         if self.endpoint is not None:
             self.endpoint.pump()
-        if (self.stop_requested or (self.requests is not None and self.requests.closing)) and not self.completed and not self.aborting:
+        # Native sequence completion leaves the final Core record pending.
+        # Explicit cancellation still needs client shutdown handling; a normal
+        # close already received may finish the existing terminal wait instead.
+        closing = self.requests is not None and self.requests.closing
+        if (self.stop_requested or closing) and not self.aborting and not (self.completed and closing):
             raise ClientClosed("client cancellation or shutdown requested")
         if self.execution is None or self.execution.active is None:
             return

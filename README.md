@@ -63,66 +63,21 @@ to watch navigation, cancellation and replacement.
 
 ## Current scope
 
-| Available today | Next |
+| Available today | Entry point |
 |---|---|
-| Execution authority, guarded results, cancellation and deadlines | Contributor reproduction and further backend tutorials |
-| Local workers, dependent tasks, replacement and provider rebinding | Broader loss and recovery coverage |
-| Limited Linux Host recovery; experimental Nav2 sequencing, moving cancellation, replacement and bounded loss isolation | Broader robot skills and learning-based backends |
+| Execution authority, guarded results, cancellation and deadlines | [C++ Core](examples/installed_core/README.md) |
+| Shared task execution with ALOHA/ACT and Nav2 consumers | [Python Runtime](bindings/python/README.md) |
+| Simulated navigation, cancellation, replacement and bounded loss isolation | [Humble/Gazebo](integrations/ros2/simulation/README.md) |
+| Existing-agent tools and embodied business applications | [MCP](integrations/mcp/README.md) · [Robot Agent](https://github.com/xiao-yang25/robot-agent) |
 
-[M4 simulation scope is complete](docs/TESTING.md#m4-closeout). The
-[Runtime slice](docs/RUNTIME_SLICE.md) provides a session host, policy worker and
-Python/Core bridge, with an [external Agent consumer](docs/DESIGN.md#agent-consumer-and-repository-organization)
-developed alongside it. The optional [Python session](bindings/python/README.md)
-now runs a deterministic fixture and optional [MuJoCo/ACT profiles](integrations/mujoco/README.md)
-through the real Core: repeated trials, or an opt-in400-step transfer followed by
-a separately admitted50-step hold in one episode.
-The optional [local MCP integration](integrations/mcp/README.md) lets existing agents
-such as Codex consume this session. Its tool path is separate from an embodied
-business Agent's task state, perception interpretation and recovery; that application
-may use Runtime directly. The first
-[Robot Agent application](https://github.com/xiao-yang25/robot-agent/tree/c3b291c5d39c5ce32df472acfc071a457f509b77)
-uses camera/joints to choose transfer and a subsequent hold. Its
-[pinned skill setup](https://github.com/xiao-yang25/robot-agent/blob/c3b291c5d39c5ce32df472acfc071a457f509b77/skills/aloha/README.md)
-provides the worker, dependencies and weight preparation.
+**Next:** business-Agent failures during motion, broader robot skills and independent
+reproduction. Learning and self-improvement remain future directions.
 
-[M5's selected scope is delivered](docs/TESTING.md#m5-closeout): one ALOHA
-business task, public two-repository preparation, Mac/MPS and selected Linux
-ARM/CPU normal paths, bounded counterexamples and a comparable native task owner.
-Agent `c3b291c` pins Harness `0de9eb0`; this combination passed installed deterministic
-consumption. Earlier real visual results retain their original Harness `3acc9aa`
-scope. The comparison supports responsibility reuse, with no established general
-speed, memory or net development-time advantage. The public evaluator/regressions
-and [installed combination CI](docs/TESTING.md#installed-agent-combination) are
-delivered. M6b adds [installed ALOHA and navigation consumers](docs/TESTING.md#m6b-delivery-ci-coverage)
-using the shared execution coordinator. Agent `9516daf` pins Harness `6f32578`;
-the delivered pair passed 56 application checks and five installed combination
-checks on Ubuntu, retaining ALOHA consumption alongside navigation. See
-[component roles](docs/DESIGN.md#user-components-task-examples-and-internal-mechanisms)
-and [evolution direction](docs/DESIGN.md#evolution-toward-reusable-task-execution).
-Extend [embodiment and backend coverage](docs/DESIGN.md#incremental-embodiment-and-backend-coverage)
-one reproducible task at a time. Simulation work can proceed independently of
-physical-device availability; hardware validation retains its own prerequisites.
-[Preview and adoption preparation](CONTRIBUTING.md#adoption-stages) proceeds alongside
-integration work; a versioned preview and external reproduction remain pending.
-
-The optional Python package also includes a
-[navigation request client](docs/API.md#navigation-requests-to-a-prepared-owner)
-for a prepared local owner. The optional [bounded Nav2 owner](integrations/ros2/nav2_session/README.md)
-is now installable and has completed an independent-client A→B simulation through
-the shared Core coordinator. The fixed native heading profile also completed the
-standalone launcher route. Public cancellation during B rotation and actual client
-loss during B translation have local, finite physical protection evidence.
-The owner still reports stop unknown/settlement pending on abort; navigation
-business-Agent normal consumption has [recorded simulation evidence](docs/TESTING.md#m6b-navigation-business-agent)
-and [paired delivery CI](docs/TESTING.md#m6b-delivery-ci-coverage). Model errors and
-business-Agent cancellation during real motion remain the next qualification increment.
-
-**Early-stage software and simulation.** No physical-robot integration or hard stop
-guarantee yet. Recovery requires a surviving, polled Owner; sequential navigation
-uses an exclusive simulator. The source-built [simulation package](integrations/ros2/simulation/README.md)
-provides the matching native fixture. See [tested behavior and limits](docs/TESTING.md#current-validation-baseline)
-and the [architecture](docs/DESIGN.md#product-boundary). Learning and self-improvement
-are future directions, not current product capabilities.
+**Early-stage software, validated in limited simulation profiles.** No physical-robot
+integration or hard stop guarantee yet. Motion recovery requires a surviving,
+polled Owner; cancellation does not by itself prove native stop or settlement.
+See [validation and supported combinations](docs/TESTING.md#m6b-delivery-ci-coverage)
+and [architecture and limits](docs/DESIGN.md#product-boundary).
 
 ## Interfaces and compatibility
 

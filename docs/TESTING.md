@@ -2309,14 +2309,12 @@ installed old-Agent compatibility and documentation build/deployment. This does
 not move Agent's immutable `ea7b1eb` dependency or migrate recorded qualification.
 GetState preparation-timeout cause remains unresolved.
 
-One usable-delivery gap remains: the public `simulate.py session` command launches
-its deterministic request example, while the business Agent's connection recipe
-requires a prepared owner and proposal executable in that same isolated container.
-The complete business reproduction still used research-only launcher/observation
-tools. A public setup/run/report-check tutorial must connect these existing
-components before the M6 delivery scope can close. A launcher completion marker
-is not a physical task verdict. No general evaluator API, remote model protocol,
-Owner recovery, hard-stop guarantee or hardware support is implied.
+The original audit found that full business reproduction required research-only
+control wrappers. That delivery gap is now resolved by the Agent's
+[public navigation tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md),
+using the trusted-client launcher below, fixed dependencies and new installations.
+A launcher completion marker remains distinct from a physical task verdict.
+The final bounded delivery scope is recorded in [M6 closeout](#m6-closeout).
 
 ### Trusted external session client
 
@@ -2341,3 +2339,40 @@ A context-process exit prevents service queries; the final lifecycle, transform,
 map and fresh-observation checks still precede admission. Two focused actual-driver
 checks cover ordering/deadline and process-exit rejection. Historical response-time
 failures remain separate; this change does not establish general reliability.
+
+<a id="m6-closeout"></a>
+## M6 closeout: two consumers of shared execution
+
+The declared M6 slice is delivered: the ALOHA Host and bounded Nav2 Owner consume
+one execution coordinator for retained requests, Core authority, deadlines,
+result disposition and explicit settlement. ACT stepping and Nav2 control/closure
+remain dedicated backend responsibilities; task decisions stay in Robot Agent.
+The coordinator and installed examples do not form a general task or skill SDK.
+
+Recorded normal tasks, selected public-CLI interruption and proposal faults,
+and matched native normal/late-proposal comparisons cover their stated conditions.
+The comparison identifies responsibilities and single-run resource costs; it does
+not establish a net performance, reliability or development-time advantage.
+Earlier input-loss/closure probes retain their original profiles and do not
+qualify every later profile. There is no general navigation physical evaluator;
+the Agent's installed task evaluator applies only to ALOHA.
+
+Agent [`0c219f5`](https://github.com/xiao-yang25/robot-agent/commit/0c219f5b62c24a497f40fda8ff545ab4d38eda4d)
+delivers the controlled and host model tutorial, pinning Harness
+`13bc75e903f6005da3dd5d969f8242ce211d182f`. New public-source Linux/host installs
+completed one real three-proposal navigation task; its separate finite physical
+evaluation and local process/container cleanup passed. The
+[Agent qualification](https://github.com/xiao-yang25/robot-agent/blob/0c219f5b62c24a497f40fda8ff545ab4d38eda4d/docs/TESTING.md#public-host-model-navigation-workflow)
+records the versions, failures, outcomes and limits. Its mainline application and
+installed combination CI passed 67/12 checks. Harness retains the independent
+older-Agent compatibility pin; this documentation update changes no runtime or
+manifest and does not repeat prior qualifications. Published recordings keep
+their own source versions and scope.
+
+Final B acceptance, pending settlement, unknown native/remote cleanup and an
+unassessed application verdict remain valid distinct outcomes. M6 completion does
+not imply Owner restart recovery, a hard stopping deadline, physical hardware,
+model reliability, stable APIs or public preview readiness. Agent licensing and
+external adoption remain separate work. The next integration begins with a
+specific third task/backend and environment preflight, before new assets or GPU
+capacity are provisioned.

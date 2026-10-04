@@ -18,6 +18,11 @@ the detailed contracts and evidence.
 These software paths need no model or robot. For a failed command, start with
 [example troubleshooting](../examples/README.md#if-a-command-fails).
 
+For a full Agent-driven Nav2 scene, follow the
+[navigation business tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md).
+It supplies fixed-version preparation, controlled or host model proposals, and
+report/cleanup inspection; see [delivery scope](TESTING.md#m6-closeout).
+
 For signatures and the installed/source-tree boundary, use the [API entry points](API.md).
 Before adopting example code, read the
 [user-component and example classification](DESIGN.md#user-components-task-examples-and-internal-mechanisms).

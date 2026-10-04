@@ -855,3 +855,37 @@ consumer uses 45 seconds including public RPC allowance. The owner continues
 polling and handling EOF/cancel; expiry still aborts. This is caller think-time
 configuration, not a larger execution deadline, freshness TTL or physical stop
 budget. [Owner setup](../integrations/ros2/nav2_session/README.md) owns the command.
+
+
+## Planned cancellation settlement for business revision
+
+Design only; the installed navigation Owner still exits after current cancel,
+close or EOF and leaves unresolved settlement pending. Its normal A close path
+supports release before B, but the abort path does not qualify reuse.
+
+The next bounded candidate is an explicit profile over the existing two scoped
+Nav2 contexts, allowing one intentional cancellation of moving A and later B
+admission. It would keep the existing public cancel/status/observe/submit shapes,
+same coordinator and Core, and default profile behavior. Business intent belongs
+to the caller, not to this profile or the model.
+
+The Owner would revoke exactly A, schedule native cancellation and outlet sealing
+independently, and keep progressing while collecting correlated native terminal,
+child/BT/lane closure, drive ACK and fresh quiet. Aggregate release for reuse also
+requires fresh B readiness. Cancel intent or external stillness alone cannot
+supply settlement. A genuinely cancelled result remains cancelled/no-output;
+a success racing cancellation retains its actual native and output disposition.
+Missing or ambiguous facts keep A pending and prohibit B.
+
+This requires separating intentional A closure from fault/EOF/global shutdown;
+revocation may be tolerated only in that associated closure phase. Other faults
+must retain the existing abort behavior. Closure would remain bounded by the
+original operation/task deadline and normal 15-second close budget; the existing
+two-second abort is not extended. Owner liveness remains a premise, without
+claiming finite-permission, restart or hard-stop qualification.
+
+First verify real Core disposition and actual Humble/Nav2 cancelled-A closure
+with a private bounded probe. Only then implement and independently review the
+explicit profile, installed tests and relevant failures. Agent consumption and
+new installed/model/physics qualification follow that delivery. No dependency
+pin, controller policy, Core contract or supported runtime behavior changes here.

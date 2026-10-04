@@ -25,6 +25,7 @@
     @media(max-width:700px){.wrap{padding:0 20px}nav{gap:14px;padding:20px 0}.brand{font-size:16px}.brand img{width:30px;height:30px}nav .links{gap:16px;font-size:12px}nav .optional{display:none}.hero{padding:45px 0 42px}.hero-mark{width:72px;height:72px;margin-bottom:22px}h1{font-size:47px;letter-spacing:-2.5px}.hero p{font-size:16px}.demo-top,.demo-bottom{padding:13px 16px;flex-wrap:wrap}.demo-top span{font-size:10px}.principles,.scope,.start{grid-template-columns:minmax(0,1fr);gap:30px}.section-title{display:block}.section-title span{display:block;margin-top:12px}section.section{padding:42px 0}.principles h3{margin-top:8px}.scope{gap:32px}footer{flex-wrap:wrap}footer a{margin:0 12px 0 0}pre{font-size:11px;padding:18px}.closing{padding:40px 0}}
     .model-demo video{aspect-ratio:8/5}.model-demo .scope{grid-template-columns:1.5fr 1fr;gap:36px;align-items:center}.model-demo .demo-bottom{font-size:11px}.model-demo h3{font-size:24px;line-height:1.3}.demo-meta{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;font:11px ui-monospace,monospace;color:var(--muted)}.demo-meta span{padding:5px 9px;border:1px solid var(--line);border-radius:4px}.model-demo details{margin-top:16px;font-size:12px;color:var(--muted)}.model-demo summary{cursor:pointer}.model-demo details p{margin-top:10px}
     .demo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.demo-grid>*{min-width:0;scroll-margin-top:30px}.demo-grid .demo{display:flex;flex-direction:column}.demo-grid .demo-top{min-height:68px;padding:16px 18px;align-items:flex-start;flex-direction:column;gap:4px}.demo-grid video{aspect-ratio:8/5;object-fit:contain}.demo-grid .demo-bottom{display:flex;flex:1;flex-direction:column;gap:14px;font-size:13px;padding:18px}.demo-grid .demo-bottom a{font-size:12px;white-space:normal;margin-top:auto}.recording-note{font-size:12px;color:var(--muted);margin:20px 0 0}
+    .checkpoint-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     @media(min-width:701px) and (max-width:960px){.demo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.model-demo .scope{grid-template-columns:1.2fr 1fr;gap:24px}}
     @media(max-width:700px){.model-demo .scope,.demo-grid{grid-template-columns:minmax(0,1fr);gap:24px}.demo-grid .demo-top{min-height:0}.model-demo h3{font-size:22px}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -94,6 +95,28 @@
         </article>
       </div>
       <p class="recording-note">Separate actual simulations, with deterministic callers in these three clips. Navigation startup is trimmed and the view cropped, at original speed. No physical-robot validation. <a href="guide/docs/assets/demo/index.html">Full recordings, scope &amp; setup</a>.</p>
+    </section>
+    <section class="section" id="checkpoint-demos" aria-label="Recorded business instructions at a released navigation checkpoint">
+      <div class="section-title"><h2>One checkpoint. Two possible routes.</h2><span>BUSINESS INPUT / MODEL PROPOSAL / EXECUTION</span></div>
+      <div class="demo-grid checkpoint-grid">
+        <article class="demo" id="checkpoint-finish-demo">
+          <div class="demo-top"><strong>Finish here.</strong><span>Controlled instruction and proposal</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/checkpoint-finish-poster.png" aria-label="Robot reaches A, accepts a finish instruction and completes the checkpoint task without submitting B">
+            <source src="assets/demo/checkpoint-finish.mp4" type="video/mp4">
+            <p><a href="assets/demo/checkpoint-finish.mp4">Download the finish-at-A recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>A reaches its release boundary. One bound business instruction completes this checkpoint task at A; no B request is sent.</p><p>Prepared B resources may still exist. Task verdict stays unassessed and native cleanup unknown.</p><a href="guide/docs/assets/demo/index.html#checkpoint-navigation">Recording &amp; scope ↗</a></div>
+        </article>
+        <article class="demo" id="checkpoint-continue-demo">
+          <div class="demo-top"><strong>Continue from fresh feedback.</strong><span>Controlled instruction · actual host model</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/checkpoint-continue-poster.png" aria-label="Robot reaches A, an actual host model follows the bound continue instruction, and fresh feedback permits a single B request">
+            <source src="assets/demo/checkpoint-continue.mp4" type="video/mp4">
+            <p><a href="assets/demo/checkpoint-continue.mp4">Download the continue-to-B recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>The business provider chooses B. Three actual model proposals follow the task, while fresh feedback and Harness govern execution.</p><p>A releases before B starts. Final B settlement remains pending; the model does not supply execution authority.</p><a href="https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md#run-the-checkpoint-task">Run the checkpoint tutorial ↗</a></div>
+        </article>
+      </div>
+      <p class="recording-note">Separate same-run Humble/Nav2 simulations at original speed. Both business instructions are controlled; only the continue clip uses an actual model. This is a released-A checkpoint, not in-motion replanning or hardware qualification.</p>
     </section>
     <section class="section" id="failure-demos" aria-label="Recorded business interruption and proposal expiry">
       <div class="section-title"><h2>When the plan changes.</h2><span>BUSINESS STOP / LATE PROPOSAL / OWNER LOSS</span></div>

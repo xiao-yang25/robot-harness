@@ -1,5 +1,33 @@
 # Simulation recordings
 
+## Checkpoint navigation
+
+Two new same-run recordings exercise Robot Agent's explicit checkpoint task with
+the existing fixed Harness `13bc75e903f6005da3dd5d969f8242ce211d182f` dependency.
+Recorded application code is `2ac951b0cafedf5e4871e689dbd5d6ec4d7e749c`; new Linux
+Core and Agent installations use an existing qualified Ubuntu22.04/Humble amd64
+image. The scene has no network, 2 CPU and 4 GiB. No physical robot is used.
+
+| Clip | Business and proposal sources | Recorded outcome |
+|---|---|---|
+| [Finish at A](checkpoint-finish.mp4), about 28 seconds | Controlled business instruction, delivered once after a four-second wait; controlled proposal | A settled/released, then this new task completes at A; no B request. Separate same-run Gazebo evaluation measured A error 0.189m |
+| [Continue to B](checkpoint-continue.mp4), about 68 seconds | Controlled business instruction, delivered once after a four-second wait; three actual host `gpt-6-sol` / high proposals via Codex0.159.0 | A releases before a single B admission with fresh feedback; final B current/pending. Separate same-run evaluation measured A/B errors 0.188/0.175m |
+
+The model receives the bound business instruction and declared map measurements;
+it does not choose business intent or receive physical-evaluator truth or a robot
+interface. Actual host model and relay children were reaped, both host groups
+exited zero without forced cleanup, and the exact scene containers were removed.
+Task verdicts remain unassessed; native and remote model cleanup stay unknown.
+Prepared B resources may exist even when no B request is sent.
+
+Startup is trimmed, the RViz view cropped, captions added and the last frame held
+two seconds. Motion plays at original speed; caption alignment uses same-run
+monotonic events and retains screen-capture startup uncertainty. These clips are
+not timing instruments, in-motion replanning or hard stop evidence. Selected
+foreign and late instruction rejection runs are qualified separately; they are
+not silently inserted into these normal recordings. See the
+[checkpoint tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md#run-the-checkpoint-task).
+
 [Watch on the project website](https://xiao-yang25.github.io/robot-harness/#demo).
 The gallery contains actual ALOHA / MuJoCo and TurtleBot3 / Gazebo Classic
 recordings. Each silent clip identifies model-guided or deterministic decisions. Video shows motion;

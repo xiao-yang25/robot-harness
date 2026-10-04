@@ -19,15 +19,19 @@ dpkg-query -W > /output/packages.txt
 python3 - <<'PY'
 from pathlib import Path
 import json
+import os
 import uuid
 import yaml
 import xml.etree.ElementTree as ET
-from robot_harness_nav2._profile import PROFILE_ID, configure_controller
+from robot_harness_nav2._profile import PROFILE_ID, PERMISSION_PROFILE_ID, PROFILES, configure_controller
+profile = os.environ.get("M6_NAVIGATION_PROFILE", PROFILE_ID)
+if profile not in PROFILES:
+    raise RuntimeError("unknown navigation profile")
 scopes = dict(a_scope=uuid.uuid4().hex, b_scope=uuid.uuid4().hex)
 Path('/output/producer-context.json').write_text(json.dumps(scopes))
 params = yaml.safe_load(Path('/opt/ros/humble/share/nav2_bringup/params/nav2_params.yaml').read_text())
 configure_controller(params)
-Path('/output/navigation-profile.json').write_text(json.dumps(dict(profile=PROFILE_ID,
+Path('/output/navigation-profile.json').write_text(json.dumps(dict(profile=profile,
     controller=params['controller_server']['ros__parameters']['FollowPath'])))
 amcl = params['amcl']['ros__parameters']
 amcl['set_initial_pose'] = True
@@ -48,6 +52,8 @@ if len(plugins) != 1:
     raise RuntimeError('expected one drive outlet')
 plugins[0].set('filename', 'libscoped_diff_drive.so')
 ET.SubElement(plugins[0], 'generation_mode').text = 'true'
+if profile == PERMISSION_PROFILE_ID:
+    ET.SubElement(plugins[0], 'owner_permission_mode').text = 'true'
 model.write('/output/scoped-waffle.model', encoding='unicode')
 PY
 # The launcher owns the scene and separate example process. The installed owner
@@ -84,8 +90,11 @@ if [[ ${M6_SHOW_VIEW:-0} == 1 ]]; then
   python3 - <<'VIEW'
 from pathlib import Path
 import yaml
+import os
 p = Path('/output/live-view.rviz')
 v = yaml.safe_load(p.read_text())
+if os.environ.get('M6_NAVIGATION_PROFILE') == 'scoped-two-context-nav2-owner-permit-v1':
+    v['Visualization Manager']['Global Options']['Frame Rate'] = 5
 v['Visualization Manager']['Views']['Current'].update(Scale=250, X=-.7, Y=-.5)
 p.write_text(yaml.safe_dump(v, sort_keys=False))
 VIEW
@@ -99,8 +108,11 @@ launch_pid=$!
 python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
 bridge_pid=$!
 owner_options=()
+if [[ -n ${M6_NAVIGATION_PROFILE:-} ]]; then
+  owner_options+=(--profile "$M6_NAVIGATION_PROFILE")
+fi
 if [[ -n ${M6_CALLER_WAIT_SECONDS:-} ]]; then
-  owner_options=(--caller-wait-seconds "$M6_CALLER_WAIT_SECONDS")
+  owner_options+=(--caller-wait-seconds "$M6_CALLER_WAIT_SECONDS")
 fi
 python3 -m robot_harness_nav2 "${owner_options[@]}" > /output/caller.log 2>&1 &
 owner_pid=$!

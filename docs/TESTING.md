@@ -2376,3 +2376,40 @@ model reliability, stable APIs or public preview readiness. Agent licensing and
 external adoption remain separate work. The next integration begins with a
 specific third task/backend and environment preflight, before new assets or GPU
 capacity are provisioned.
+
+<a id="finite-owner-motion-permission"></a>
+## Finite Owner motion permission checks
+
+The optional finite Nav2 profile keeps the default v1 and public Session/Core
+API. Its contract is in [Design](DESIGN.md#finite-owner-motion-permission).
+These checks cover separate boundaries:
+
+| Check | Actual scope |
+|---|---|
+| `nav2_motion_permission` | Literal policy traces: issue-based deadlines, normal A/B handoff, identity rejection, exact expiry, clock reversal, fault latch; controlled expiry after calculation and between native writes |
+| Installed `linux_driver_checks.py` | Actual Owner methods and real Core with synthetic ROS edges: unsolicited fault ACK leads to abort/revocation, keeps output/settlement pending; malformed ACK rejection, missing-service startup refusal and unresolved-renewal handoff refusal |
+| `native_drive/linux_protocol_checks.py` | Actual Gazebo wheel plugin and ROS callbacks: finite mode refuses old wire/late renewal/new generation after expiry; default generation mode retains open/close and ACK fields |
+| Separate navigation runs | Actual installed Owner/Core/bridge/native workers and external motion observations; process or protocol unit checks alone cannot qualify physical arrival or stopping |
+
+Automatic Ubuntu 22.04/Humble CI builds the private messages, installed Owner
+and pure permission checks. A second job builds the actual Gazebo 11 drive and
+runs the finite/legacy protocol fixture, retaining its raw logs as an artifact.
+The protocol fixture disables gravity and does not adjudicate braking or a
+physical navigation task. Existing manual simulation runs retain their scope.
+
+After building/installing the private interfaces and drive in a Humble Linux
+environment, the focused checks can be run with:
+
+```sh
+ctest --test-dir build-nav2 -R '^nav2_motion_permission$' --output-on-failure --no-tests=error
+PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 integrations/ros2/nav2_session/tests/linux_driver_checks.py
+ROS_LOCALHOST_ONLY=1 ROS_DOMAIN_ID=76 M4_ISOLATED_SIMULATION=1 GAZEBO_MODEL_DATABASE_URI='' \
+  GAZEBO_PLUGIN_PATH="/drive/lib:${GAZEBO_PLUGIN_PATH:-}" \
+  python3 integrations/ros2/simulation/native_drive/linux_protocol_checks.py
+```
+
+The last command requires a fresh writable `/output` in its isolated container
+and a sourced custom-interface setup. It owns and reaps only its child Gazebo
+processes. No Owner restart, hardware, hard stopping-time or native worker
+termination qualification follows from these checks.

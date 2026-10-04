@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/91a164f6-653c-41e2-ae12-b494489ea3b4
 *Local M6 candidate · Gazebo simulation · 70.9 seconds at original speed.*
 A releases before B starts; B settlement remains pending at the end.
 
-[More demos: manipulation, cancellation and handoff](https://xiao-yang25.github.io/robot-harness/#more-demos)
+[More demos: manipulation, cancellation, handoff and Owner loss](https://xiao-yang25.github.io/robot-harness/#more-demos)
 · [Recording notes and same-run evidence](docs/assets/demo/README.md)
 
 ## Build
@@ -74,12 +74,13 @@ Run the [navigation business tutorial](https://github.com/xiao-yang25/robot-agen
 with controlled or host model proposals. The [M6 delivery scope](docs/TESTING.md#m6-closeout)
 covers the two-consumer slice and its recorded qualifications.
 
-**Next:** select and preflight a third task/backend combination. Broader skills,
+**Next:** broaden task/skill consumers and qualify a third backend combination. Broader skills,
 learning and self-improvement remain future directions.
 
 **Early-stage software, validated in limited simulation profiles.** No physical-robot
-integration or hard stop guarantee yet. Motion recovery requires a surviving,
-polled Owner; cancellation does not by itself prove native stop or settlement.
+integration or hard stop guarantee yet. Recovery requires a surviving,
+polled Owner; the [optional finite motion profile](integrations/ros2/nav2_session/README.md#explicit-finite-motion-profile)
+can expire outlet permission after Owner loss; cancellation does not by itself prove native stop or settlement.
 See [validation and supported combinations](docs/TESTING.md#m6b-delivery-ci-coverage)
 and [architecture and limits](docs/DESIGN.md#product-boundary).
 

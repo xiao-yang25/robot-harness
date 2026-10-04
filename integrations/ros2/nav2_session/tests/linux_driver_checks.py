@@ -1,5 +1,6 @@
 """Actual driver methods with real Core, synthetic ROS edges; isolated Linux only."""
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -369,6 +370,126 @@ class DriverChecks(unittest.TestCase):
                 'sys.argv', ['owner']):
             self.assertEqual(entry.main(), 1)
         self.assertEqual(calls, ['abort'])
+
+
+class PermissionOwnerChecks(unittest.TestCase):
+    def setUp(self):
+        from robot_harness_nav2 import _permission
+        self.permission = _permission
+        self.owner = _permission.PermissionOwner.__new__(_permission.PermissionOwner)
+        self.context = dict(scope_id='a'*32, generation=1, operation_id=7,
+                            initial_permission_deadline_ns=1000, last_permission_deadline_ns=1200)
+        self.owner.contexts = {'A': self.context}
+        self.owner.permission_fault = None
+        self.fact = dict(event='motion_scope_applied', scope_id='a'*32, generation=1,
+                         operation_id=7, sealed=True, wheel_targets_zero=True,
+                         update_sequence=5, sim_ns=200, steady_ns=1300,
+                         permission_deadline_ns=1200, closure_reason='permission_expired')
+
+    def ack(self, **changes):
+        with patch.object(self.permission, 'now_ns', return_value=1400), patch.object(self.permission, 'emit'):
+            self.owner.drive_ack(SimpleNamespace(data=json.dumps(dict(self.fact, **changes))))
+
+    def test_unsolicited_ack_enters_existing_abort_and_keeps_settlement_pending(self):
+        # Actual live Owner methods / real Core; only ROS spin and edge clients
+        # are synthetic. No close request is required for the autonomous fact.
+        self.assertNotIn('close_requested_ns', self.context)
+        self.ack()
+        gate = _core.Gate('p', 'd', 'cap', self.owner.profile, 1, 0)
+        self.addCleanup(gate.close)
+        for kind in ('idle', 'worker', 'sink'):
+            gate.startup(kind, True, 1)
+        gate.capabilities(True, 2, 100)
+        execution = ExecutionCoordinator(gate, lambda: 3)
+        record = execution.reserve('A', ('A',), lambda: {'stage': 'A'})[0]
+        execution.admit(record, 1, 50, 3)
+        execution.dispatch(record)
+        self.owner.execution = execution
+        self.owner.gate = gate
+        self.owner.endpoint = self.owner.requests = None
+        self.owner.stop_requested = self.owner.completed = self.owner.aborting = False
+        self.owner.context_process = SimpleNamespace(poll=lambda: None)
+        self.owner.valid_observation = lambda: True
+        self.owner.capability_at = 100
+        self.owner.pending = []
+        self.owner.current = self.context
+        close = unittest.mock.Mock(return_value=SimpleNamespace(done=lambda: False))
+        self.owner.scoped_clients = {'/close_scoped_motion': SimpleNamespace(
+            service_is_ready=lambda: True, call_async=close)}
+        with patch.object(driver.ScopedDriver, 'tick'), patch.object(driver.time, 'monotonic_ns', return_value=3):
+            with self.assertRaisesRegex(RuntimeError, 'permission fault'):
+                self.owner.tick()
+        with patch.object(driver, 'diagnose'), patch.object(driver.time, 'monotonic', side_effect=[0, 3]):
+            self.owner.abort()
+        close.assert_called_once()
+        self.assertEqual(gate.receipt(1)['authority_disposition'], 'revoked')
+        self.assertEqual(gate.receipt(1)['settlement'], 'pending')
+        self.assertEqual(gate.receipt(1)['output'], 'pending')
+        self.assertNotIn('drive_ack', self.context)
+
+    def test_fault_fact_rejects_wrong_identity_premature_time_and_bool_integer(self):
+        for changes in (dict(operation_id=8), dict(generation=True),
+                        dict(steady_ns=1199), dict(sim_ns=0), dict(wheel_targets_zero=False)):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                self.ack(**changes)
+        self.assertIsNone(self.owner.permission_fault)
+        self.ack()
+        self.ack()  # Exact duplicate is harmless.
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            self.ack(update_sequence=6)
+
+    def test_normal_ack_still_requires_owner_close_request(self):
+        with self.assertRaisesRegex(ValueError, 'unexpected drive'):
+            self.ack(closure_reason='normal_close')
+        self.assertIsNone(self.owner.permission_fault)
+
+    def test_unresolved_old_renewal_blocks_b_open(self):
+        owner = self.owner
+        record = dict(stage='B', scope_id='b'*32, generation=2, operation_id=8)
+        owner.execution = SimpleNamespace(active=record, dispatch=lambda record: True,
+                                          snapshot=lambda record: record,
+                                          tick=lambda: {'authority_disposition': 'current'})
+        owner.aborting = False
+        owner.valid_observation = lambda: True
+        owner.context_process = SimpleNamespace(poll=lambda: None)
+        owner.contexts = {'B': dict(scope_id='b'*32, generation=2)}
+        owner.b_observed_client = None
+        owner.permission_context = None
+        old = SimpleNamespace(done=lambda: False)
+        owner.permission_future = old
+        owner.permission_issued = 100
+        response = SimpleNamespace(accepted=True, generation=2, deadline_ns=100+self.permission.LIFETIME_NS)
+        opening = unittest.mock.Mock(return_value=SimpleNamespace(done=lambda: True, result=lambda: response))
+        owner.permit_open = SimpleNamespace(service_is_ready=lambda: True, call_async=opening)
+        def wait(predicate, *args, **kwargs):
+            if not predicate():
+                raise TimeoutError('old renewal unresolved')
+        owner.wait = wait
+        with tempfile.TemporaryDirectory() as directory, patch.object(self.permission, 'OUT', Path(directory)), \
+                patch.object(self.permission, 'emit'), patch.object(self.permission, 'now_ns', return_value=100):
+            with self.assertRaisesRegex(TimeoutError, 'old renewal unresolved'):
+                owner.open_scope('B')
+        self.assertIs(owner.permission_future, old)
+        opening.assert_not_called()
+        # A response rejected after normal closure is harmless, but must be
+        # observed before B can acquire the one outstanding renewal slot.
+        old.done = lambda: True
+        old.result = unittest.mock.Mock(return_value=SimpleNamespace(accepted=False, deadline_ns=1200))
+        with tempfile.TemporaryDirectory() as directory, patch.object(self.permission, 'OUT', Path(directory)), \
+                patch.object(self.permission, 'emit'), patch.object(self.permission, 'now_ns', return_value=100):
+            owner.open_scope('B')
+        old.result.assert_called_once()
+        opening.assert_called_once()
+        self.assertIsNone(owner.permission_future)
+
+    def test_missing_permission_service_prevents_public_endpoint_preparation(self):
+        self.owner.scoped_clients = {}
+        self.owner.create_client = lambda *a: SimpleNamespace(service_is_ready=lambda: False)
+        self.owner.wait = unittest.mock.Mock(side_effect=TimeoutError('permission service missing'))
+        with patch.object(driver.NavigationOwner, 'prepare_b_initial') as public_prepare:
+            with self.assertRaisesRegex(TimeoutError, 'permission service missing'):
+                self.owner.prepare_b_initial()
+        public_prepare.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -20,6 +20,10 @@ ament_target_dependencies(robot_harness_nav2_observation rclcpp rclcpp_action na
   nav_msgs geometry_msgs rosgraph_msgs lifecycle_msgs)
 
 if(BUILD_TESTING)
+  add_executable(nav2_motion_permission_test motion_permission_test.cpp)
+  target_compile_features(nav2_motion_permission_test PRIVATE cxx_std_17)
+  target_compile_options(nav2_motion_permission_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME nav2_motion_permission COMMAND nav2_motion_permission_test)
   add_executable(nav2_motion_window_test motion_window_test.cpp)
   target_compile_features(nav2_motion_window_test PRIVATE cxx_std_17)
   add_test(NAME nav2_motion_window COMMAND nav2_motion_window_test)

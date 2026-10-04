@@ -17,6 +17,7 @@ from configure_mirror import validate_mirror_url
 ROOT = Path(__file__).resolve().parents[3]
 IMAGE = 'robot-harness-simulation:humble'
 VISUAL_IMAGE = 'robot-harness-simulation:humble-visual'
+PROFILES = ('scoped-two-context-nav2-shim-v1', 'scoped-two-context-nav2-owner-permit-v1')
 CASES = ('normal', 'cancel-moving', 'replace-moving',
          'obstacle-wait', 'obstacle-wait-frozen-scan',
          'obstacle-resume', 'obstacle-resume-frozen-scan', 'obstacle-resume-missing-controller',
@@ -100,6 +101,11 @@ def run_case(args):
                    '-e', f'M4_VISUAL={int(getattr(args, "visual", False))}']
         if getattr(args, 'session', False):
             client, client_prefix, caller_wait = session_client(args)
+            profile = getattr(args, 'profile', PROFILES[0])
+            if profile not in PROFILES:
+                raise ValueError('unknown navigation profile')
+            status['profile'] = profile
+            command.extend(['-e', 'M6_NAVIGATION_PROFILE='+profile])
             prefix = Path(args.python_prefix).expanduser().resolve(strict=True)
             if not (prefix / 'lib/robot-harness/python/robot_harness_nav2/__main__.py').is_file():
                 raise ValueError('prefix does not contain the installed Nav2 owner')
@@ -211,6 +217,8 @@ def main():
     run.add_argument('--visual', action='store_true', help='capture actual RViz frames')
     run.add_argument('--output', required=True, help='new directory; existing paths are rejected')
     session = commands.add_parser('session', help='run the installed bounded Nav2 owner and independent A/B example')
+    session.add_argument('--profile', choices=PROFILES, default=PROFILES[0],
+                         help='explicit native motion profile; existing v1 remains default')
     session.add_argument('--python-prefix', required=True, help='Linux install prefix with optional Python bridge')
     session.add_argument('--image', required=True, help='qualified local scoped Humble/Nav2 image')
     session.add_argument('--output', required=True, help='new result directory')

@@ -6,7 +6,8 @@ find_package(geometry_msgs REQUIRED)
 # Message-only counterpart of the trusted simulation fixture. No drive or server.
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CloseMotionScope.srv" "srv/OpenMotionScope.srv" "srv/CloseScopedMotion.srv"
-  "msg/ScopedTwist.msg" DEPENDENCIES geometry_msgs)
+  "srv/OpenPermit.srv" "srv/RenewPermit.srv" "srv/ClosePermit.srv"
+  "msg/ScopedTwist.msg" "msg/PermittedTwist.msg" DEPENDENCIES geometry_msgs)
 ament_export_dependencies(rosidl_default_runtime)
 install(FILES ../../../LICENSE ../../../LICENSE-MIT ../../../LICENSE-APACHE
   DESTINATION share/${PROJECT_NAME}/licenses)

@@ -1,5 +1,7 @@
 """Single fixed native controller policy for the isolated Nav2 Session."""
 PROFILE_ID = 'scoped-two-context-nav2-shim-v1'
+PERMISSION_PROFILE_ID = 'scoped-two-context-nav2-owner-permit-v1'
+PROFILES = (PROFILE_ID, PERMISSION_PROFILE_ID)
 
 
 def configure_controller(parameters):

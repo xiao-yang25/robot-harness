@@ -1735,3 +1735,50 @@ for up to three 5-second public RPC waits; it does not alter execution deadlines
 observation freshness or physical closure predicates. Idle expiry still aborts
 and preserves unknown/pending facts. This is a bounded simulation-profile setting,
 not a hard-stop or owner recovery mechanism.
+
+<a id="finite-owner-motion-permission"></a>
+## Finite Owner motion permission in the isolated Nav2 profile
+
+`scoped-two-context-nav2-owner-permit-v1` is an explicit optional motion profile.
+`scoped-two-context-nav2-shim-v1` remains the default; public NavigationSession
+and Core interfaces are unchanged. Both use the same fixed Rotation Shim/DWB
+controller, sites, prepared contexts and physical observation predicates.
+The new behavior lives in the installed Nav2 Owner and private Gazebo drive,
+not in a business Agent or a universal hardware safety API.
+
+The drive starts closed and must actually apply zero before opening. The Owner
+binds each admitted Core operation to its immutable producer scope/generation,
+then sends a typed permission stamped with `CLOCK_MONOTONIC`. Each grant expires
+one second after its **issue** time, not its receipt time. The same Owner loop
+attempts renewal every 100 ms, with at most one renewal in flight, while Core
+permission, navigation observations and the native context remain current.
+Normal close stops issuance while retaining any outstanding renewal; its result
+must be observed before opening the next generation. A response timeout blocks
+that opening. There is no background renewal thread; the producer bridge can send motion but
+cannot renew permission. All participants share one isolated Linux boot/time
+namespace. This protocol is not authorized for cross-machine timestamps or
+untrusted ROS participants.
+
+The drive serializes service callbacks, command consumption, closure and wheel
+writes under one mutex. It checks identity and expiry on receipt and immediately
+before **each** actual wheel write, after control calculations. A late renewal,
+old command, wrong operation or fresh generation cannot reopen a fault-closed
+instance. Only a normal close with actual zero application permits the next
+prepared generation. In finite mode, legacy open/close and scoped motion inputs
+are rejected; the legacy default retains its existing wire and ACK fields.
+A missing finite service prevents exposure of the public request endpoint.
+
+Expiry or a detected clock reversal seals admission, clears cached targets and
+retries writing zero on physics updates. An application ACK is emitted only
+when every native zero write reports success. A living Owner accepts this
+correlated **unsolicited** fault ACK without a preceding close request and
+enters its existing abort path. The ACK cannot establish native worker cleanup,
+external quiet, Core settlement or task success. Those remain separate facts;
+Owner loss leaves native cleanup and Core settlement unknown.
+
+The one-second value bounds the validity of a grant at the declared native call
+boundary. It is not a hard braking deadline, an interrupt inside Gazebo, a bound
+on a stalled physics process, or CPU/GPU worker termination. Restart, durable
+recovery, reprovisioning of a fault-closed scope and real hardware protection
+remain outside this profile. See [verification](TESTING.md#finite-owner-motion-permission)
+and the [installed Owner entry](../integrations/ros2/nav2_session/README.md).

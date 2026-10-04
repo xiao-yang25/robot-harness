@@ -26,14 +26,32 @@ class Bridge(Node):
     def __init__(self, scope, generation):
         super().__init__('producer_bridge_' + str(generation))
         topic = '/m4_motion/s_' + scope + '/smoothed'
-        publisher = self.create_publisher(ScopedTwist, '/scoped_cmd_vel', 10)
+        finite = os.environ.get('M6_NAVIGATION_PROFILE') == 'scoped-two-context-nav2-owner-permit-v1'
+        if finite:
+            from m4_drive_probe.msg import PermittedTwist
+        kind = PermittedTwist if finite else ScopedTwist
+        publisher = self.create_publisher(kind, '/owner_permission/cmd' if finite else '/scoped_cmd_vel', 10)
+        operation = None
         # These closure bindings never change. Each subscription is permanently
         # attached to one producer channel, even if another generation opens.
         def forward(message):
-            command = ScopedTwist(scope_id=scope, generation=generation, twist=message)
+            nonlocal operation
+            fields = {}
+            if finite:
+                if operation is None:
+                    binding = Path('/output')/('operation-'+scope+'.json')
+                    if not binding.exists():
+                        return
+                    row = json.loads(binding.read_text())
+                    if (row['scope_id'] != scope or row['generation'] != generation
+                            or type(row['operation_id']) is not int or not 0 < row['operation_id'] < 2**64):
+                        raise RuntimeError('producer immutable operation binding invalid')
+                    operation = row['operation_id']
+                fields['operation_id'] = operation
+            command = kind(scope_id=scope, generation=generation, twist=message, **fields)
             publisher.publish(command)
             print(json.dumps(dict(event='producer_command_forwarded', scope_id=scope,
-                                  generation=generation, input_topic=topic,
+                                  generation=generation, input_topic=topic, **fields,
                                   linear_x=message.linear.x, angular_z=message.angular.z,
                                   steady_ns=time.monotonic_ns())), flush=True)
         self.create_subscription(Twist, topic, forward, 10)

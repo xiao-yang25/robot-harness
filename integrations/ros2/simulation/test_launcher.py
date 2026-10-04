@@ -12,7 +12,7 @@ import simulate
 
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
-                 output_links=False, blocked_record=False, session=False, custom_client=False):
+                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0]):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -61,7 +61,7 @@ class LauncherTest(unittest.TestCase):
             with patch.object(simulate.subprocess, 'run', side_effect=docker), \
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
                 code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
-                    session=session, python_prefix=str(prefix),
+                    session=session, profile=profile, python_prefix=str(prefix),
                     client_script=str(client) if custom_client else None,
                     client_prefix=str(client_prefix) if custom_client else None,
                     caller_wait_seconds=45 if custom_client else None))
@@ -73,6 +73,7 @@ class LauncherTest(unittest.TestCase):
                 self.assertEqual(command[-2:], ['image-id', '/simulation/navigation_session.sh'])
                 self.assertIn('none', command)
                 self.assertIn('M6_NATIVE_ISOLATED=1', command)
+                self.assertIn('M6_NAVIGATION_PROFILE='+profile, command)
                 self.assertTrue(any('target=/installed,readonly' in part for part in command))
                 self.assertTrue(any('target=/navigation-example.py,readonly' in part for part in command))
                 self.assertFalse(any('target=/simulation/navigation_requests.py' in part for part in command))
@@ -85,6 +86,10 @@ class LauncherTest(unittest.TestCase):
                     self.assertNotIn('M6_CLIENT_PREFIX=/client-prefix', command)
                     self.assertFalse(any(part.startswith('M6_CALLER_WAIT_SECONDS=') for part in command))
             return code, status
+
+    def test_explicit_permission_profile_reaches_container_and_host_record(self):
+        _, status = self.exercise(session=True, profile=simulate.PROFILES[1])
+        self.assertEqual(status['profile'], simulate.PROFILES[1])
 
     def test_installed_session_launch_has_separate_readonly_example_mount(self):
         code, status = self.exercise(session=True)

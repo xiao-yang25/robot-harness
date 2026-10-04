@@ -127,3 +127,28 @@ PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}" \
 These use the real Core and synthetic ROS edges; they test scheduling and error
 isolation, not physical stop. See [Runtime design](../../../docs/RUNTIME_SLICE.md#installed-bounded-nav2-owner)
 and [Testing](../../../docs/TESTING.md#navigation-request-entry) for qualification limits.
+
+### Explicit finite motion profile
+
+Select `--profile scoped-two-context-nav2-owner-permit-v1` on the host `session`
+command to use the installed finite-permission Owner with a rebuilt scoped
+simulation image. The default remains `scoped-two-context-nav2-shim-v1`.
+The image and install prefix must both contain the new private interfaces and
+Owner code; a legacy image cannot provide the finite services.
+
+```sh
+python3 integrations/ros2/simulation/simulate.py session \
+  --profile scoped-two-context-nav2-owner-permit-v1 \
+  --image YOUR_REBUILT_SCOPED_HUMBLE_IMAGE \
+  --python-prefix /absolute/linux-install-prefix \
+  --output /absolute/new-result-directory
+```
+
+The Owner renews issue-stamped one-second permissions from its own loop. When
+progress stops, the drive independently expires permission, rejects later motion
+and attempts actual wheel zero application. A fault-closed instance cannot be
+reopened. This protects the selected motion outlet; it does not prove a hard
+physical stop deadline, stop other workers, recover an Owner, or settle Core.
+See [design](../../../docs/DESIGN.md#finite-owner-motion-permission) and
+[checks](../../../docs/TESTING.md#finite-owner-motion-permission). Existing
+business-Agent consumers retain their declared default profile/version pin.

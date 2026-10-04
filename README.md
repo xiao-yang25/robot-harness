@@ -70,9 +70,12 @@ to watch navigation, cancellation and replacement.
 | Simulated navigation, cancellation, replacement and bounded loss isolation | [Humble/Gazebo](integrations/ros2/simulation/README.md) |
 | Existing-agent tools and embodied business applications | [MCP](integrations/mcp/README.md) · [Robot Agent](https://github.com/xiao-yang25/robot-agent) |
 
-**Next:** a public end-to-end navigation business tutorial and recorded-task
-verification, followed by broader robot skills. Learning and self-improvement
-remain future directions.
+Run the [navigation business tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md)
+with controlled or host model proposals. The [M6 delivery scope](docs/TESTING.md#m6-closeout)
+covers the two-consumer slice and its recorded qualifications.
+
+**Next:** select and preflight a third task/backend combination. Broader skills,
+learning and self-improvement remain future directions.
 
 **Early-stage software, validated in limited simulation profiles.** No physical-robot
 integration or hard stop guarantee yet. Motion recovery requires a surviving,

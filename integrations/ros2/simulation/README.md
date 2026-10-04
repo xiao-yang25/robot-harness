@@ -282,3 +282,12 @@ simulation source, then starts the owner and the independent public A/B example.
 It checks process completion, while physical task evaluation remains external.
 The fixed heading profile completed standalone normal reproduction locally; see the owner README
 and [Testing](../../../docs/TESTING.md#navigation-request-entry) for current limits.
+
+For the installed business Agent, use the separate
+[navigation tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md).
+It selects a fixed Harness dependency and reuses this launcher with a read-only
+client/prefix and bounded caller wait. Controlled proposals are the default;
+opt-in Codex proposals run on the host with credentials and private logs outside
+all container mounts. The tutorial explains new Linux/host installations,
+reports and owned-process cleanup. Its [qualification](../../../docs/TESTING.md#m6-closeout)
+is separate from the default request example and the viewer's recorded scenarios.

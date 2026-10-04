@@ -1,0 +1,8 @@
+string scope_id
+uint64 expected_generation
+uint64 operation_id
+uint64 issued_ns
+---
+bool accepted
+uint64 generation
+uint64 deadline_ns

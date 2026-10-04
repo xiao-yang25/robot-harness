@@ -283,3 +283,32 @@ and their B/wait/final frames were inspected. Summary files select existing fact
 without operator paths or prompts; they are presentation metadata, not another
 evaluation. See [Testing](../../TESTING.md#final-proposal-cancellation-candidate)
 and the [fixed Agent checks](https://github.com/xiao-yang25/robot-agent/blob/ffad065ae81ca9e9b17cba558d471078d657a9b2/docs/TESTING.md#updated-fixed-pairing).
+
+## Finite Owner motion permission
+
+[Recording](owner-permission.mp4) · [Selected same-run facts](owner-permission-run.json) ·
+[Explicit profile and reproduction](../../../integrations/ros2/nav2_session/README.md#explicit-finite-motion-profile)
+
+The installed product candidate uses `scoped-two-context-nav2-owner-permit-v1`,
+based on `f43f4c3` with the corrected Owner patch delivered alongside these assets. The final
+installation passed21 focused Owner/Core checks and a new normal A→B run.
+In one isolated Ubuntu22.04/Humble/Gazebo run, A settles/releases, B starts
+moving, and the actual Owner is killed with SIGKILL. Native command production
+continues; the drive independently expires the issue-stamped permission and
+actually writes every wheel target to zero. Late renewal and a fresh generation
+are refused. The separate evaluator confirms fresh external quiet and the fixed
+Gazebo snapshot window, declared to start 1.5 seconds after fault injection.
+
+This run observed 1.013 seconds from the fault to zero application and 29.3 ms
+from the last permission deadline to application. These are observations, **not
+hard time bounds**. Native cleanup and Core settlement remain unknown, task
+success unassessed; there is no automatic restart or hardware qualification.
+A separate installed normal A→B and actual SIGSTOP check also passed their
+declared predicates; this recording demonstrates the SIGKILL case only.
+
+The 1280×800 recording is about31.1 seconds at original speed. Startup/view are
+trimmed, approximate monotonic event captions are added, and the last frame is
+held two seconds. Display refresh is5fps; the recorder samples10fps. Full decoding
+and final-frame inspection passed. Captions are not a timing instrument. The
+poster is the final frame from this export. The JSON selects the existing
+unique evaluation; it does not rerun physical adjudication or contain local paths.

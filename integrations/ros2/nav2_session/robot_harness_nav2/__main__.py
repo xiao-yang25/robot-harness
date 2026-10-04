@@ -56,6 +56,9 @@ def caller_wait_seconds(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    from ._profile import PROFILE_ID, PERMISSION_PROFILE_ID, PROFILES
+    parser.add_argument('--profile', choices=PROFILES, default=PROFILE_ID,
+                        help='explicit native motion policy; existing v1 is the default')
     parser.add_argument('--caller-wait-seconds', type=caller_wait_seconds,
                         help='bounded idle wait for each admission and final client close; '
                              'default admission 15s / final close 10s')
@@ -63,6 +66,9 @@ def main():
     require_isolation()  # Fail before importing ROS or starting any resource.
     import rclpy
     from ._owner import NavigationOwner, ClientClosed
+    if args.profile == PERMISSION_PROFILE_ID:
+        from ._permission import PermissionOwner
+        NavigationOwner = PermissionOwner
     from ._observations import emit, diagnose
     rclpy.init()
     owner = NavigationOwner.__new__(NavigationOwner)

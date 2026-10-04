@@ -291,3 +291,9 @@ opt-in Codex proposals run on the host with credentials and private logs outside
 all container mounts. The tutorial explains new Linux/host installations,
 reports and owned-process cleanup. Its [qualification](../../../docs/TESTING.md#m6-closeout)
 is separate from the default request example and the viewer's recorded scenarios.
+
+The installed Session also offers an [explicit finite Owner permission profile](../nav2_session/README.md#explicit-finite-motion-profile).
+It uses the rebuilt private drive/interfaces and preserves the default legacy
+profile. A [same-run Owner-loss recording](https://xiao-yang25.github.io/robot-harness/#owner-loss-demo)
+shows autonomous outlet expiry; its scope does not include hard braking limits,
+worker termination or restart recovery.

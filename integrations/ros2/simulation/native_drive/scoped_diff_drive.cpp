@@ -77,21 +77,27 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include "motion_permission.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
+#include <m4_drive_probe/msg/permitted_twist.hpp>
 #include <m4_drive_probe/msg/scoped_twist.hpp>
 #include <m4_drive_probe/srv/close_motion_scope.hpp>
+#include <m4_drive_probe/srv/close_permit.hpp>
 #include <m4_drive_probe/srv/close_scoped_motion.hpp>
 #include <m4_drive_probe/srv/open_motion_scope.hpp>
+#include <m4_drive_probe/srv/open_permit.hpp>
+#include <m4_drive_probe/srv/renew_permit.hpp>
 #include <memory>
 #include <optional>
 #include <std_msgs/msg/string.hpp>
 #include <stdexcept>
 #include <string>
+#include <time.h>
 #include <vector>
 
 namespace gazebo_plugins {
@@ -107,6 +113,37 @@ public:
   CloseGeneration(const std::shared_ptr<m4_drive_probe::srv::CloseScopedMotion::Request> request,
                   std::shared_ptr<m4_drive_probe::srv::CloseScopedMotion::Response> response);
   void OnScopedCmd(const m4_drive_probe::msg::ScopedTwist::SharedPtr message);
+  bool owner_permission_mode_{false};
+  using OpenPermit = m4_drive_probe::srv::OpenPermit;
+  using RenewPermit = m4_drive_probe::srv::RenewPermit;
+  using ClosePermit = m4_drive_probe::srv::ClosePermit;
+  using PermittedTwist = m4_drive_probe::msg::PermittedTwist;
+  robot_harness::simulation::MotionPermission permission_{1000000000ULL};
+  uint64_t operation_id_{0};
+  std::string closure_reason_{"boot"};
+  rclcpp::Service<OpenPermit>::SharedPtr permit_open_;
+  rclcpp::Service<RenewPermit>::SharedPtr permit_renew_;
+  rclcpp::Service<ClosePermit>::SharedPtr permit_close_;
+  rclcpp::Subscription<PermittedTwist>::SharedPtr permitted_sub_;
+  static uint64_t permit_now_ns() {
+    timespec stamp{};
+    if (clock_gettime(CLOCK_MONOTONIC, &stamp) != 0) {
+      throw std::runtime_error("permission monotonic clock unavailable");
+    }
+    return uint64_t(stamp.tv_sec) * 1000000000ULL + stamp.tv_nsec;
+  }
+  uint64_t motion_now_ns() const {
+    return owner_permission_mode_ ? permit_now_ns()
+                                  : std::chrono::steady_clock::now().time_since_epoch().count();
+  }
+  robot_harness::simulation::MotionPermitIdentity permit_identity() const {
+    return {scope_, generation_, operation_id_};
+  }
+  void sync_permission(uint64_t now);
+  void open_permit(std::shared_ptr<OpenPermit::Request>, std::shared_ptr<OpenPermit::Response>);
+  void renew_permit(std::shared_ptr<RenewPermit::Request>, std::shared_ptr<RenewPermit::Response>);
+  void close_permit(std::shared_ptr<ClosePermit::Request>, std::shared_ptr<ClosePermit::Response>);
+  void permitted_command(PermittedTwist::SharedPtr);
   std::string scope_;
   bool generation_mode_{false};  // Immutable after Load; explicit experiment opt-in.
   uint64_t generation_{0};
@@ -280,6 +317,10 @@ void ScopedDiffDrive::Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sd
   impl_->model_ = _model;
   impl_->generation_mode_ = _sdf->Get<bool>("generation_mode", false).first;
   impl_->sealed_ = impl_->generation_mode_;
+  impl_->owner_permission_mode_ = _sdf->Get<bool>("owner_permission_mode", false).first;
+  if (impl_->owner_permission_mode_ && !impl_->generation_mode_) {
+    throw std::runtime_error("Owner permission requires generation mode");
+  }
 
   // Initialize ROS node
   impl_->ros_node_ = gazebo_ros::Node::Get(_sdf);
@@ -323,6 +364,40 @@ void ScopedDiffDrive::Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sd
         });
   }
 
+  if (impl_->owner_permission_mode_) {
+    impl_->permit_open_ = impl_->ros_node_->create_service<ScopedDiffDrivePrivate::OpenPermit>(
+        "/owner_permission/open",
+        [weak](std::shared_ptr<ScopedDiffDrivePrivate::OpenPermit::Request> request,
+               std::shared_ptr<ScopedDiffDrivePrivate::OpenPermit::Response> response) {
+          if (auto state = weak.lock()) {
+            state->open_permit(request, response);
+          }
+        });
+    impl_->permit_renew_ = impl_->ros_node_->create_service<ScopedDiffDrivePrivate::RenewPermit>(
+        "/owner_permission/renew",
+        [weak](std::shared_ptr<ScopedDiffDrivePrivate::RenewPermit::Request> request,
+               std::shared_ptr<ScopedDiffDrivePrivate::RenewPermit::Response> response) {
+          if (auto state = weak.lock()) {
+            state->renew_permit(request, response);
+          }
+        });
+    impl_->permit_close_ = impl_->ros_node_->create_service<ScopedDiffDrivePrivate::ClosePermit>(
+        "/owner_permission/close",
+        [weak](std::shared_ptr<ScopedDiffDrivePrivate::ClosePermit::Request> request,
+               std::shared_ptr<ScopedDiffDrivePrivate::ClosePermit::Response> response) {
+          if (auto state = weak.lock()) {
+            state->close_permit(request, response);
+          }
+        });
+    impl_->permitted_sub_ =
+        impl_->ros_node_->create_subscription<ScopedDiffDrivePrivate::PermittedTwist>(
+            "/owner_permission/cmd", rclcpp::QoS(10).reliable(),
+            [weak](ScopedDiffDrivePrivate::PermittedTwist::SharedPtr command) {
+              if (auto state = weak.lock()) {
+                state->permitted_command(command);
+              }
+            });
+  }
   // Get QoS profiles
   const gazebo_ros::QoS& qos = impl_->ros_node_->get_qos();
 
@@ -558,7 +633,12 @@ void ScopedDiffDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo& _info) {
   // update that still applies a copied pre-seal target.
   std::lock_guard<std::mutex> guard(lock_);
   ++update_sequence_;
-  if (sealed_) {
+  if (owner_permission_mode_) {
+    const auto permit_now = permit_now_ns();
+    permission_.can_consume(permit_identity(), permit_now);
+    sync_permission(permit_now);
+  }
+  const auto apply_zero = [this, &_info]() {
     bool accepted = true;
     for (unsigned int i = 0; i < 2 * num_wheel_pairs_; ++i) {
       const bool wrote_zero = joints_[i]->SetParam("vel", 0, 0.0);
@@ -573,23 +653,45 @@ void ScopedDiffDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo& _info) {
         last_update_time_ = _info.simTime;
         return;
       }
-      const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                          std::chrono::steady_clock::now().time_since_epoch())
-                          .count();
+      const auto ns = motion_now_ns();
       std_msgs::msg::String message;
-      message.data = "{\"event\":\"motion_scope_applied\",\"scope_id\":\"" + scope_ +
-                     "\",\"sealed\":true,\"wheel_targets_zero\":true,\"update_sequence\":" +
-                     std::to_string(update_sequence_) + ",\"sim_ns\":" +
-                     std::to_string(_info.simTime.sec * int64_t{1000000000} + _info.simTime.nsec) +
-                     ",\"steady_ns\":" + std::to_string(ns) +
-                     (generation_mode_ ? ",\"generation\":" + std::to_string(generation_) : "") +
-                     "}";
+      message.data =
+          "{\"event\":\"motion_scope_applied\",\"scope_id\":\"" + scope_ +
+          "\",\"sealed\":true,\"wheel_targets_zero\":true,\"update_sequence\":" +
+          std::to_string(update_sequence_) + ",\"sim_ns\":" +
+          std::to_string(_info.simTime.sec * int64_t{1000000000} + _info.simTime.nsec) +
+          ",\"steady_ns\":" + std::to_string(ns) +
+          (generation_mode_ ? ",\"generation\":" + std::to_string(generation_) : "") +
+          (owner_permission_mode_
+               ? ",\"operation_id\":" + std::to_string(operation_id_) +
+                     ",\"permission_deadline_ns\":" + std::to_string(permission_.deadline_ns()) +
+                     ",\"closure_reason\":\"" + closure_reason_ + "\""
+               : "") +
+          "}";
       log_ << message.data << std::endl;
       ack_pub_->publish(message);
     }
     last_update_time_ = _info.simTime;
     return;
+  };
+  if (sealed_) {
+    apply_zero();
+    return;
   }
+  const auto write_permitted = [this, &apply_zero](unsigned int wheel, double target) {
+    if (!owner_permission_mode_) {
+      joints_[wheel]->SetParam("vel", 0, target);
+      return true;
+    }
+    const auto identity = permit_identity();
+    return robot_harness::simulation::write_current(
+        permission_, identity, permit_now_ns,
+        [this, &apply_zero](uint64_t now) {
+          sync_permission(now);
+          apply_zero();
+        },
+        [this, wheel, target]() { joints_[wheel]->SetParam("vel", 0, target); });
+  };
   // Normal movement retains the original acceleration-limited control.
   UpdateWheelVelocities();
 #ifdef IGN_PROFILER_ENABLE
@@ -609,10 +711,12 @@ void ScopedDiffDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo& _info) {
     if (max_wheel_accel_ == 0 ||
         ((fabs(desired_wheel_speed_[2 * i + LEFT] - current_speed[2 * i + LEFT]) < 0.01) &&
          (fabs(desired_wheel_speed_[2 * i + RIGHT] - current_speed[2 * i + RIGHT]) < 0.01))) {
-      joints_[2 * i + LEFT]->SetParam(
-          "vel", 0, desired_wheel_speed_[2 * i + LEFT] / (wheel_diameter_[i] / 2.0));
-      joints_[2 * i + RIGHT]->SetParam(
-          "vel", 0, desired_wheel_speed_[2 * i + RIGHT] / (wheel_diameter_[i] / 2.0));
+      if (!write_permitted(2 * i + LEFT,
+                           desired_wheel_speed_[2 * i + LEFT] / (wheel_diameter_[i] / 2.0)) ||
+          !write_permitted(2 * i + RIGHT,
+                           desired_wheel_speed_[2 * i + RIGHT] / (wheel_diameter_[i] / 2.0))) {
+        return;
+      }
     } else {
       if (desired_wheel_speed_[2 * i + LEFT] >= current_speed[2 * i + LEFT]) {
         wheel_speed_instr_[2 * i + LEFT] +=
@@ -634,10 +738,12 @@ void ScopedDiffDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo& _info) {
                  -max_wheel_accel_ * seconds_since_last_update);
       }
 
-      joints_[2 * i + LEFT]->SetParam(
-          "vel", 0, wheel_speed_instr_[2 * i + LEFT] / (wheel_diameter_[i] / 2.0));
-      joints_[2 * i + RIGHT]->SetParam(
-          "vel", 0, wheel_speed_instr_[2 * i + RIGHT] / (wheel_diameter_[i] / 2.0));
+      if (!write_permitted(2 * i + LEFT,
+                           wheel_speed_instr_[2 * i + LEFT] / (wheel_diameter_[i] / 2.0)) ||
+          !write_permitted(2 * i + RIGHT,
+                           wheel_speed_instr_[2 * i + RIGHT] / (wheel_diameter_[i] / 2.0))) {
+        return;
+      }
     }
   }
 
@@ -676,11 +782,13 @@ void ScopedDiffDrivePrivate::OnCmdVel(const geometry_msgs::msg::Twist::SharedPtr
 
 void ScopedDiffDrivePrivate::Record(const std::string& event,
                                     std::optional<uint64_t> command_generation) {
-  const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::steady_clock::now().time_since_epoch())
-                      .count();
+  const auto ns = motion_now_ns();
   log_ << "{\"event\":\"" << event << "\",\"scope_id\":\"" << scope_ << "\",\"steady_ns\":" << ns
        << (generation_mode_ ? ",\"generation\":" + std::to_string(generation_) : "")
+       << (owner_permission_mode_
+               ? ",\"operation_id\":" + std::to_string(operation_id_) +
+                     ",\"permission_deadline_ns\":" + std::to_string(permission_.deadline_ns())
+               : "")
        << (command_generation ? ",\"command_generation\":" + std::to_string(*command_generation)
                               : "")
        << "}" << std::endl;
@@ -716,6 +824,12 @@ void ScopedDiffDrivePrivate::OpenScope(
     const std::shared_ptr<m4_drive_probe::srv::OpenMotionScope::Request> request,
     std::shared_ptr<m4_drive_probe::srv::OpenMotionScope::Response> response) {
   std::lock_guard<std::mutex> guard(lock_);
+  if (owner_permission_mode_) {
+    response->accepted = false;
+    response->generation = generation_;
+    Record("legacy_open_rejected");
+    return;
+  }
   response->accepted = false;
   response->generation = generation_;
   const auto& scope = request->scope_id;
@@ -749,6 +863,11 @@ void ScopedDiffDrivePrivate::CloseGeneration(
     const std::shared_ptr<m4_drive_probe::srv::CloseScopedMotion::Request> request,
     std::shared_ptr<m4_drive_probe::srv::CloseScopedMotion::Response> response) {
   std::lock_guard<std::mutex> guard(lock_);
+  if (owner_permission_mode_) {
+    response->accepted = false;
+    Record("legacy_close_rejected");
+    return;
+  }
   response->accepted = false;
   if (!generation_mode_ || generation_ == 0 || request->generation != generation_ ||
       request->scope_id != scope_) {
@@ -766,6 +885,10 @@ void ScopedDiffDrivePrivate::CloseGeneration(
 void ScopedDiffDrivePrivate::OnScopedCmd(
     const m4_drive_probe::msg::ScopedTwist::SharedPtr message) {
   std::lock_guard<std::mutex> guard(lock_);
+  if (owner_permission_mode_) {
+    Record("legacy_command_rejected");
+    return;
+  }
   if (!generation_mode_ || generation_ == 0 || sealed_ || message->generation != generation_ ||
       message->scope_id != scope_ || !std::isfinite(message->twist.linear.x) ||
       !std::isfinite(message->twist.angular.z)) {
@@ -774,6 +897,88 @@ void ScopedDiffDrivePrivate::OnScopedCmd(
   }
   target_x_ = message->twist.linear.x;
   target_rot_ = message->twist.angular.z;
+}
+
+// Every caller holds lock_, including the final wheel-write path.
+void ScopedDiffDrivePrivate::sync_permission(uint64_t now) {
+  if (permission_.state() == robot_harness::simulation::MotionPermission::State::kFaultClosed &&
+      !sealed_) {
+    sealed_ = true;
+    applied_ = false;
+    target_x_ = target_rot_ = 0.0;
+    std::fill(desired_wheel_speed_.begin(), desired_wheel_speed_.end(), 0.0);
+    std::fill(wheel_speed_instr_.begin(), wheel_speed_instr_.end(), 0.0);
+    closure_reason_ = now >= permission_.deadline_ns() ? "permission_expired" : "clock_invalid";
+    Record("permission_fault_sealed");
+  }
+}
+
+void ScopedDiffDrivePrivate::open_permit(std::shared_ptr<OpenPermit::Request> request,
+                                         std::shared_ptr<OpenPermit::Response> response) {
+  std::lock_guard<std::mutex> guard(lock_);
+  const auto now = permit_now_ns();
+  const robot_harness::simulation::MotionPermitIdentity identity{
+      request->scope_id, request->expected_generation + 1, request->operation_id};
+  const bool retry = !sealed_;
+  response->accepted =
+      permission_.open(identity, request->expected_generation, request->issued_ns, now, applied_);
+  sync_permission(now);
+  if (response->accepted && !retry) {
+    scope_ = identity.scope_id;
+    generation_ = identity.generation;
+    operation_id_ = identity.operation_id;
+    target_x_ = target_rot_ = 0.0;
+    applied_ = sealed_ = false;
+    closure_reason_ = "open";
+    Record("motion_scope_opened");
+  }
+  response->generation = generation_;
+  response->deadline_ns = permission_.deadline_ns();
+  Record(response->accepted ? "permission_open_accepted" : "permission_open_rejected");
+}
+
+void ScopedDiffDrivePrivate::renew_permit(std::shared_ptr<RenewPermit::Request> request,
+                                          std::shared_ptr<RenewPermit::Response> response) {
+  std::lock_guard<std::mutex> guard(lock_);
+  const auto now = permit_now_ns();
+  response->accepted = permission_.renew(
+      {request->scope_id, request->generation, request->operation_id}, request->issued_ns, now);
+  sync_permission(now);
+  response->deadline_ns = permission_.deadline_ns();
+  Record(response->accepted ? "permission_renewed" : "permission_renew_rejected");
+}
+
+void ScopedDiffDrivePrivate::close_permit(std::shared_ptr<ClosePermit::Request> request,
+                                          std::shared_ptr<ClosePermit::Response> response) {
+  std::lock_guard<std::mutex> guard(lock_);
+  const auto now = permit_now_ns();
+  response->accepted =
+      permission_.close({request->scope_id, request->generation, request->operation_id}, now);
+  sync_permission(now);
+  if (response->accepted && !sealed_) {
+    sealed_ = true;
+    applied_ = false;
+    target_x_ = target_rot_ = 0.0;
+    std::fill(desired_wheel_speed_.begin(), desired_wheel_speed_.end(), 0.0);
+    std::fill(wheel_speed_instr_.begin(), wheel_speed_instr_.end(), 0.0);
+    closure_reason_ = "normal_close";
+    Record("motion_scope_sealed");
+  }
+}
+
+void ScopedDiffDrivePrivate::permitted_command(PermittedTwist::SharedPtr command) {
+  std::lock_guard<std::mutex> guard(lock_);
+  const auto now = permit_now_ns();
+  const bool allowed =
+      permission_.can_consume({command->scope_id, command->generation, command->operation_id}, now);
+  sync_permission(now);
+  if (!allowed || sealed_ || !std::isfinite(command->twist.linear.x) ||
+      !std::isfinite(command->twist.angular.z)) {
+    Record("scoped_command_rejected", command->generation);
+    return;
+  }
+  target_x_ = command->twist.linear.x;
+  target_rot_ = command->twist.angular.z;
 }
 
 void ScopedDiffDrivePrivate::UpdateOdometryEncoder(const gazebo::common::Time& _current_time) {

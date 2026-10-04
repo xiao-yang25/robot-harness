@@ -1,0 +1,34 @@
+{
+  "result": "passed",
+  "case": "owner-exit",
+  "profile": "scoped-two-context-nav2-owner-permit-v1",
+  "max_grant_gap_seconds": {
+    "A": 0.109912791,
+    "B": 0.109227
+  },
+  "fault_to_application_seconds": 1.0130966669998998,
+  "expiry_to_application_seconds": 0.029250376,
+  "quiet_samples": 11,
+  "quiet_sim_seconds": 1.019999999999996,
+  "fixed_window_sim_seconds": 5.202000000000005,
+  "transition_sim_seconds": 6.596000000000004,
+  "physical_start_after_fault_seconds": 1.5,
+  "fixed_snapshot_drift_m": 0.00017935439777157697,
+  "fixed_snapshot_yaw_change_rad": 0.005940000000000278,
+  "native_commands_after_application": 115,
+  "rejected_after_application": 116,
+  "native_cleanup": "unknown",
+  "settlement": "unknown_after_owner_loss",
+  "task_verdict": "unassessed",
+  "scope": "isolated candidate Owner OS fault / autonomous drive zero / fresh physical quiet; no hard deadline, recovery or hardware",
+  "source": "owner-permission-product-exit-02; corrected installed product patch based on f43f4c3",
+  "presentation": {
+    "raw_start": 39.0003286430001,
+    "raw_end": 68.12063386399996,
+    "timing": "approximate same-run monotonic captions; capture startup latency remains; not a timing instrument",
+    "playback": "original speed; startup trimmed; scene cropped; captions added; final frame held two seconds",
+    "output": "owner-permission.mp4",
+    "duration_seconds": 31.1
+  },
+  "evidence_role": "Selected same-run facts; presentation metadata, not another evaluator"
+}

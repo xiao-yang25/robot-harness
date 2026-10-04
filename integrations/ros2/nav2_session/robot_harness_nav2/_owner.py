@@ -23,6 +23,8 @@ class ClientClosed(RuntimeError):
 
 
 class NavigationOwner(ScopedDriver):
+    profile = PROFILE_ID
+
     def __init__(self):
         self.requests = self.endpoint = None
         self.stop_requested = self.completed = False
@@ -41,7 +43,7 @@ class NavigationOwner(ScopedDriver):
                 or not self.valid_observation()):
             raise RuntimeError('initial binding not idle and observed')
         self.gate = _core.Gate('scoped-nav2', 'exclusive-waffle-drive', 'navigation.visit',
-                              PROFILE_ID, 1, time.monotonic_ns(),
+                              self.profile, 1, time.monotonic_ns(),
                               settlement_scope='native-outlet-quiet-and-next-context')
         self.execution = ExecutionCoordinator(self.gate, time.monotonic_ns)
         for kind in ('idle', 'worker', 'sink'):
@@ -49,11 +51,11 @@ class NavigationOwner(ScopedDriver):
         self.refresh_capability()
         self.client = ObservedClient(self.a_client, self)
         self.b_observed_client = ObservedClient(self.b_client, self)
-        emit('core_ready', profile=PROFILE_ID)
+        emit('core_ready', profile=self.profile)
 
         self.requests = NavigationRequests(self.execution,
             sites={stage: (*target, 0.0) for stage, target in GOALS.items()},
-            profile=PROFILE_ID, map_id='turtlebot3-world-v1',
+            profile=self.profile, map_id='turtlebot3-world-v1',
             observation=self.public_observation,
             ready=lambda: not self.aborting and self.stage_index < 2
                 and self.context_process.poll() is None

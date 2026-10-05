@@ -200,3 +200,36 @@ The Owner does not choose or send a backup. This fixed, exclusive, live-Owner
 profile does not inherit finite permission, arbitrary BT, restart or hard-stop
 qualification. See [design](../../../docs/DESIGN.md#navigation-failure-settlement)
 and [checks](../../../docs/TESTING.md#navigation-failure-settlement).
+
+## Explicit recovery test scenes
+
+The public launcher accepts `--scene normal` (default) or `--scene occupied-a`.
+The latter requires `--profile scoped-two-context-nav2-failure-recovery-v1`;
+other combinations fail before Docker or ROS starts. Build a current simulation
+image: earlier images may lack the failure leaves or current drive interfaces.
+
+`occupied-a` derives a static map from the installed TurtleBot3 world map,
+marking a 0.8 m square around A occupied while keeping B and the start free.
+It changes the planner map, not the physical world. The installed Owner consumes
+actual `/map` before preparing B or exposing the request endpoint and checks
+frame/geometry and occupied A/free B/free start. Its capabilities and measurements
+use `turtlebot3-occupied-a-probe-v1`; normal remains `turtlebot3-world-v1`.
+The retained `probe` identifier denotes this bounded test scene.
+
+```sh
+python3 integrations/ros2/simulation/simulate.py session \
+  --image YOUR_CURRENT_SCOPED_HUMBLE_IMAGE \
+  --python-prefix /absolute/new-linux-install-prefix \
+  --profile scoped-two-context-nav2-failure-recovery-v1 --scene occupied-a \
+  --client-script /absolute/trusted-recovery-client.py \
+  --client-prefix /absolute/linux-agent-prefix --caller-wait-seconds 45 \
+  --output /absolute/new-recovery-result-directory
+```
+
+Use a recovery-aware caller, such as the separate business Agent tutorial; the
+default A/B request example does not make a business recovery decision. Scene
+selection never allocates authority or skips native closure/quiet/B-readiness
+checks. `navigation-scene.json` records the selection; `map-fixture.json` and
+`occupied-a.yaml`/`.pgm` record preparation; `scene_map_consumed` in `caller.jsonl`
+records the actual loaded map sample. These diagnostics alone do not prove the
+entire map, physical obstacles, dynamic map updates or general recovery safety.

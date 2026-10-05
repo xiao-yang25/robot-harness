@@ -19,6 +19,7 @@ IMAGE = 'robot-harness-simulation:humble'
 VISUAL_IMAGE = 'robot-harness-simulation:humble-visual'
 PROFILES = ('scoped-two-context-nav2-shim-v1', 'scoped-two-context-nav2-owner-permit-v1',
             'scoped-two-context-nav2-revision-v1', 'scoped-two-context-nav2-failure-recovery-v1')
+SCENES = ('normal', 'occupied-a')
 CASES = ('normal', 'cancel-moving', 'replace-moving',
          'obstacle-wait', 'obstacle-wait-frozen-scan',
          'obstacle-resume', 'obstacle-resume-frozen-scan', 'obstacle-resume-missing-controller',
@@ -62,6 +63,10 @@ def write_host_record(path, text):
 
 
 def run_case(args):
+    scene = getattr(args, 'scene', 'normal')
+    if scene not in SCENES or (scene != 'normal' and
+            (not getattr(args, 'session', False) or getattr(args, 'profile', PROFILES[0]) != PROFILES[3])):
+        raise ValueError('occupied-a requires a session with the explicit failure recovery profile')
     output = Path(args.output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
     # Keep the authoritative cleanup ID outside the container-writable mount.
@@ -106,7 +111,8 @@ def run_case(args):
             if profile not in PROFILES:
                 raise ValueError('unknown navigation profile')
             status['profile'] = profile
-            command.extend(['-e', 'M6_NAVIGATION_PROFILE='+profile])
+            status['scene'] = scene
+            command.extend(['-e', 'M6_NAVIGATION_PROFILE='+profile, '-e', 'M6_NAVIGATION_SCENE='+scene])
             prefix = Path(args.python_prefix).expanduser().resolve(strict=True)
             if not (prefix / 'lib/robot-harness/python/robot_harness_nav2/__main__.py').is_file():
                 raise ValueError('prefix does not contain the installed Nav2 owner')
@@ -220,6 +226,7 @@ def main():
     session = commands.add_parser('session', help='run the installed bounded Nav2 owner and independent A/B example')
     session.add_argument('--profile', choices=PROFILES, default=PROFILES[0],
                          help='explicit native motion profile; existing v1 remains default')
+    session.add_argument('--scene', choices=SCENES, default='normal', help='occupied-a is a static map test, not a physical obstacle')
     session.add_argument('--python-prefix', required=True, help='Linux install prefix with optional Python bridge')
     session.add_argument('--image', required=True, help='qualified local scoped Humble/Nav2 image')
     session.add_argument('--output', required=True, help='new result directory')
@@ -248,6 +255,8 @@ def main():
         return run_case(args)
     except FileExistsError:
         parser.error('output directory already exists; select a new path')
+    except ValueError as error:
+        parser.error(str(error))
 
 
 if __name__ == '__main__':

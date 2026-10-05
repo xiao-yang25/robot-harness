@@ -1,0 +1,25 @@
+{
+  "case": "backup",
+  "result": "passed",
+  "task_status": "completed",
+  "map_id": "turtlebot3-occupied-a-probe-v1",
+  "completed_sites": [
+    "B"
+  ],
+  "submitted_sites": [
+    "A",
+    "B"
+  ],
+  "physical_error_m": {
+    "B": 0.23024042426124913
+  },
+  "task_verdict": "unassessed",
+  "native_cleanup": "unknown",
+  "model_requested": "gpt-6-sol",
+  "model_requests": 3,
+  "agent_revision": "682ead6247366f6c2507a58eb228322e7bf3e43f",
+  "agent_runtime_candidate": "3bfa44b5efdd2aeec8c4dc2463e655ba22ba9415",
+  "harness_revision": "9278fea6249e61c1533defd4b39ea3d776f1a2ae",
+  "recording_date": "2026-10-05",
+  "scope": "presentation of the original qualified run; private map preparation, not the subsequent public scene command"
+}

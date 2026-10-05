@@ -2491,3 +2491,50 @@ isolated Humble/Nav2 1.1.20 setup; experimental occupied-map metadata and passiv
 map observation were fixture-only. Each scene had one physical evaluation.
 No business Agent/model, restart, general unreachable classification or hard-stop
 qualification follows from these checks. Remote CI is a separate delivery gate.
+
+
+## Public failure-recovery scene entry
+
+The Session launcher selects `--scene normal|occupied-a`; occupied A requires the
+explicit failure profile before resources start. Current simulation builds
+include the failure BT leaves and drive/interfaces; older qualified images for
+other profiles may not contain them. See the [public scene commands](../integrations/ros2/nav2_session/README.md#explicit-recovery-test-scenes).
+
+Focused checks cover fixed-map preparation without changing the source map,
+actual map geometry/occupancy rejection, wrong-profile startup with no ROS/Docker
+resources, Owner pre-endpoint map gating and matching public observation identity.
+The existing Humble CI installs PyYAML and discovers these checks; no additional
+workflow or second physical evaluator is introduced. Local macOS simulation
+checks passed56 tests (five ROS-dependent skips); a real installed Linux Core /
+current drive-interface run passed24 Owner,11 cancellation,11 failure and56
+simulation checks without skips. Its new installed Owner files were compared
+directly with source. The first Linux check used an older image with missing
+`OpenPermit` interfaces and failed five finite-permission tests; the unchanged
+new installation passed with current interfaces. That does not qualify the old
+image for the new scene. New public scene/physical runs are qualified separately.
+
+[Recovery recordings](assets/demo/README.md#single-failure-recovery) present two
+already qualified actual-model runs from the original Harness/Agent pairing.
+They are not recordings or qualification of the new public scene command.
+
+
+The current public image recipe rebuilt successfully on Ubuntu22.04/Humble with
+Nav2 1.1.20, including both failure leaves and the current drive interfaces.
+An initial archive connection failure was retained; an explicit HTTPS Ubuntu
+mirror supplied the successful build without changing package/signature checks.
+The new image passed its native/observation build checks and installed Owner24 /
+failure11 checks. Two new public `simulate.py session` runs used this image,
+the new Linux Owner installation, and installed Agent `682ead6` with controlled
+proposals: normal completed only A (0.225161 m); occupied A returned accepted /
+status6, completed native closure and A release, then admitted one B
+(0.233654 m). Each run used one external same-run evaluation; Gazebo observations
+never entered task inputs. An event-name compatibility view reused the existing
+evaluator; raw `scene_map_consumed` events were preserved. Final B remains
+pending, task verdict unassessed and native cleanup unknown.
+
+A fresh independent review found no implementation/presentation defects and
+performed one separate map-mismatch startup check with the actual entry/callback
+and synthetic ROS edges: no B preparation or public endpoint, with disposal and
+shutdown. Its initial outstanding build/run/remote-CI evidence was subsequently
+supplied; this does not turn its synthetic check into physical qualification.
+The recordings above retain their original model runs and versions.

@@ -12,7 +12,7 @@ import simulate
 
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
-                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0]):
+                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal'):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -61,7 +61,7 @@ class LauncherTest(unittest.TestCase):
             with patch.object(simulate.subprocess, 'run', side_effect=docker), \
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
                 code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
-                    session=session, profile=profile, python_prefix=str(prefix),
+                    session=session, profile=profile, scene=scene, python_prefix=str(prefix),
                     client_script=str(client) if custom_client else None,
                     client_prefix=str(client_prefix) if custom_client else None,
                     caller_wait_seconds=45 if custom_client else None))
@@ -74,6 +74,7 @@ class LauncherTest(unittest.TestCase):
                 self.assertIn('none', command)
                 self.assertIn('M6_NATIVE_ISOLATED=1', command)
                 self.assertIn('M6_NAVIGATION_PROFILE='+profile, command)
+                self.assertIn('M6_NAVIGATION_SCENE='+scene, command)
                 self.assertTrue(any('target=/installed,readonly' in part for part in command))
                 self.assertTrue(any('target=/navigation-example.py,readonly' in part for part in command))
                 self.assertFalse(any('target=/simulation/navigation_requests.py' in part for part in command))
@@ -94,6 +95,20 @@ class LauncherTest(unittest.TestCase):
     def test_explicit_revision_profile_reaches_container_and_host_record(self):
         _, status = self.exercise(session=True, profile=simulate.PROFILES[2])
         self.assertEqual(status['profile'], 'scoped-two-context-nav2-revision-v1')
+
+    def test_occupied_a_scene_reaches_only_explicit_failure_session(self):
+        _, status = self.exercise(session=True, profile=simulate.PROFILES[3], scene='occupied-a')
+        self.assertEqual(status['scene'],'occupied-a')
+
+    def test_invalid_scene_selection_starts_no_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/'new'
+            for session, profile, scene in ((False,simulate.PROFILES[3],'occupied-a'),
+                    (True,simulate.PROFILES[0],'occupied-a'),(True,simulate.PROFILES[3],'other')):
+                with self.subTest(scene=scene,profile=profile), patch.object(simulate.subprocess,'run') as docker:
+                    with self.assertRaises(ValueError):
+                        simulate.run_case(argparse.Namespace(output=str(output),session=session,profile=profile,scene=scene))
+                    self.assertFalse(output.exists()); docker.assert_not_called()
 
     def test_explicit_failure_profile_reaches_container_and_host_record(self):
         _, status = self.exercise(session=True, profile=simulate.PROFILES[3])

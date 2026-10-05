@@ -492,5 +492,37 @@ class PermissionOwnerChecks(unittest.TestCase):
         public_prepare.assert_not_called()
 
 
+class SceneOwnerChecks(unittest.TestCase):
+    def owner(self):
+        from robot_harness_nav2._failure import FailureOwner
+        owner=FailureOwner.__new__(FailureOwner)
+        owner.requests=None;owner.motion_started=False;owner.subscriptions_keep=[]
+        owner.create_subscription=unittest.mock.Mock(return_value='map-subscription')
+        return owner
+
+    def test_occupied_map_is_required_before_native_successor_or_public_endpoint(self):
+        owner=self.owner();owner.configure_scene('occupied-a')
+        self.assertEqual(owner.map_id,'turtlebot3-occupied-a-probe-v1')
+        self.assertEqual(owner.subscriptions_keep,['map-subscription'])
+        with patch.object(scoped.ScopedDriver,'prepare_b_initial') as prepare:
+            with self.assertRaisesRegex(RuntimeError,'map has not been checked'):owner.prepare_b_initial()
+            prepare.assert_not_called()
+        self.assertIsNone(owner.requests)
+
+    def test_configured_identity_reaches_public_observation_and_late_configuration_is_refused(self):
+        owner=self.owner();owner.configure_scene('occupied-a')
+        owner.observation=lambda:dict(pose=(-2.,-.5),pose_stamp=1.,clock_age=0.,streams=[])
+        owner.valid_observation=lambda:True;owner.localization_ok=True
+        self.assertEqual(owner.public_observation()['map_id'],owner.map_id)
+        owner.requests=object()
+        with self.assertRaisesRegex(RuntimeError,'precede public startup'):owner.configure_scene('occupied-a')
+
+    def test_wrong_profile_fails_before_ros_initialization(self):
+        from robot_harness_nav2 import __main__ as entry
+        with patch('sys.argv',['owner','--scene','occupied-a']),patch.object(entry,'require_isolation') as guard,patch.object(driver.rclpy,'init') as init:
+            with self.assertRaises(SystemExit) as caught:entry.main()
+            self.assertEqual(caught.exception.code,2);guard.assert_not_called();init.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

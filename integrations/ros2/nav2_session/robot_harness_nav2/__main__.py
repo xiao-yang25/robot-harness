@@ -56,13 +56,18 @@ def caller_wait_seconds(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    from ._profile import PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, FAILURE_PROFILE_ID, PROFILES
+    from ._profile import PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, FAILURE_PROFILE_ID, PROFILES, SCENE_MAP_IDS, scene_map_id
     parser.add_argument('--profile', choices=PROFILES, default=PROFILE_ID,
                         help='explicit native motion policy; existing v1 is the default')
     parser.add_argument('--caller-wait-seconds', type=caller_wait_seconds,
                         help='bounded idle wait for each admission and final client close; '
                              'default admission 15s / final close 10s')
+    parser.add_argument('--scene', choices=SCENE_MAP_IDS, default='normal')
     args = parser.parse_args()
+    try:
+        scene_map_id(args.scene, args.profile)
+    except ValueError as error:
+        parser.error(str(error))
     require_isolation()  # Fail before importing ROS or starting any resource.
     import rclpy
     from ._owner import NavigationOwner, ClientClosed
@@ -81,7 +86,11 @@ def main():
     code = 0
     try:
         owner.__init__()
+        if args.scene != 'normal':
+            owner.configure_scene(args.scene)
         owner.ready()
+        if args.scene != 'normal':
+            owner.wait(lambda: owner.scene_map is not None, 5, require_fresh=True)
         owner.prepare_b_initial()
         for stage in ('A', 'B'):
             owner.wait(lambda: owner.execution.active is not None, args.caller_wait_seconds or 15, require_fresh=True)

@@ -386,3 +386,39 @@ held two seconds. Display refresh is5fps; the recorder samples10fps. Full decodi
 and final-frame inspection passed. Captions are not a timing instrument. The
 poster is the final frame from this export. The JSON selects the existing
 unique evaluation; it does not rerun physical adjudication or contain local paths.
+
+
+## Single failure recovery
+
+[Homepage players](https://xiao-yang25.github.io/robot-harness/#recovery-demos) ·
+[Normal A](recovery-normal.mp4) · [Single backup B](recovery-backup.mp4) ·
+[Normal facts](recovery-normal-run.json) · [Backup facts](recovery-backup-run.json)
+
+Two separate 2026-10-05 isolated Humble/Nav2 runs use actual host-model proposals
+and the installed recovery business Task/public Session. Agent
+`682ead6247366f6c2507a58eb228322e7bf3e43f` delivers runtime candidate
+`3bfa44b5efdd2aeec8c4dc2463e655ba22ba9415` (subsequent changes are documentation),
+paired with Harness `9278fea6249e61c1533defd4b39ea3d776f1a2ae`.
+The requested model was `gpt-6-sol`, reasoning `high`, through Codex CLI 0.159.0.
+Private host logs/credentials remain outside container mounts; proposal answers
+cross the shared exchange. These recordings used private map preparation and
+map observation. They do not record the subsequently added public scene command.
+
+Normal A uses two proposals, arrives within 0.209177 m and never submits B.
+In the backup run, A is actually accepted and returns status6 with no output on
+the static occupied-A planner map. Actual planner/BT closure, the sealed
+never-submitted controller, zero/quiet drive and six fresh B readiness facts
+precede Core settlement/release. Only then does one failure proposal select B;
+fresh identity/observation checks precede its admission. Three proposals are
+used; B arrives within 0.230241 m. A single evaluator qualified each run and one
+independent safety-decision review checked the ordering. The JSON files select
+those existing facts and are presentation metadata, not another evaluation.
+
+The 1280×800 recordings are approximately31.1/48.8 seconds at original speed.
+Startup/teardown are trimmed, approximate event captions are added and the final
+frame is held two seconds; no internal cuts or speed changes. Both exports were
+fully decoded and start/branch/final frames inspected. Posters are their final
+frames. Captions are not timing instruments. Static map occupancy does not
+establish physical obstacles or general unreachability. Final B settlement is
+pending, task verdict unassessed and native cleanup unknown. These runs do not
+qualify Owner restart, hard stop bounds or hardware safety.

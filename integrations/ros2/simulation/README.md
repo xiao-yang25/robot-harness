@@ -303,3 +303,10 @@ allows confirmed A cancellation to release for B only after native, outlet,
 quiet and fresh B readiness evidence. It is explicit opt-in, uses the shim
 workers, and requires a progressing Owner; finite permission is not combined
 with it. Business-Agent instruction/model revision remains a separate increment.
+
+The Session's [recovery test scenes](../nav2_session/README.md#explicit-recovery-test-scenes)
+select normal or static occupied A explicitly. Occupied A requires the failure
+profile and a recovery-aware caller; build the current image and use a new Linux
+Owner installation. This is a fixed test map, not a physical obstacle or arbitrary
+map interface. The scene records its selection and the Owner's actual map sample;
+launcher success continues to mean process completion only.

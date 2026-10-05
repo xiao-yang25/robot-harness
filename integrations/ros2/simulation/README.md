@@ -297,3 +297,9 @@ It uses the rebuilt private drive/interfaces and preserves the default legacy
 profile. A [same-run Owner-loss recording](https://xiao-yang25.github.io/robot-harness/#owner-loss-demo)
 shows autonomous outlet expiry; its scope does not include hard braking limits,
 worker termination or restart recovery.
+
+The separate [cancellation settlement profile](../nav2_session/README.md#explicit-cancellation-settlement-profile)
+allows confirmed A cancellation to release for B only after native, outlet,
+quiet and fresh B readiness evidence. It is explicit opt-in, uses the shim
+workers, and requires a progressing Owner; finite permission is not combined
+with it. Business-Agent instruction/model revision remains a separate increment.

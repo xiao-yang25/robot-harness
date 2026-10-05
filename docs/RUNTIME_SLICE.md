@@ -857,35 +857,34 @@ configuration, not a larger execution deadline, freshness TTL or physical stop
 budget. [Owner setup](../integrations/ros2/nav2_session/README.md) owns the command.
 
 
-## Planned cancellation settlement for business revision
+<a id="planned-cancellation-settlement-for-business-revision"></a>
+## Cancellation settlement for business revision
 
-Design only; the installed navigation Owner still exits after current cancel,
-close or EOF and leaves unresolved settlement pending. Its normal A close path
-supports release before B, but the abort path does not qualify reuse.
+The explicit `scoped-two-context-nav2-revision-v1` profile adds bounded closure
+of a confirmed A cancellation before reuse of the prepared B context. It keeps
+the same public Session and Core shapes. The default and finite-permission
+profiles retain their existing cancel/close/EOF abort behavior.
 
-The next bounded candidate is an explicit profile over the existing two scoped
-Nav2 contexts, allowing one intentional cancellation of moving A and later B
-admission. It would keep the existing public cancel/status/observe/submit shapes,
-same coordinator and Core, and default profile behavior. Business intent belongs
-to the caller, not to this profile or the model.
+The single Owner pumps the public endpoint before checking authority. Only the
+associated, accepted A with pending native outcome may continue progressing
+after its public cancellation revoked authority. Native cancellation and exact
+outlet sealing are initiated separately. The retained actual terminal must be
+cancelled or succeeded; correlated child/BT/lane closure, manager pause, drive
+ACK, fresh quiet and six fresh B readiness responses must all precede settlement
+and release. A genuine cancelled result uses no-output; success racing cancel
+stays succeeded with authority-revoked output. Already accepted results on the
+existing terminal shutdown path remain accepted.
 
-The Owner would revoke exactly A, schedule native cancellation and outlet sealing
-independently, and keep progressing while collecting correlated native terminal,
-child/BT/lane closure, drive ACK and fresh quiet. Aggregate release for reuse also
-requires fresh B readiness. Cancel intent or external stillness alone cannot
-supply settlement. A genuinely cancelled result remains cancelled/no-output;
-a success racing cancellation retains its actual native and output disposition.
-Missing or ambiguous facts keep A pending and prohibit B.
+Closure shares one 15-second deadline clipped to the original operation deadline
+and the profile's 240-second task bound. Missing evidence, expiry, input/process
+loss, EOF or global close prohibit reuse and retain unresolved settlement. Late
+unconfirmed acceptance stays on the old abort path, retaining the actual handle
+for cancellation; B cancellation does not create a third context.
 
-This requires separating intentional A closure from fault/EOF/global shutdown;
-revocation may be tolerated only in that associated closure phase. Other faults
-must retain the existing abort behavior. Closure would remain bounded by the
-original operation/task deadline and normal 15-second close budget; the existing
-two-second abort is not extended. Owner liveness remains a premise, without
-claiming finite-permission, restart or hard-stop qualification.
-
-First verify real Core disposition and actual Humble/Nav2 cancelled-A closure
-with a private bounded probe. Only then implement and independently review the
-explicit profile, installed tests and relevant failures. Agent consumption and
-new installed/model/physics qualification follow that delivery. No dependency
-pin, controller policy, Core contract or supported runtime behavior changes here.
+Installed real-Humble controlled-caller checks exercise cancelled-A reuse and an
+actual paused-B refusal. [Testing](TESTING.md#navigation-cancellation-settlement)
+separates these from controlled ROS-edge checks. Owner survival/progress is
+required; this shim profile does not inherit finite permission, restart or hard
+stop qualification. Business intent, instruction polling and after-revision
+model proposals belong to the Agent and remain the next separate increment.
+Existing Agent dependency pins and preview tags are unchanged.

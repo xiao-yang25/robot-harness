@@ -91,6 +91,10 @@ class LauncherTest(unittest.TestCase):
         _, status = self.exercise(session=True, profile=simulate.PROFILES[1])
         self.assertEqual(status['profile'], simulate.PROFILES[1])
 
+    def test_explicit_revision_profile_reaches_container_and_host_record(self):
+        _, status = self.exercise(session=True, profile=simulate.PROFILES[2])
+        self.assertEqual(status['profile'], 'scoped-two-context-nav2-revision-v1')
+
     def test_installed_session_launch_has_separate_readonly_example_mount(self):
         code, status = self.exercise(session=True)
         self.assertEqual(code, 0)

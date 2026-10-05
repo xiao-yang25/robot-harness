@@ -2442,7 +2442,17 @@ Quiet at the reuse boundary relies on correlated fresh odometry and native
 closure; passive Gazebo snapshots corroborate selected motion/position, not an
 independent continuous pre-B quiet window or hard stop limit.
 
-Old Agent application and installed Session combinations retain their default
-profile and dependency pin. New business instruction polling, after-revision
-model qualification and matching demo videos remain separate Agent work.
+The separate installed Agent `1891459` / Harness `7279cd1` pair now has bounded
+real Humble/Nav2 qualification for no instruction, in-motion stop, redirect and
+selected readiness/identity/global-stop failures. An actual host-model redirect
+used three proposals: prepare before the business input, then after-revision and
+final after it. Cancellation and confirmed A release precede the after-revision
+model wait and B admission. See
+[Agent qualification](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#in-motion-revision-qualification)
+and [same-run recordings](assets/demo/README.md#in-motion-business-revision).
+These results do not change the old default profile or fixed old-Agent
+compatibility lane; CI's synthetic native facts do not establish physics/model
+results. The first recorded model scene failed at RViz startup before any model
+request and remains incomplete; a subsequent unchanged scene passed, without
+establishing a root-cause fix or broad reliability.
 The final B, task verdict and whole-native cleanup remain pending/unassessed/unknown.

@@ -1,5 +1,51 @@
 # Simulation recordings
 
+## In-motion business revision
+
+Two new recordings use installed Agent
+`189145996d2c7811ecd5d70641bc01c3e575a3d5` and its immutable Harness
+`7279cd12ae48d01384e081757c54c38b7858557b` dependency, explicitly selecting
+`scoped-two-context-nav2-revision-v1`. The retained Ubuntu22.04/Humble/Nav2/Gazebo
+amd64 image runs without network, at 2CPU/4GiB. No physical robot is used.
+
+Both business instructions are controlled and delivered once after the single
+motion window opens: stop after four seconds, redirect immediately. Each scene
+has its own one-time physical evaluation; each clip contains only its own run.
+
+| Clip | Proposal source | Recorded outcome |
+|---|---|---|
+| [Stop during motion](revision-stop.mp4) | Controlled proposal | Exact A cancelled/no output, native closure/quiet/six B readiness replies, then settled/released in about5.050s. No B or completed site; `stopped_by_instruction` |
+| [Redirect during motion](revision-redirect.mp4) | Three actual host proposals; explicitly requested `gpt-6-sol` / high via Codex0.159.0 | A cancelled/no output and released in about4.994s before after-revision proposal/fresh B admission. Only B completed, independent error0.236m; final B current/pending |
+
+The model sees the bound redirect instruction and public map measurements,
+without a robot interface or independent Gazebo truth. Cancellation precedes
+the model wait; the model cannot grant reuse. Native/child/BT/outlet closure,
+fresh odometry quiet and successor readiness establish the reuse boundary.
+Passive Gazebo snapshots corroborate selected motion and B position, not an
+independent continuous quiet window. Prepared B resources can exist even when
+no B request is sent. Task verdicts stay unassessed and native/remote cleanup
+unknown. Exact scene/export containers and owned model/relay children were
+removed/reaped; host groups exited zero without forced cleanup.
+
+Startup is trimmed, the RViz view cropped, captions added and the last frame
+held two seconds. The stop clip ends after task return; its later scene teardown
+is excluded. The redirect clip retains the model waits and task completion.
+There are no internal cuts or speed changes. Event captions
+use same-run monotonic time with screen-capture startup uncertainty; these
+videos and individual closure times are not timing guarantees. Old A paths
+may remain visible after cancellation and do not indicate live authority.
+
+Separate no-instruction/foreign-identity/global-stop/actual B-pause scenes cover
+their selected outcomes. A first model scene failed in RViz startup before any
+proposal and remains incomplete; later unchanged runs passed without resolving
+that graphics failure's root cause. A separately evaluated four-second-delay
+model run completed the task but its RViz view stayed empty; that recording was
+rejected for presentation and is not spliced into these clips. Its graphics
+issue also remains unresolved. No arbitrary-route, Owner recovery, human
+intent recognition, hardware or general model-service qualification is implied.
+See the [revision tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md#run-the-in-motion-revision-task)
+and [qualification scope](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#in-motion-revision-qualification).
+
 ## Checkpoint navigation
 
 Two new same-run recordings exercise Robot Agent's explicit checkpoint task with

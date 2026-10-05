@@ -96,6 +96,28 @@
       </div>
       <p class="recording-note">Separate actual simulations, with deterministic callers in these three clips. Navigation startup is trimmed and the view cropped, at original speed. No physical-robot validation. <a href="guide/docs/assets/demo/index.html">Full recordings, scope &amp; setup</a>.</p>
     </section>
+    <section class="section" id="revision-demos" aria-label="Recorded business stop and redirect during navigation motion">
+      <div class="section-title"><h2>Change course while moving.</h2><span>BUSINESS INPUT / CANCEL / RELEASE / DECIDE</span></div>
+      <div class="demo-grid checkpoint-grid">
+        <article class="demo" id="revision-stop-demo">
+          <div class="demo-top"><strong>Stop and release.</strong><span>Controlled instruction and proposal</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/revision-stop-poster.png" aria-label="Robot moves toward A, receives one stop instruction and waits for A release without requesting B">
+            <source src="assets/demo/revision-stop.mp4" type="video/mp4">
+            <p><a href="assets/demo/revision-stop.mp4">Download the in-motion stop recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>A starts moving. One bound business instruction cancels exact A; native closure, fresh quiet and successor readiness permit release.</p><p>The task stops with no completed site or B request. Native cleanup stays unknown.</p><a href="guide/docs/assets/demo/index.html#in-motion-business-revision">Recording &amp; scope ↗</a></div>
+        </article>
+        <article class="demo" id="revision-redirect-demo">
+          <div class="demo-top"><strong>Redirect after confirmed release.</strong><span>Controlled instruction · actual host model</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/revision-redirect-poster.png" aria-label="Robot cancels moving A, confirms release, then an actual model follows the bound redirect instruction and fresh feedback permits B">
+            <source src="assets/demo/revision-redirect.mp4" type="video/mp4">
+            <p><a href="assets/demo/revision-redirect.mp4">Download the in-motion redirect recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>Cancel comes before the model wait. After A releases, a fresh proposal and revalidated feedback permit one B request.</p><p>Only B counts as visited. Its settlement remains pending; model proposals never grant execution authority.</p><a href="https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md#run-the-in-motion-revision-task">Run the revision tutorial ↗</a></div>
+        </article>
+      </div>
+      <p class="recording-note">Separate same-run Humble/Nav2 recordings at original speed. Stop uses a four-second instruction delay; redirect uses zero delay. Both business inputs are controlled; only redirect uses an actual model. Task verdicts stay unassessed. No arbitrary-route, Owner recovery, hardware or hard stop qualification.</p>
+    </section>
     <section class="section" id="checkpoint-demos" aria-label="Recorded business instructions at a released navigation checkpoint">
       <div class="section-title"><h2>One checkpoint. Two possible routes.</h2><span>BUSINESS INPUT / MODEL PROPOSAL / EXECUTION</span></div>
       <div class="demo-grid checkpoint-grid">

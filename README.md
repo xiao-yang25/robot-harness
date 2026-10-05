@@ -36,7 +36,8 @@ https://github.com/user-attachments/assets/91a164f6-653c-41e2-ae12-b494489ea3b4
 *Local M6 candidate · Gazebo simulation · 70.9 seconds at original speed.*
 A releases before B starts; B settlement remains pending at the end.
 
-[Checkpoint instructions: finish at A or continue to B](https://xiao-yang25.github.io/robot-harness/#checkpoint-demos)
+[In-motion instructions: stop or redirect to B](https://xiao-yang25.github.io/robot-harness/#revision-demos)
+· [Checkpoint: finish at A or continue to B](https://xiao-yang25.github.io/robot-harness/#checkpoint-demos)
 · [More demos: manipulation, cancellation, handoff and Owner loss](https://xiao-yang25.github.io/robot-harness/#more-demos)
 · [Recording notes and same-run evidence](docs/assets/demo/README.md)
 

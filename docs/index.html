@@ -96,6 +96,29 @@
       </div>
       <p class="recording-note">Separate actual simulations, with deterministic callers in these three clips. Navigation startup is trimmed and the view cropped, at original speed. No physical-robot validation. <a href="guide/docs/assets/demo/index.html">Full recordings, scope &amp; setup</a>.</p>
     </section>
+    <section class="section" id="recovery-demos" aria-label="Recorded normal navigation and a single failure recovery">
+      <div class="section-title"><h2>Recover after a confirmed failure</h2><span>Actual model · two separate runs</span></div>
+      <div class="demo-grid checkpoint-grid">
+        <article class="demo" id="recovery-normal-demo">
+          <div class="demo-top"><strong>Normal A · no backup</strong><span>Actual host model · 31 s</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/recovery-normal-poster.png" aria-label="Actual model visits A successfully and finishes without requesting B">
+            <source src="assets/demo/recovery-normal.mp4" type="video/mp4">
+            <a href="assets/demo/recovery-normal.mp4">Watch the normal A recording</a>
+          </video>
+          <div class="demo-bottom"><p>A succeeds. Fresh public feedback lets the Agent finish; it never submits B.</p><a href="guide/docs/assets/demo/index.html#single-failure-recovery">Same-run evidence and limits →</a></div>
+        </article>
+        <article class="demo" id="recovery-backup-demo">
+          <div class="demo-top"><strong>Failed A → one B</strong><span>Actual host model · 49 s</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/recovery-backup-poster.png" aria-label="A fails on an occupied planner map, Runtime confirms closure and release, then the actual model proposes one B and the robot reaches it">
+            <source src="assets/demo/recovery-backup.mp4" type="video/mp4">
+            <a href="assets/demo/recovery-backup.mp4">Watch the single backup recording</a>
+          </video>
+          <div class="demo-bottom"><p>A's planner fails on a static occupied map. Native closure, quiet and fresh B readiness precede A release; only then does the model propose B.</p><a href="guide/docs/assets/demo/index.html#single-failure-recovery">Same-run evidence and limits →</a></div>
+        </article>
+      </div>
+      <p class="recording-note">Two separate runs at original speed. The occupied map is a test fixture, not a physical obstacle. Final B settlement remains pending; see the original versions and recording scope.</p>
+    </section>
+
     <section class="section" id="revision-demos" aria-label="Recorded business stop and redirect during navigation motion">
       <div class="section-title"><h2>Change course while moving.</h2><span>BUSINESS INPUT / CANCEL / RELEASE / DECIDE</span></div>
       <div class="demo-grid checkpoint-grid">

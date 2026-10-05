@@ -6,7 +6,7 @@ from pathlib import Path
 from ._scoped import ScopedDriver, request_fields, identity
 from ._observations import OUT, emit, diagnose
 from ._predicates import GOALS
-from ._profile import PROFILE_ID
+from ._profile import PROFILE_ID, SCENE_MAP_IDS, scene_map_id
 from ._native_lane import ObservedClient
 from ._requests import RequestEndpoint
 from robot_harness.navigation import NavigationRequests
@@ -24,6 +24,7 @@ class ClientClosed(RuntimeError):
 
 class NavigationOwner(ScopedDriver):
     profile = PROFILE_ID
+    map_id = SCENE_MAP_IDS['normal']
 
     def __init__(self):
         self.requests = self.endpoint = None
@@ -35,7 +36,31 @@ class NavigationOwner(ScopedDriver):
         self.capability_at = 0
         super().__init__()
 
+    def configure_scene(self, scene):
+        map_id = scene_map_id(scene, self.profile)
+        if self.requests is not None or self.motion_started:
+            raise RuntimeError('scene configuration must precede public startup')
+        self.map_id = map_id
+        self.scene_map = None
+        if scene == 'normal':
+            return
+        from nav_msgs.msg import OccupancyGrid
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+        self.subscriptions_keep.append(self.create_subscription(OccupancyGrid, '/map',
+            self.record_scene_map, QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                                            durability=DurabilityPolicy.TRANSIENT_LOCAL)))
+
+    def record_scene_map(self, message):
+        if self.scene_map is not None:
+            return
+        from ._scene_map import occupied_a_sample
+        sample = occupied_a_sample(message)
+        emit('scene_map_consumed', map_id=self.map_id, **sample)
+        self.scene_map = sample
+
     def prepare_b_initial(self):
+        if self.map_id != SCENE_MAP_IDS['normal'] and self.scene_map is None:
+            raise RuntimeError('actual occupied scene map has not been checked')
         super().prepare_b_initial()
         # Startup observations belong to this exclusive, sealed, unsent scene.
         if (self.motion_started or self.active is not None or not self.odometry
@@ -55,7 +80,7 @@ class NavigationOwner(ScopedDriver):
 
         self.requests = NavigationRequests(self.execution,
             sites={stage: (*target, 0.0) for stage, target in GOALS.items()},
-            profile=self.profile, map_id='turtlebot3-world-v1',
+            profile=self.profile, map_id=self.map_id,
             observation=self.public_observation,
             ready=lambda: not self.aborting and self.stage_index < 2
                 and self.context_process.poll() is None
@@ -67,7 +92,7 @@ class NavigationOwner(ScopedDriver):
 
     def public_observation(self):
         row = self.observation()
-        return dict(epoch=0, map_id='turtlebot3-world-v1', frame='map',
+        return dict(epoch=0, map_id=self.map_id, frame='map',
                     valid=self.valid_observation(), pose=row['pose'],
                     sample_sim_seconds=row['pose_stamp'], sensor_health=dict(
                         localization=self.localization_ok, clock_age=row['clock_age'],

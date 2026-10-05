@@ -93,6 +93,9 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
+scene=${M6_NAVIGATION_SCENE:-normal}
+python3 /simulation/navigation_scene.py "$scene"
+map_file=$(python3 -c 'import json; print(json.load(open("/output/navigation-scene.json"))["map_file"])')
 rviz_options=(use_rviz:=False)
 if [[ ${M6_SHOW_VIEW:-0} == 1 ]]; then
   [[ -n ${DISPLAY:-} ]] || exit 2
@@ -112,12 +115,12 @@ VIEW
 fi
 ros2 launch /simulation/native_worker/producer_scope.launch.py headless:=True "${rviz_options[@]}" \
   use_sim_time:=True use_respawn:=False use_composition:=False \
-  params_file:=/output/native-params.yaml robot_sdf:=/output/scoped-waffle.model \
+  params_file:=/output/native-params.yaml map:="$map_file" robot_sdf:=/output/scoped-waffle.model \
   > /output/launch.log 2>&1 &
 launch_pid=$!
 python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
 bridge_pid=$!
-owner_options=()
+owner_options=(--scene "$scene")
 if [[ -n ${M6_NAVIGATION_PROFILE:-} ]]; then
   owner_options+=(--profile "$M6_NAVIGATION_PROFILE")
 fi

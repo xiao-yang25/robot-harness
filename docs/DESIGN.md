@@ -1829,3 +1829,13 @@ persistence and hard-stop bounds. Earlier profiles retain their native plugins
 and closure predicates. Core and public Session shapes remain unchanged.
 See [implementation](RUNTIME_SLICE.md#failure-settlement-before-caller-selected-backup)
 and [checks](TESTING.md#navigation-failure-settlement).
+
+
+The public Session launcher has two fixed test scenes: normal and occupied A.
+Occupied A requires this failure profile, derives a static planner map without
+adding physical obstacles, and waits for the actual `/map` sample (occupied A,
+free B/start, supported frame/geometry) before B preparation or public startup.
+Capability/measurement identities bind the selected scene. This startup check
+is not a certificate for the whole map or changing maps; native closure and
+fresh readiness still govern release. Default normal profiles keep their prior
+startup path. See the [scene commands](../integrations/ros2/nav2_session/README.md#explicit-recovery-test-scenes).

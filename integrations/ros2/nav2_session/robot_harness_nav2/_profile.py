@@ -4,6 +4,16 @@ PERMISSION_PROFILE_ID = 'scoped-two-context-nav2-owner-permit-v1'
 REVISION_PROFILE_ID = 'scoped-two-context-nav2-revision-v1'
 FAILURE_PROFILE_ID = 'scoped-two-context-nav2-failure-recovery-v1'
 PROFILES = (PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, FAILURE_PROFILE_ID)
+SCENE_MAP_IDS = {'normal': 'turtlebot3-world-v1',
+                 'occupied-a': 'turtlebot3-occupied-a-probe-v1'}
+
+
+def scene_map_id(scene, profile):
+    if scene not in SCENE_MAP_IDS or profile not in PROFILES:
+        raise ValueError('unknown navigation scene or profile')
+    if scene != 'normal' and profile != FAILURE_PROFILE_ID:
+        raise ValueError('occupied-a requires the explicit failure recovery profile')
+    return SCENE_MAP_IDS[scene]
 
 
 def configure_controller(parameters):

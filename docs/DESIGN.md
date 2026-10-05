@@ -1782,3 +1782,23 @@ on a stalled physics process, or CPU/GPU worker termination. Restart, durable
 recovery, reprovisioning of a fault-closed scope and real hardware protection
 remain outside this profile. See [verification](TESTING.md#finite-owner-motion-permission)
 and the [installed Owner entry](../integrations/ros2/nav2_session/README.md).
+
+<a id="navigation-cancellation-settlement"></a>
+## Explicit navigation cancellation settlement
+
+`scoped-two-context-nav2-revision-v1` preserves Core and public Session shapes
+while allowing the live Owner to close a publicly cancelled, confirmed accepted
+A before B reuse. Only the associated A with pending native outcome tolerates
+revoked authority for closure progress. Native cancel and outlet sealing start
+independently; actual cancelled/succeeded terminal, correlated scoped child/BT
+and manager closure, drive ACK, fresh quiet and fresh B readiness must precede
+correct output disposition, settlement and release. A success racing cancel
+remains succeeded; an interrupted A is not evidence of arrival.
+
+The shared closure bound is 15 seconds clipped to original operation and task
+deadlines. Unconfirmed acceptance, EOF/global close, expiry or missing facts keep
+the operation unresolved and prohibit B. Default and finite-permission profiles
+retain their abort behavior. This profile assumes Owner survival and progress;
+finite-permission, recovery and hard-stop guarantees are not inherited. Business
+intent and model proposals remain caller responsibilities. See [implementation](RUNTIME_SLICE.md#cancellation-settlement-for-business-revision)
+and [verification](TESTING.md#navigation-cancellation-settlement).

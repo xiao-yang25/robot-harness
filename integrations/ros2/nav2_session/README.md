@@ -104,7 +104,7 @@ socket. The external client must run in the same container. The socket lives
 outside shared output mounts, with directory mode 0700 and socket mode 0600.
 The CLI rejects startup outside the required isolation flags before importing ROS.
 
-Cancel, close and client EOF revoke authority and schedule native cancellation
+In the default and finite-permission profiles, cancel, close and client EOF revoke authority and schedule native cancellation
 and exact outlet closure. An intent response is not physical stop confirmation.
 Cleanup reports unknown stop and retains pending settlement. Final process-tree
 release belongs to the launcher/container boundary. Owner restart, general site
@@ -152,3 +152,34 @@ physical stop deadline, stop other workers, recover an Owner, or settle Core.
 See [design](../../../docs/DESIGN.md#finite-owner-motion-permission) and
 [checks](../../../docs/TESTING.md#finite-owner-motion-permission). Existing
 business-Agent consumers retain their declared default profile/version pin.
+
+### Explicit cancellation settlement profile
+
+`scoped-two-context-nav2-revision-v1` uses the existing shim and scoped workers.
+It allows a publicly cancelled, confirmed accepted A to settle and release only
+after actual native terminal, scoped closure, fresh quiet and fresh B readiness.
+Native success racing cancel stays succeeded; cancel intent alone remains unknown.
+Late unconfirmed acceptance, B cancel, EOF, global close, expiry or missing
+evidence use unresolved shutdown, without B reuse. The shared closure deadline
+is at most 15 seconds, clipped to the original operation and task deadlines.
+
+Select it explicitly with a **new Linux install prefix** and a trusted public
+Session caller. The standard A/B example still runs its normal sequence:
+
+```sh
+python3 integrations/ros2/simulation/simulate.py session \
+  --profile scoped-two-context-nav2-revision-v1 \
+  --image YOUR_SCOPED_HUMBLE_IMAGE \
+  --python-prefix /absolute/new-linux-install-prefix \
+  --client-script /absolute/your-session-caller.py \
+  --caller-wait-seconds 45 --output /absolute/new-result-directory
+```
+
+The caller can query A's retained receipt; it must await `released` and acquire
+a fresh observation reference before submitting B. Local installed controlled
+Humble runs exercised moving-A cancel/reuse and actual paused-B refusal.
+This requires a live, progressing Owner and does not include finite permission,
+restart or a hard stop deadline. Agent instruction polling and model-guided
+revision are a separate planned increment; its existing pin is unchanged.
+See [design](../../../docs/DESIGN.md#navigation-cancellation-settlement) and
+[checks](../../../docs/TESTING.md#navigation-cancellation-settlement).

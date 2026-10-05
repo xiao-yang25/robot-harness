@@ -22,6 +22,9 @@ class BudgetTests(unittest.TestCase):
             def open_scope(self, stage): pass
             def visit(self, stage): pass
             def close_visit(self, stage): pass
+            def visit_and_close(self, stage):
+                self.visit(stage)
+                self.close_visit(stage)
             def abort(self): calls.append('abort')
             def wait(self, predicate, seconds, **kwargs):
                 calls.append((seconds, kwargs.get('require_fresh', False)))
@@ -32,10 +35,17 @@ class BudgetTests(unittest.TestCase):
         ros.shutdown = lambda: None
         owner = ModuleType('robot_harness_nav2._owner')
         owner.NavigationOwner, owner.ClientClosed = Owner, ClientClosed
+        revision = ModuleType('robot_harness_nav2._revision')
+        class RevisionOwner(Owner):
+            def __init__(self):
+                super().__init__()
+                calls.append('revision-profile')
+        revision.RevisionOwner = RevisionOwner
         observations = ModuleType('robot_harness_nav2._observations')
         observations.emit = lambda *a, **kw: None
         observations.diagnose = lambda *a, **kw: None
         with patch.dict(sys.modules, {'rclpy': ros, owner.__name__: owner,
+                                      revision.__name__: revision,
                                       observations.__name__: observations}), \
                 patch.object(sys, 'argv', ['owner', *options]), \
                 patch.object(entry, 'require_isolation'):
@@ -46,6 +56,12 @@ class BudgetTests(unittest.TestCase):
         code, calls = self.exercise()
         self.assertEqual(code, 0)
         self.assertEqual(calls, [(15, True), (15, True), (10, False), 'abort'])
+
+    def test_revision_profile_is_explicit_and_keeps_idle_budget(self):
+        code, calls = self.exercise(['--profile', 'scoped-two-context-nav2-revision-v1',
+                                     '--caller-wait-seconds', '45'])
+        self.assertEqual(code, 0)
+        self.assertEqual(calls, ['revision-profile', (45, True), (45, True), (45, False), 'abort'])
 
     def test_final_proposal_beyond_old_wait_requires_explicit_budget(self):
         code, calls = self.exercise(final_delay=12)

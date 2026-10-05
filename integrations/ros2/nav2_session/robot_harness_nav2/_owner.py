@@ -110,13 +110,20 @@ class NavigationOwner(ScopedDriver):
         if self.aborting:
             self.cancel_pending()
             return
-        if (receipt['authority_disposition'] != 'current' or not self.valid_observation()
+        if (not self.authority_progress_allowed(receipt) or not self.valid_observation()
                 or self.context_process.poll() is not None):
             self.aborting = True
             self.execution.cancel(self.execution.active)
             raise RuntimeError('Core authority or required navigation observation lost')
         if time.monotonic_ns() >= self.capability_at:
             self.refresh_capability()
+
+    def authority_progress_allowed(self, receipt):
+        return receipt['authority_disposition'] == 'current'
+
+    def visit_and_close(self, stage):
+        self.visit(stage)
+        self.close_visit(stage)
 
     def open_scope(self, stage):
         record = self.execution.active
@@ -147,18 +154,29 @@ class NavigationOwner(ScopedDriver):
         if self.execution.tick()['authority_disposition'] != 'current':
             raise RuntimeError('native submission authority lost')
 
-    def fresh_b_ready(self):
+    def fresh_b_ready(self, *, close_until=None):
         # Initial preparation is not enough at the later reuse boundary.
+        def budget():
+            remaining = 5 if close_until is None else min(5, close_until-time.monotonic())
+            if remaining <= 0:
+                raise TimeoutError('shared A closure deadline')
+            return remaining
         namespace = self.contexts['B']['namespace']
         for name in ('bt_navigator', 'planner_server', 'controller_server', 'velocity_smoother'):
-            future = self.service(GetState, namespace+'/'+name+'/get_state', GetState.Request())
-            self.wait(future.done, 5, require_fresh=True)
-            if future.result().current_state.id != 3:
+            future = self.service(GetState, namespace+'/'+name+'/get_state', GetState.Request(), budget())
+            self.wait(future.done, budget(), require_fresh=True)
+            state = future.result().current_state.id
+            if close_until is not None:
+                emit('revision_readiness', service=name+'/get_state', state=state, success=None)
+            if state != 3:
                 raise RuntimeError('B no longer active')
         for name in ('controller_transform_ready', 'planner_map_ready'):
-            future = self.service(Trigger, namespace+'/'+name, Trigger.Request())
-            self.wait(future.done, 5, require_fresh=True)
-            if future.result().success is not True:
+            future = self.service(Trigger, namespace+'/'+name, Trigger.Request(), budget())
+            self.wait(future.done, budget(), require_fresh=True)
+            success = future.result().success
+            if close_until is not None:
+                emit('revision_readiness', service=name, state=None, success=success)
+            if success is not True:
                 raise RuntimeError('B native readiness lost')
         if (not self.b_client.server_is_ready() or self.context_process.poll() is not None
                 or not self.valid_observation()):
@@ -168,7 +186,7 @@ class NavigationOwner(ScopedDriver):
         # across that boundary into the actual result/settlement calls.
         if (not self.valid_observation() or self.context_process.poll() is not None
                 or not self.b_client.server_is_ready()
-                or self.execution.tick()['authority_disposition'] != 'current'):
+                or not self.authority_progress_allowed(self.execution.tick())):
             raise RuntimeError('B readiness or authority lost before settlement')
 
     def close_visit(self, stage, **kwargs):

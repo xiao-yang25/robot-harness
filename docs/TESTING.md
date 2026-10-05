@@ -2413,3 +2413,36 @@ The last command requires a fresh writable `/output` in its isolated container
 and a sourced custom-interface setup. It owns and reaps only its child Gazebo
 processes. No Owner restart, hardware, hard stopping-time or native worker
 termination qualification follows from these checks.
+
+## Navigation cancellation settlement
+
+The explicit revision profile uses the existing shim/native closing graph.
+Ubuntu 22.04/Humble CI builds and relocates the installed bridge, then runs both
+`linux_driver_checks.py` and `linux_revision_checks.py`. The latter uses real Core
+and public endpoint with controlled ROS edges: same-tick cancel, success racing
+cancel, retained late acceptance, missing terminal/outlet/lane/quiet/readiness,
+original deadline expiry, global close and EOF during closure. These checks
+prove scheduling and Core dispositions, not physical stopping. CLI/profile
+selection and host forwarding are covered by the existing package/launcher suites.
+
+After sourcing Humble and the current private fixture interfaces:
+
+```sh
+PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 integrations/ros2/nav2_session/tests/linux_revision_checks.py
+```
+
+Separate local installed real-Humble runs observed moving accepted A, exact
+public cancellation, actual cancelled terminal, scoped closure, fresh quiet
+and six B readiness responses before Core release and public B admission.
+One normal reuse run released A after about 4.89 seconds and observed B within
+the existing 0.35 m tolerance. A controlled actual B-domain pause returned
+lifecycle state 2: A output/settlement stayed pending and B was never sent.
+Quiet at the reuse boundary relies on correlated fresh odometry and native
+closure; passive Gazebo snapshots corroborate selected motion/position, not an
+independent continuous pre-B quiet window or hard stop limit.
+
+Old Agent application and installed Session combinations retain their default
+profile and dependency pin. New business instruction polling, after-revision
+model qualification and matching demo videos remain separate Agent work.
+The final B, task verdict and whole-native cleanup remain pending/unassessed/unknown.

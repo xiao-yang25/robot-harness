@@ -17,7 +17,8 @@ from configure_mirror import validate_mirror_url
 ROOT = Path(__file__).resolve().parents[3]
 IMAGE = 'robot-harness-simulation:humble'
 VISUAL_IMAGE = 'robot-harness-simulation:humble-visual'
-PROFILES = ('scoped-two-context-nav2-shim-v1', 'scoped-two-context-nav2-owner-permit-v1')
+PROFILES = ('scoped-two-context-nav2-shim-v1', 'scoped-two-context-nav2-owner-permit-v1',
+            'scoped-two-context-nav2-revision-v1')
 CASES = ('normal', 'cancel-moving', 'replace-moving',
          'obstacle-wait', 'obstacle-wait-frozen-scan',
          'obstacle-resume', 'obstacle-resume-frozen-scan', 'obstacle-resume-missing-controller',

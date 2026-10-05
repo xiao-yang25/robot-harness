@@ -23,7 +23,7 @@ import os
 import uuid
 import yaml
 import xml.etree.ElementTree as ET
-from robot_harness_nav2._profile import PROFILE_ID, PERMISSION_PROFILE_ID, PROFILES, configure_controller
+from robot_harness_nav2._profile import PROFILE_ID, PERMISSION_PROFILE_ID, FAILURE_PROFILE_ID, PROFILES, configure_controller
 profile = os.environ.get("M6_NAVIGATION_PROFILE", PROFILE_ID)
 if profile not in PROFILES:
     raise RuntimeError("unknown navigation profile")
@@ -38,11 +38,21 @@ amcl['set_initial_pose'] = True
 amcl['initial_pose'] = dict(x=-2.0, y=-0.5, z=0.0, yaw=0.0)
 nav = params['bt_navigator']['ros__parameters']
 nav['plugin_lib_names'].extend(['scoped_follow_path', 'scoped_compute_path'])
+failure_proof = profile == FAILURE_PROFILE_ID
+if failure_proof:
+    nav['plugin_lib_names'].extend(['failure_follow_path', 'failure_compute_path'])
+    nav['failure_proof_enabled'] = True
+    params['controller_server']['ros__parameters']['failure_proof_enabled'] = True
 for stage, scope in zip(('A', 'B'), scopes.values()):
+    if failure_proof:
+        params['controller_server']['ros__parameters'].update(failure_scope_id=scope,
+            failure_generation=1 if stage == 'A' else 2)
     path = '/output/request-'+scope+'.xml'
+    planner = 'FailureComputePathToPose' if failure_proof else 'ScopedComputePathToPose'
+    controller = 'FailureFollowPath' if failure_proof else 'ScopedFollowPath'
     Path(path).write_text('<root main_tree_to_execute="MainTree"><BehaviorTree ID="MainTree"><Sequence>'
-        '<ScopedComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased" scope_id="'+scope+'"/>'
-        '<ScopedFollowPath path="{path}" controller_id="FollowPath" scope_id="'+scope+'"/>'
+        '<'+planner+' goal="{goal}" path="{path}" planner_id="GridBased" scope_id="'+scope+'"/>'
+        '<'+controller+' path="{path}" controller_id="FollowPath" scope_id="'+scope+'"/>'
         '</Sequence></BehaviorTree></root>')
     nav['default_nav_to_pose_bt_xml'] = path
     Path('/output/'+('native' if stage == 'A' else 'b')+'-params.yaml').write_text(yaml.safe_dump(params))

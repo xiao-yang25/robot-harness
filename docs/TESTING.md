@@ -2456,3 +2456,38 @@ results. The first recorded model scene failed at RViz startup before any model
 request and remains incomplete; a subsequent unchanged scene passed, without
 establishing a root-cause fix or broad reliability.
 The final B, task verdict and whole-native cleanup remain pending/unassessed/unknown.
+
+<a id="navigation-failure-settlement"></a>
+## Confirmed planning failure checks
+
+The Humble workflow runs installed `linux_failure_checks.py` with real Core and
+public endpoint, using controlled ROS edges. It checks failed/no-output release,
+explicit status6 selection, missing terminal or lane/quiet proof, original expiry
+and task clipping, post-readiness input loss, cancel/close/EOF precedence and
+native proof/unused-controller-seal rejection. These are scheduling and receipt
+checks; mocked ROS edges do not prove physical closure.
+
+```sh
+PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 integrations/ros2/nav2_session/tests/linux_failure_checks.py
+```
+
+A separate version-pinned Humble job compiles all native workers and both plugin
+sets, and runs the leaf-evidence, actual tree-halt and Action-startup tests.
+The existing default/revision Owner, public Python and launcher suites remain
+compatibility checks. Installed real-Humble movement evidence must be recorded
+separately before claiming a complete failure-recovery or Agent/model combination.
+The profile is restricted as specified in [Design](DESIGN.md#navigation-failure-settlement).
+
+Local fresh-install Humble checks passed: 62 public Python, 21 existing Owner,
+11 cancellation, 11 failure, 50 launcher checks and 3 native lifecycle tests.
+The installed failure profile also completed a real accepted/status6 A:
+correlated native closure, quiet and six B readiness checks preceded
+failed/no-output settlement and release after about 2.78 seconds, then one B
+succeeded within 0.231 m of the registered site. Final B remained pending.
+An actual paused B domain kept failed A pending and admitted no B. Normal A/B
+passed under both the new profile and the old default. These runs used the same
+isolated Humble/Nav2 1.1.20 setup; experimental occupied-map metadata and passive
+map observation were fixture-only. Each scene had one physical evaluation.
+No business Agent/model, restart, general unreachable classification or hard-stop
+qualification follows from these checks. Remote CI is a separate delivery gate.

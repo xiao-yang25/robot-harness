@@ -180,6 +180,23 @@ a fresh observation reference before submitting B. Local installed controlled
 Humble runs exercised moving-A cancel/reuse and actual paused-B refusal.
 This requires a live, progressing Owner and does not include finite permission,
 restart or a hard stop deadline. Agent instruction polling and model-guided
-revision are a separate planned increment; its existing pin is unchanged.
+revision remain separate business features; the existing pairing is unchanged.
 See [design](../../../docs/DESIGN.md#navigation-cancellation-settlement) and
 [checks](../../../docs/TESTING.md#navigation-cancellation-settlement).
+
+### Explicit planning-failure settlement profile
+
+`scoped-two-context-nav2-failure-recovery-v1` can release a confirmed failed A
+only after positive native planner/unsent-controller closure, drive ACK, fresh
+quiet and fresh B readiness. An entered-but-unconfirmed child remains unknown;
+missing or contradictory evidence cannot enable B. Normal A is unchanged,
+while B failure, cancellation, EOF and global close use unresolved shutdown.
+
+Use a fresh Linux install and a simulation image rebuilt from the same source:
+select `--profile scoped-two-context-nav2-failure-recovery-v1` in the Session
+command above. The trusted caller must inspect A's released failure receipt and
+obtain a new observation reference before an explicitly allowed B submission.
+The Owner does not choose or send a backup. This fixed, exclusive, live-Owner
+profile does not inherit finite permission, arbitrary BT, restart or hard-stop
+qualification. See [design](../../../docs/DESIGN.md#navigation-failure-settlement)
+and [checks](../../../docs/TESTING.md#navigation-failure-settlement).

@@ -56,7 +56,7 @@ def caller_wait_seconds(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    from ._profile import PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, PROFILES
+    from ._profile import PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, FAILURE_PROFILE_ID, PROFILES
     parser.add_argument('--profile', choices=PROFILES, default=PROFILE_ID,
                         help='explicit native motion policy; existing v1 is the default')
     parser.add_argument('--caller-wait-seconds', type=caller_wait_seconds,
@@ -72,6 +72,9 @@ def main():
     elif args.profile == REVISION_PROFILE_ID:
         from ._revision import RevisionOwner
         NavigationOwner = RevisionOwner
+    elif args.profile == FAILURE_PROFILE_ID:
+        from ._failure import FailureOwner
+        NavigationOwner = FailureOwner
     from ._observations import emit, diagnose
     rclpy.init()
     owner = NavigationOwner.__new__(NavigationOwner)

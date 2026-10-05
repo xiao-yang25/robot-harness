@@ -886,5 +886,21 @@ actual paused-B refusal. [Testing](TESTING.md#navigation-cancellation-settlement
 separates these from controlled ROS-edge checks. Owner survival/progress is
 required; this shim profile does not inherit finite permission, restart or hard
 stop qualification. Business intent, instruction polling and after-revision
-model proposals belong to the Agent and remain the next separate increment.
+model proposals belong to the Agent, separately from this Owner profile.
 Existing Agent dependency pins and preview tags are unchanged.
+
+## Failure settlement before caller-selected backup
+
+The explicit failure profile routes only a real status6 A result into bounded
+closure. The retained accepted UUID/terminal and current authority must match.
+It seals the drive, reads joined/sealed BT leaf evidence, waits for the failed
+planner's real worker ACK and seals the never-entered controller endpoint. It
+then uses the existing manager/quiet/readiness path and Core no-output,
+settle/release calls. A repeated closure attempt cannot refresh its deadline.
+
+Normal A/B uses the previous path. B failure and public cancel/close/EOF remain
+unresolved shutdown; no third context is created. The profile advertises a
+reusable execution boundary, not a business recovery policy: Agent backup
+selection, model qualification and new demonstration media are separate work.
+See [scope](DESIGN.md#navigation-failure-settlement) and
+[verification](TESTING.md#navigation-failure-settlement).

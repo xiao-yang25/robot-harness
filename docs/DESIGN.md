@@ -1802,3 +1802,30 @@ retain their abort behavior. This profile assumes Owner survival and progress;
 finite-permission, recovery and hard-stop guarantees are not inherited. Business
 intent and model proposals remain caller responsibilities. See [implementation](RUNTIME_SLICE.md#cancellation-settlement-for-business-revision)
 and [verification](TESTING.md#navigation-cancellation-settlement).
+
+<a id="navigation-failure-settlement"></a>
+## Explicit navigation failure settlement
+
+`scoped-two-context-nav2-failure-recovery-v1` permits the live Owner to release
+confirmed failed A only for the fixed planner-failed/controller-unsent branch.
+It uses separate native leaves, with a sticky entry record set before any goal
+RPC. A leaf entered without a confirmed terminal remains unknown. The navigator
+reads the fixed two-leaf records only after its worker joins, the endpoint seals
+and the tree halts. A never-entered controller also needs its actual Action
+endpoint sealed with no worker/current/pending goal; missing logs or IDLE alone
+cannot prove non-submission.
+
+Drive ACK, correlated planner worker closure, manager pause, fresh quiet and
+six fresh B readiness checks must precede failed/no-output settlement and release.
+The 15-second closure window is clipped to the original operation/240-second
+task deadline. Missing or contradictory evidence, cancellation, EOF/global close,
+expiry or input loss prohibits reuse. Normal A remains a real arrival; failed A
+never becomes one. The caller decides whether a preauthorized B is appropriate
+and must use a fresh public observation; the Owner does not send B automatically.
+
+This isolated, exclusive, one-shot profile excludes arbitrary BTs, external raw
+Action clients, endpoint reactivation, finite owner permission, Owner restart,
+persistence and hard-stop bounds. Earlier profiles retain their native plugins
+and closure predicates. Core and public Session shapes remain unchanged.
+See [implementation](RUNTIME_SLICE.md#failure-settlement-before-caller-selected-backup)
+and [checks](TESTING.md#navigation-failure-settlement).

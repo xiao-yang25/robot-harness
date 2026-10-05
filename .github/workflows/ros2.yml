@@ -52,9 +52,32 @@ jobs:
           python3 -m robot_harness_nav2 --help
           python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_driver_checks.py"
           python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_revision_checks.py"
+          python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_failure_checks.py"
       - name: Check simulation launcher and diagnostics
         run: python3 -m unittest discover -s integrations/ros2/simulation -p 'test_*.py'
       # Gazebo movement runs use the separate manual simulation workflow.
+
+  native-closure:
+    name: Compile fixed Nav2 workers and check sealed leaf evidence
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install version-pinned native dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake 'ros-humble-nav2-controller=1.1.20-*' 'ros-humble-nav2-planner=1.1.20-*' 'ros-humble-nav2-bt-navigator=1.1.20-*'
+      - name: Compile native workers and test lifecycle evidence
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          export ROS_LOCALHOST_ONLY=1 ROS_DOMAIN_ID=77
+          cmake -S integrations/ros2/simulation/native_worker -B build-native -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+          cmake --build build-native --parallel 2
+          ctest --test-dir build-native --output-on-failure --no-tests=error
 
   drive-protocol:
     name: Compile drive and check finite/legacy wire on Humble

@@ -41,11 +41,18 @@ class BudgetTests(unittest.TestCase):
                 super().__init__()
                 calls.append('revision-profile')
         revision.RevisionOwner = RevisionOwner
+        failure = ModuleType('robot_harness_nav2._failure')
+        class FailureOwner(Owner):
+            def __init__(self):
+                super().__init__()
+                calls.append('failure-profile')
+        failure.FailureOwner = FailureOwner
         observations = ModuleType('robot_harness_nav2._observations')
         observations.emit = lambda *a, **kw: None
         observations.diagnose = lambda *a, **kw: None
         with patch.dict(sys.modules, {'rclpy': ros, owner.__name__: owner,
                                       revision.__name__: revision,
+                                      failure.__name__: failure,
                                       observations.__name__: observations}), \
                 patch.object(sys, 'argv', ['owner', *options]), \
                 patch.object(entry, 'require_isolation'):
@@ -62,6 +69,12 @@ class BudgetTests(unittest.TestCase):
                                      '--caller-wait-seconds', '45'])
         self.assertEqual(code, 0)
         self.assertEqual(calls, ['revision-profile', (45, True), (45, True), (45, False), 'abort'])
+
+    def test_failure_profile_is_explicit_and_keeps_idle_budget(self):
+        code, calls = self.exercise(['--profile', 'scoped-two-context-nav2-failure-recovery-v1',
+                                     '--caller-wait-seconds', '45'])
+        self.assertEqual(code, 0)
+        self.assertEqual(calls, ['failure-profile', (45, True), (45, True), (45, False), 'abort'])
 
     def test_final_proposal_beyond_old_wait_requires_explicit_budget(self):
         code, calls = self.exercise(final_delay=12)

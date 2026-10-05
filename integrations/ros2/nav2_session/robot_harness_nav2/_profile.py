@@ -2,7 +2,8 @@
 PROFILE_ID = 'scoped-two-context-nav2-shim-v1'
 PERMISSION_PROFILE_ID = 'scoped-two-context-nav2-owner-permit-v1'
 REVISION_PROFILE_ID = 'scoped-two-context-nav2-revision-v1'
-PROFILES = (PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID)
+FAILURE_PROFILE_ID = 'scoped-two-context-nav2-failure-recovery-v1'
+PROFILES = (PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, FAILURE_PROFILE_ID)
 
 
 def configure_controller(parameters):

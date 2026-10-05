@@ -190,8 +190,7 @@ class Observations(Node):
                                    timeout=Duration(seconds=0)).header.stamp)
         emit('native_result', stage=stage, goal_id=goal_id, status=result.status,
              result_clock=result_clock, result_tf_stamp=result_tf_stamp)
-        if result.status != 4:
-            raise RuntimeError('native result unsuccessful')
+        self.validate_result(stage, result)
         self.active = None
         self.wait(lambda: self.observation()['pose_stamp'] > max(result_clock, result_tf_stamp),
                   5, require_fresh=True)
@@ -200,3 +199,7 @@ class Observations(Node):
             raise RuntimeError('fresh localization outside target')
         emit('arrival', stage=stage, goal_id=goal_id, status=result.status,
              result_clock=result_clock, result_tf_stamp=result_tf_stamp, observation=observation)
+
+    def validate_result(self, stage, result):
+        if result.status != 4:
+            raise RuntimeError('native result unsuccessful')

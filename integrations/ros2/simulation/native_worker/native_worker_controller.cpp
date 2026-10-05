@@ -41,6 +41,7 @@ public:
   ~WorkerController() override {
     // Captured derived state must outlive the real native execution callback.
     timer_.reset();
+    idle_close_.reset();
     readiness_.reset();
     if (action_server_) {
       action_server_->deactivate();
@@ -81,11 +82,59 @@ protected:
           response->message = response->success ? "controller map transform available"
                                                 : "controller map transform unavailable";
         });
+    if (!has_parameter("failure_proof_enabled"))
+      declare_parameter<bool>("failure_proof_enabled", false);
+    if (!has_parameter("failure_scope_id"))
+      declare_parameter<std::string>("failure_scope_id", "");
+    if (!has_parameter("failure_generation"))
+      declare_parameter<int>("failure_generation", 0);
+    idle_close_ = create_service<std_srvs::srv::Trigger>(
+        "seal_unsubmitted_controller",
+        [this](std::shared_ptr<std_srvs::srv::Trigger::Request>,
+               std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+          if (!get_parameter("failure_proof_enabled").as_bool())
+            return;
+          const auto scope = get_parameter("failure_scope_id").as_string();
+          const auto generation = get_parameter("failure_generation").as_int();
+          if (scope.size() != 32 || scope == std::string(32, '0') ||
+              scope.find_first_not_of("0123456789abcdef") != std::string::npos || generation < 1)
+            return;
+          // Native admission callbacks and this service share the main executor.
+          // The joined BT's positive never-entered proof is required separately.
+          {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            if (calls_ != 0)
+              return;
+          }
+          if (!action_server_ || action_server_->is_running() ||
+              action_server_->get_current_goal() || action_server_->get_pending_goal())
+            return;
+          action_server_->deactivate();
+          {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            if (calls_ != 0)
+              return;
+          }
+          if (action_server_->is_server_active() || action_server_->is_running() ||
+              action_server_->get_current_goal() || action_server_->get_pending_goal())
+            return;
+          const auto stamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::steady_clock::now().time_since_epoch())
+                                 .count();
+          response->success = true;
+          response->message = "{\"event\":\"controller_unsubmitted_sealed\",\"scope_id\":\"" +
+                              scope + "\",\"generation\":" + std::to_string(generation) +
+                              ",\"worker_callbacks\":0,\"server_idle\":true,\"endpoint_sealed\":"
+                              "true,\"steady_ns\":" +
+                              std::to_string(stamp) + "}";
+          std::lock_guard<std::mutex> lock(log_mutex_);
+          log_ << response->message << std::endl;
+        });
     return result;
   }
 
 private:
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr readiness_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr readiness_, idle_close_;
   void record(const std::string& event, const std::string& uuid) {
     const auto stamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                            std::chrono::steady_clock::now().time_since_epoch())

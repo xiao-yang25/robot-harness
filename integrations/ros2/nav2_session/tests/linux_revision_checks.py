@@ -17,17 +17,19 @@ from robot_harness_nav2._profile import REVISION_PROFILE_ID
 
 
 class RevisionChecks(unittest.TestCase):
+    owner_type = revision.RevisionOwner
+    profile_id = REVISION_PROFILE_ID
     def setUp(self):
         self.make_owner()
 
     def make_owner(self, native=True):
         now = time.monotonic_ns()
-        gate = self.gate = _core.Gate('p', 'd', 'cap', REVISION_PROFILE_ID, 1, now)
+        gate = self.gate = _core.Gate('p', 'd', 'cap', self.profile_id, 1, now)
         self.addCleanup(gate.close)
         for kind in ('idle', 'worker', 'sink'):
             accepted(gate.startup(kind, True, time.monotonic_ns()))
         accepted(gate.capabilities(True, time.monotonic_ns(), time.monotonic_ns()+60_000_000_000))
-        owner = self.owner = revision.RevisionOwner.__new__(revision.RevisionOwner)
+        owner = self.owner = self.owner_type.__new__(self.owner_type)
         owner.gate = gate
         owner.execution = ExecutionCoordinator(gate, time.monotonic_ns)
         record = self.a = owner.execution.reserve('A', ('A',), lambda: dict(stage='A'))[0]
@@ -63,7 +65,7 @@ class RevisionChecks(unittest.TestCase):
         owner.active = self.handle
         owner.endpoint = None
         owner.requests = NavigationRequests(owner.execution, sites={'A': (1, 2, 0), 'B': (0, 0, 0)},
-            profile=REVISION_PROFILE_ID, map_id='m',
+            profile=self.profile_id, map_id='m',
             observation=lambda: dict(epoch=0, map_id='m', frame='map', valid=True),
             ready=lambda: True, context=lambda: {}, request_stop=owner.request_stop)
         self.edges = []

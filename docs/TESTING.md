@@ -2516,3 +2516,25 @@ image for the new scene. New public scene/physical runs are qualified separately
 [Recovery recordings](assets/demo/README.md#single-failure-recovery) present two
 already qualified actual-model runs from the original Harness/Agent pairing.
 They are not recordings or qualification of the new public scene command.
+
+
+The current public image recipe rebuilt successfully on Ubuntu22.04/Humble with
+Nav2 1.1.20, including both failure leaves and the current drive interfaces.
+An initial archive connection failure was retained; an explicit HTTPS Ubuntu
+mirror supplied the successful build without changing package/signature checks.
+The new image passed its native/observation build checks and installed Owner24 /
+failure11 checks. Two new public `simulate.py session` runs used this image,
+the new Linux Owner installation, and installed Agent `682ead6` with controlled
+proposals: normal completed only A (0.225161 m); occupied A returned accepted /
+status6, completed native closure and A release, then admitted one B
+(0.233654 m). Each run used one external same-run evaluation; Gazebo observations
+never entered task inputs. An event-name compatibility view reused the existing
+evaluator; raw `scene_map_consumed` events were preserved. Final B remains
+pending, task verdict unassessed and native cleanup unknown.
+
+A fresh independent review found no implementation/presentation defects and
+performed one separate map-mismatch startup check with the actual entry/callback
+and synthetic ROS edges: no B preparation or public endpoint, with disposal and
+shutdown. Its initial outstanding build/run/remote-CI evidence was subsequently
+supplied; this does not turn its synthetic check into physical qualification.
+The recordings above retain their original model runs and versions.

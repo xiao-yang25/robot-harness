@@ -12,7 +12,7 @@ import simulate
 
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
-                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal'):
+                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal', record_evaluation=False):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -61,7 +61,7 @@ class LauncherTest(unittest.TestCase):
             with patch.object(simulate.subprocess, 'run', side_effect=docker), \
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
                 code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
-                    session=session, profile=profile, scene=scene, python_prefix=str(prefix),
+                    session=session, profile=profile, scene=scene, record_evaluation=record_evaluation, python_prefix=str(prefix),
                     client_script=str(client) if custom_client else None,
                     client_prefix=str(client_prefix) if custom_client else None,
                     caller_wait_seconds=45 if custom_client else None))
@@ -75,6 +75,12 @@ class LauncherTest(unittest.TestCase):
                 self.assertIn('M6_NATIVE_ISOLATED=1', command)
                 self.assertIn('M6_NAVIGATION_PROFILE='+profile, command)
                 self.assertIn('M6_NAVIGATION_SCENE='+scene, command)
+                if record_evaluation:
+                    self.assertIn('M6_COLLECT_EVALUATION=1', command)
+                    self.assertEqual(command[command.index('--hostname')+1], status['container_name'])
+                else:
+                    self.assertNotIn('M6_COLLECT_EVALUATION=1', command)
+                    self.assertNotIn('--hostname', command)
                 self.assertTrue(any('target=/installed,readonly' in part for part in command))
                 self.assertTrue(any('target=/navigation-example.py,readonly' in part for part in command))
                 self.assertFalse(any('target=/simulation/navigation_requests.py' in part for part in command))
@@ -87,6 +93,28 @@ class LauncherTest(unittest.TestCase):
                     self.assertNotIn('M6_CLIENT_PREFIX=/client-prefix', command)
                     self.assertFalse(any(part.startswith('M6_CALLER_WAIT_SECONDS=') for part in command))
             return code, status
+
+    def test_optional_collection_has_explicit_same_run_identity(self):
+        code, status = self.exercise(session=True, record_evaluation=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(status['evaluation_collection'])
+
+    def test_default_does_not_select_collection(self):
+        _, status = self.exercise(session=True)
+        self.assertNotIn('evaluation_collection', status)
+
+    def test_unsupported_collection_starts_no_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/'new'
+            for session, profile, scene in ((False,simulate.PROFILES[0],'normal'),
+                    (True,simulate.PROFILES[1],'normal'),(True,simulate.PROFILES[2],'normal'),
+                    (True,simulate.PROFILES[3],'normal'),(True,simulate.PROFILES[3],'occupied-a')):
+                with self.subTest(profile=profile, scene=scene), patch.object(simulate.subprocess,'run') as docker:
+                    with self.assertRaisesRegex(ValueError, 'evaluation collection requires'):
+                        simulate.run_case(argparse.Namespace(output=str(output), session=session,
+                            profile=profile, scene=scene, record_evaluation=True))
+                    self.assertFalse(output.exists())
+                    docker.assert_not_called()
 
     def test_explicit_permission_profile_reaches_container_and_host_record(self):
         _, status = self.exercise(session=True, profile=simulate.PROFILES[1])

@@ -2538,3 +2538,26 @@ and synthetic ROS edges: no B preparation or public endpoint, with disposal and
 shutdown. Its initial outstanding build/run/remote-CI evidence was subsequently
 supplied; this does not turn its synthetic check into physical qualification.
 The recordings above retain their original model runs and versions.
+
+## Passive navigation collection checks
+
+The optional [normal Session collector](../integrations/ros2/simulation/README.md#optional-passive-evaluation-collection)
+has no effect on default execution. Existing Humble simulation discovery includes
+its tests without adding a workflow or a physical evaluator. Tests check opt-in
+identity forwarding, unsupported scope before resources, actual prepared
+configuration guards, finite/failed/late/duplicate queries, missing-context gaps,
+a real five-second query timeout, and interruption with a live query child.
+Linux additionally exercises the actual Session cleanup function with real
+collector/query and stand-in scene processes: the collector and query exit are
+observed, the direct children are reaped and collection output precedes scene
+teardown, while the original failure exit is preserved. A delayed-group partial
+startup test rejects waiting for a child outside the shared four-second grace;
+the supervisor tracks the leader before its group exists and kills both at the
+original deadline.
+
+Local checks on this increment passed 68 simulation tests on Linux/amd64 and
+68 on macOS (seven Linux/ROS-specific skips). A read-only inspection also consumed
+the installed Nav2 1.1.20 assets and prepared AMCL/map configuration in the current
+Humble image. These are software/lifecycle checks, not a fresh physical A→B
+qualification or proof of arbitrary map alignment. The offline Agent evaluator
+and a new installed public consumption have their own delivery and evidence.

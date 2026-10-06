@@ -68,15 +68,39 @@ model.write('/output/scoped-waffle.model', encoding='unicode')
 PY
 # The launcher owns the scene and separate example process. The installed owner
 # creates only its native B context and its private local request endpoint.
-owner_pid='' client_pid='' launch_pid='' bridge_pid=''
+owner_pid='' client_pid='' launch_pid='' bridge_pid='' collector_pid=''
 cleanup() {
   local status=$?
   trap - EXIT
+  local until=$((SECONDS+4)) live
+  if [[ -n $collector_pid ]]; then
+    # Revoke/interrupt the control side immediately even while truth is finishing.
+    for pid in "$owner_pid" "$client_pid"; do
+      [[ -n $pid ]] && kill -INT "$pid" 2>/dev/null || true
+    done
+    kill -INT -- "-$collector_pid" 2>/dev/null || true
+    # setsid may not have formed the group yet during partial startup.
+    kill -INT "$collector_pid" 2>/dev/null || true
+    while { kill -0 "$collector_pid" 2>/dev/null || kill -0 -- "-$collector_pid" 2>/dev/null; } \
+      && (( SECONDS < until )); do sleep .05; done
+    local forced=0 code=0
+    if kill -0 "$collector_pid" 2>/dev/null || kill -0 -- "-$collector_pid" 2>/dev/null; then
+      forced=1
+      kill -KILL -- "-$collector_pid" 2>/dev/null || true
+      kill -KILL "$collector_pid" 2>/dev/null || true
+    fi
+    wait "$collector_pid" || code=$?
+    python3 - "$collector_pid" "$code" "$forced" <<'COLLECTOR_EXIT' || true
+import json, sys
+from pathlib import Path
+Path('/output/collector-process.json').write_text(json.dumps(dict(
+    pid=int(sys.argv[1]), returncode=int(sys.argv[2]), group_forced=bool(int(sys.argv[3])), reaped=True)))
+COLLECTOR_EXIT
+  fi
   for pid in "$owner_pid" "$client_pid" "$launch_pid" "$bridge_pid"; do
     [[ -n $pid ]] || continue
     kill -INT "$pid" 2>/dev/null || true
   done
-  local until=$((SECONDS+4)) live
   while (( SECONDS < until )); do
     live=0
     for pid in "$owner_pid" "$client_pid" "$launch_pid" "$bridge_pid"; do
@@ -96,6 +120,13 @@ trap cleanup EXIT
 scene=${M6_NAVIGATION_SCENE:-normal}
 python3 /simulation/navigation_scene.py "$scene"
 map_file=$(python3 -c 'import json; print(json.load(open("/output/navigation-scene.json"))["map_file"])')
+collection_options=()
+if [[ ${M6_COLLECT_EVALUATION:-0} == 1 ]]; then
+  # These are the installed default values, made explicit for coordinate evidence.
+  collection_options=(world:=/opt/ros/humble/share/nav2_bringup/worlds/world_only.model
+    x_pose:=-2.0 y_pose:=-0.5 z_pose:=0.01 roll:=0.0 pitch:=0.0 yaw:=0.0 robot_name:=turtlebot3_waffle)
+  python3 /simulation/navigation_truth.py --prepare > /output/collection-prepare.log 2>&1 || true
+fi
 rviz_options=(use_rviz:=False)
 if [[ ${M6_SHOW_VIEW:-0} == 1 ]]; then
   [[ -n ${DISPLAY:-} ]] || exit 2
@@ -114,12 +145,17 @@ VIEW
   rviz_options=(use_rviz:=True rviz_config_file:=/output/live-view.rviz)
 fi
 ros2 launch /simulation/native_worker/producer_scope.launch.py headless:=True "${rviz_options[@]}" \
-  use_sim_time:=True use_respawn:=False use_composition:=False \
+  use_sim_time:=True use_respawn:=False use_composition:=False "${collection_options[@]}" \
   params_file:=/output/native-params.yaml map:="$map_file" robot_sdf:=/output/scoped-waffle.model \
   > /output/launch.log 2>&1 &
 launch_pid=$!
 python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
 bridge_pid=$!
+if [[ ${M6_COLLECT_EVALUATION:-0} == 1 ]]; then
+  # A separate group contains only this collector and its passive query children.
+  setsid python3 /simulation/navigation_truth.py > /output/collector.log 2>&1 &
+  collector_pid=$!
+fi
 owner_options=(--scene "$scene")
 if [[ -n ${M6_NAVIGATION_PROFILE:-} ]]; then
   owner_options+=(--profile "$M6_NAVIGATION_PROFILE")

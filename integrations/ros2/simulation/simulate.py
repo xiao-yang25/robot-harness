@@ -64,6 +64,10 @@ def write_host_record(path, text):
 
 def run_case(args):
     scene = getattr(args, 'scene', 'normal')
+    collect = getattr(args, 'record_evaluation', False)
+    if collect and (not getattr(args, 'session', False) or scene != 'normal'
+                    or getattr(args, 'profile', PROFILES[0]) != PROFILES[0]):
+        raise ValueError('evaluation collection requires the normal default-profile Session')
     if scene not in SCENES or (scene != 'normal' and
             (not getattr(args, 'session', False) or getattr(args, 'profile', PROFILES[0]) != PROFILES[3])):
         raise ValueError('occupied-a requires a session with the explicit failure recovery profile')
@@ -113,6 +117,9 @@ def run_case(args):
             status['profile'] = profile
             status['scene'] = scene
             command.extend(['-e', 'M6_NAVIGATION_PROFILE='+profile, '-e', 'M6_NAVIGATION_SCENE='+scene])
+            if collect:
+                status['evaluation_collection'] = True
+                command.extend(['--hostname', container_name, '-e', 'M6_COLLECT_EVALUATION=1'])
             prefix = Path(args.python_prefix).expanduser().resolve(strict=True)
             if not (prefix / 'lib/robot-harness/python/robot_harness_nav2/__main__.py').is_file():
                 raise ValueError('prefix does not contain the installed Nav2 owner')
@@ -227,6 +234,8 @@ def main():
     session.add_argument('--profile', choices=PROFILES, default=PROFILES[0],
                          help='explicit native motion profile; existing v1 remains default')
     session.add_argument('--scene', choices=SCENES, default='normal', help='occupied-a is a static map test, not a physical obstacle')
+    session.add_argument('--record-evaluation', action='store_true',
+                         help='passively record physical evidence in the normal default-profile scene')
     session.add_argument('--python-prefix', required=True, help='Linux install prefix with optional Python bridge')
     session.add_argument('--image', required=True, help='qualified local scoped Humble/Nav2 image')
     session.add_argument('--output', required=True, help='new result directory')

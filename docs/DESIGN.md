@@ -1839,16 +1839,18 @@ is not a certificate for the whole map or changing maps; native closure and
 fresh readiness still govern release. Default normal profiles keep their prior
 startup path. See the [scene commands](../integrations/ros2/nav2_session/README.md#explicit-recovery-test-scenes).
 
-## Planned passive navigation evaluation collection
+<a id="planned-passive-navigation-evaluation-collection"></a>
+## Passive navigation evaluation collection
 
-**Design only; no collector or installed navigation evaluator is delivered by
-this section.** The first collection scope is the existing normal, fixed A→B
+The optional collector is implemented by the public Session launcher. An
+installed Agent evaluator and fresh public physical qualification are separate
+delivery steps. The first collection scope is the existing normal, fixed A→B
 TurtleBot3 Waffle / Gazebo Classic / Humble Session, using the default scoped
 Nav2 profile. The [Agent application](https://github.com/xiao-yang25/robot-agent/blob/master/docs/README.md#navigation-application)
-will own its offline task predicate and verdict; Harness will only acquire
+owns its offline task predicate and verdict; Harness only acquires
 passive simulator facts and retain execution outcomes.
 
-An explicit opt-in on the existing simulation Session launcher will start a
+`session --record-evaluation` on the existing simulation launcher starts a
 sibling collector before Owner/client execution. The simulation launcher owns
 that process and its pose-query children, including partial startup, normal
 exit, interruption and timeout cleanup. Collection shares the existing scene's
@@ -1857,11 +1859,16 @@ Default runs remain unchanged. Unsupported scene/profile combinations must be
 rejected before container creation.
 
 The collector reads the Owner event stream and queries only the declared Gazebo
-model pose after an associated `arrival` event. It writes samples and collection
+model pose after the initial valid `ready` observation and each associated
+`arrival` event. It writes samples and collection
 outcome separately from Agent inputs, replies and receipts. A sample records
 run/container/model identity, stage/native goal, trigger event, monotonic query
-start/end and finite world pose. The collector must verify and record the fixed
-scene's map/world relationship using its actual prepared configuration.
+start/end and finite world pose. It consumes the actual prepared map/profile/AMCL
+configuration and the installed Nav2 1.1.20 world/map pair, and makes the matching
+spawn/initial pose explicit. The resulting context records the configured
+identity transform; the initial map/Gazebo sample lets the offline evaluator
+check its anchor. This depends on the trusted fixed installed asset pair, not an
+independently reconstructed alignment or a general map-to-world calibration.
 It must never mutate physics, send ROS actions, write control/capture handshake
 markers, publish readiness or provide policy observations. This is local trusted
 observation, not a security boundary against a malicious container.
@@ -1875,8 +1882,12 @@ the associated B `core_native_reserved.steady`, a reservation emitted before
 native transmission. Post-dispatch `core_admitted` or `goal_sent` timestamps do
 not prove timing before the caller's submit RPC. Missing/ambiguous reservation
 or clock evidence is a collection gap, not permission to weaken the bound.
-Normal completion stops and reaps it before scene teardown, so final output
+The supervisor gives the collector and its query children a separate Linux
+process group. Normal completion stops and reaps it before scene teardown, so final output
 contains either a completed collection record or an explicit collection gap.
+`collector-process.json` reports direct collector reaping and any forced group
+kill; `collection.json` reports query-child reaping. A forced kill does not
+establish child reaping when the collection record is missing.
 An interrupted or forcibly removed container may lack that record; teardown
 does not establish native stop or physical goal completion.
 
@@ -1885,9 +1896,9 @@ Agent report and these samples, without importing private Host/Core internals
 or adding a second native-settlement evaluator. Truth never drives decisions.
 There is one evaluator per new run, one focused independent safety-decision
 check, and no routine hashes or re-adjudication of historical qualifications.
-Implementation and new installed public consumption must establish this design
-before any command or collection outcome is advertised as available. Focused
-checks must cover disabled collection/default behavior, unsupported scope before
+New installed public consumption must establish the paired physical result;
+collection completion alone is not a task verdict. Focused
+checks cover disabled collection/default behavior, unsupported scope before
 container creation, partial startup, slow/failed queries, and interrupt/timeout
 with live query children. Normal shutdown must stop/reap the collector while
 Gazebo is still available, before the existing scene teardown; failure cleanup

@@ -9,8 +9,8 @@ prebuilt project image or host ROS installation is required.
 It is an isolated experimental simulator, not a general ROS adapter or robot
 controller. The default package runs without a graphical window; the optional
 [local viewer](#watch-a-live-run) captures RViz from the same scenario.
-The [passive evaluation collector design](../../../docs/DESIGN.md#planned-passive-navigation-evaluation-collection)
-is planned for fixed normal Session consumption; no collection option is available yet.
+The [optional passive collector](#optional-passive-evaluation-collection)
+records independent poses for fixed normal Session consumption.
 The [public recordings](https://xiao-yang25.github.io/robot-harness/#demo)
 show moving cancellation and handoff; their notes identify the exact recorded scope.
 
@@ -312,3 +312,33 @@ profile and a recovery-aware caller; build the current image and use a new Linux
 Owner installation. This is a fixed test map, not a physical obstacle or arbitrary
 map interface. The scene records its selection and the Owner's actual map sample;
 launcher success continues to mean process completion only.
+
+### Optional passive evaluation collection
+
+For the normal fixed A→B example with the default scoped profile, append
+`--record-evaluation` to `simulate.py session`. Other profiles/scenes are rejected
+before resources start. Omit the flag to retain the existing default behavior.
+
+```sh
+python3 integrations/ros2/simulation/simulate.py session \
+  --python-prefix /path/to/linux-install --image robot-harness-simulation:humble \
+  --record-evaluation --output simulation-results/evaluation-01
+```
+
+Use a new output directory and the current simulation source. This adds a
+passive sibling, sharing the existing resource/deadline limits. It records
+`collection-context.json` (actual fixed world/map/profile/initial configuration),
+`physical.jsonl` (initial ready and A/B world poses with trigger/query timing),
+`collection.json` (samples, gaps and query-child reaping), and
+`collector-process.json` (supervisor-observed collector exit). Preparation and
+collector diagnostics have their own logs. No truth enters model inputs or
+execution authority, and collection failure does not cancel a valid task.
+
+The query deadline is five seconds, with no retry. Missing, late or interrupted
+truth remains a gap. `completed` means samples were recorded, not that the robot
+achieved its goal. The separate Agent evaluator owns physical arrival and
+identity/timing predicates; launcher success remains process completion.
+The [collector boundary](../../../docs/DESIGN.md#planned-passive-navigation-evaluation-collection)
+explains the trusted fixed alignment and cleanup limits. Fresh paired public
+physical qualification remains a separate step; existing recordings keep their
+original versions.

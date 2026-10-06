@@ -2561,3 +2561,22 @@ the installed Nav2 1.1.20 assets and prepared AMCL/map configuration in the curr
 Humble image. These are software/lifecycle checks, not a fresh physical A→B
 qualification or proof of arbitrary map alignment. The offline Agent evaluator
 and a new installed public consumption have their own delivery and evidence.
+
+
+The 2026-10-06 public controlled tutorial consumed Harness
+`4b4bc5bf28c249016cfe4d7e272fa9877766a838` and Agent
+`71a804dfa9ff7f8671d464f8ed562cd2eeaec5e8` in fresh Linux installations. One new
+normal A→B run explicitly enabled collection. The installed Agent evaluator ran
+once, reporting `succeeded` with A/B errors 0.208517/0.188799m under its fixed
+0.25m predicate; a focused independent safety-decision check accompanied it.
+The retained qualified Ubuntu22.04/amd64 Humble/Nav2 1.1.20/Gazebo Classic image
+was reused with the current source-mounted collector, not rebuilt at this revision.
+
+The collector and three query children exited zero and were reaped without
+forced group cleanup. The scene container exited zero without OOM and was
+removed. Owner reports A settled/released and final B pending/current;
+complete native cleanup remains unknown. These facts are distinct from the
+physical goal verdict. The [Agent qualification](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#installed-fixed-navigation-evaluation)
+owns the task result and limits. This single controlled run made no model calls
+and does not qualify other scenes/profiles or hardware. Existing recordings
+retain their original provenance.

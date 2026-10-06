@@ -1830,6 +1830,15 @@ and closure predicates. Core and public Session shapes remain unchanged.
 See [implementation](RUNTIME_SLICE.md#failure-settlement-before-caller-selected-backup)
 and [checks](TESTING.md#navigation-failure-settlement).
 
+The public Session launcher has two fixed test scenes: normal and occupied A.
+Occupied A requires this failure profile, derives a static planner map without
+adding physical obstacles, and waits for the actual `/map` sample (occupied A,
+free B/start, supported frame/geometry) before B preparation or public startup.
+Capability/measurement identities bind the selected scene. This startup check
+is not a certificate for the whole map or changing maps; native closure and
+fresh readiness still govern release. Default normal profiles keep their prior
+startup path. See the [scene commands](../integrations/ros2/nav2_session/README.md#explicit-recovery-test-scenes).
+
 ## Planned passive navigation evaluation collection
 
 **Design only; no collector or installed navigation evaluator is delivered by
@@ -1883,13 +1892,3 @@ container creation, partial startup, slow/failed queries, and interrupt/timeout
 with live query children. Normal shutdown must stop/reap the collector while
 Gazebo is still available, before the existing scene teardown; failure cleanup
 must also observe query-child exit/reaping within the existing budgets.
-
-
-The public Session launcher has two fixed test scenes: normal and occupied A.
-Occupied A requires this failure profile, derives a static planner map without
-adding physical obstacles, and waits for the actual `/map` sample (occupied A,
-free B/start, supported frame/geometry) before B preparation or public startup.
-Capability/measurement identities bind the selected scene. This startup check
-is not a certificate for the whole map or changing maps; native closure and
-fresh readiness still govern release. Default normal profiles keep their prior
-startup path. See the [scene commands](../integrations/ros2/nav2_session/README.md#explicit-recovery-test-scenes).

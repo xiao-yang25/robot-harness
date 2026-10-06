@@ -1848,7 +1848,7 @@ Default runs remain unchanged. Unsupported scene/profile combinations must be
 rejected before container creation.
 
 The collector reads the Owner event stream and queries only the declared Gazebo
-model pose after an associated terminal event. It writes samples and collection
+model pose after an associated `arrival` event. It writes samples and collection
 outcome separately from Agent inputs, replies and receipts. A sample records
 run/container/model identity, stage/native goal, trigger event, monotonic query
 start/end and finite world pose. The collector must verify and record the fixed
@@ -1860,6 +1860,12 @@ observation, not a security boundary against a malicious container.
 The sibling may fail independently: missing or late truth makes physical
 evaluation unknown without cancelling a valid native operation or replacing its
 result. Its query deadline is five seconds; record failures rather than retry.
+In the same container monotonic clock, require `arrival.steady <= query_started
+<= query_finished <= arrival.steady + 5.5`. A's query must finish strictly before
+the associated B `core_native_reserved.steady`, a reservation emitted before
+native transmission. Post-dispatch `core_admitted` or `goal_sent` timestamps do
+not prove timing before the caller's submit RPC. Missing/ambiguous reservation
+or clock evidence is a collection gap, not permission to weaken the bound.
 Normal completion stops and reaps it before scene teardown, so final output
 contains either a completed collection record or an explicit collection gap.
 An interrupted or forcibly removed container may lack that record; teardown
@@ -1871,7 +1877,12 @@ or adding a second native-settlement evaluator. Truth never drives decisions.
 There is one evaluator per new run, one focused independent safety-decision
 check, and no routine hashes or re-adjudication of historical qualifications.
 Implementation and new installed public consumption must establish this design
-before any command or collection outcome is advertised as available.
+before any command or collection outcome is advertised as available. Focused
+checks must cover disabled collection/default behavior, unsupported scope before
+container creation, partial startup, slow/failed queries, and interrupt/timeout
+with live query children. Normal shutdown must stop/reap the collector while
+Gazebo is still available, before the existing scene teardown; failure cleanup
+must also observe query-child exit/reaping within the existing budgets.
 
 
 The public Session launcher has two fixed test scenes: normal and occupied A.

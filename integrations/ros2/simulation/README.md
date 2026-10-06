@@ -9,6 +9,8 @@ prebuilt project image or host ROS installation is required.
 It is an isolated experimental simulator, not a general ROS adapter or robot
 controller. The default package runs without a graphical window; the optional
 [local viewer](#watch-a-live-run) captures RViz from the same scenario.
+The [passive evaluation collector design](../../../docs/DESIGN.md#planned-passive-navigation-evaluation-collection)
+is planned for fixed normal Session consumption; no collection option is available yet.
 The [public recordings](https://xiao-yang25.github.io/robot-harness/#demo)
 show moving cancellation and handoff; their notes identify the exact recorded scope.
 

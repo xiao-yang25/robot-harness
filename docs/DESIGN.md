@@ -1830,6 +1830,49 @@ and closure predicates. Core and public Session shapes remain unchanged.
 See [implementation](RUNTIME_SLICE.md#failure-settlement-before-caller-selected-backup)
 and [checks](TESTING.md#navigation-failure-settlement).
 
+## Planned passive navigation evaluation collection
+
+**Design only; no collector or installed navigation evaluator is delivered by
+this section.** The first collection scope is the existing normal, fixed A→B
+TurtleBot3 Waffle / Gazebo Classic / Humble Session, using the default scoped
+Nav2 profile. The [Agent application](https://github.com/xiao-yang25/robot-agent/blob/master/docs/README.md#navigation-application)
+will own its offline task predicate and verdict; Harness will only acquire
+passive simulator facts and retain execution outcomes.
+
+An explicit opt-in on the existing simulation Session launcher will start a
+sibling collector before Owner/client execution. The simulation launcher owns
+that process and its pose-query children, including partial startup, normal
+exit, interruption and timeout cleanup. Collection shares the existing scene's
+CPU/memory and overall deadline; it must not extend task or shutdown budgets.
+Default runs remain unchanged. Unsupported scene/profile combinations must be
+rejected before container creation.
+
+The collector reads the Owner event stream and queries only the declared Gazebo
+model pose after an associated terminal event. It writes samples and collection
+outcome separately from Agent inputs, replies and receipts. A sample records
+run/container/model identity, stage/native goal, trigger event, monotonic query
+start/end and finite world pose. The collector must verify and record the fixed
+scene's map/world relationship using its actual prepared configuration.
+It must never mutate physics, send ROS actions, write control/capture handshake
+markers, publish readiness or provide policy observations. This is local trusted
+observation, not a security boundary against a malicious container.
+
+The sibling may fail independently: missing or late truth makes physical
+evaluation unknown without cancelling a valid native operation or replacing its
+result. Its query deadline is five seconds; record failures rather than retry.
+Normal completion stops and reaps it before scene teardown, so final output
+contains either a completed collection record or an explicit collection gap.
+An interrupted or forcibly removed container may lack that record; teardown
+does not establish native stop or physical goal completion.
+
+The offline Agent evaluator consumes the existing scene/profile, Owner events,
+Agent report and these samples, without importing private Host/Core internals
+or adding a second native-settlement evaluator. Truth never drives decisions.
+There is one evaluator per new run, one focused independent safety-decision
+check, and no routine hashes or re-adjudication of historical qualifications.
+Implementation and new installed public consumption must establish this design
+before any command or collection outcome is advertised as available.
+
 
 The public Session launcher has two fixed test scenes: normal and occupied A.
 Occupied A requires this failure profile, derives a static planner map without

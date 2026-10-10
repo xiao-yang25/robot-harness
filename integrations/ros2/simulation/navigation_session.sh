@@ -163,6 +163,9 @@ fi
 if [[ -n ${M6_CALLER_WAIT_SECONDS:-} ]]; then
   owner_options+=(--caller-wait-seconds "$M6_CALLER_WAIT_SECONDS")
 fi
+if [[ -n ${M6_TERMINAL_QUERY_SECONDS:-} ]]; then
+  owner_options+=(--terminal-query-seconds "$M6_TERMINAL_QUERY_SECONDS")
+fi
 python3 -m robot_harness_nav2 "${owner_options[@]}" > /output/caller.log 2>&1 &
 owner_pid=$!
 # Readiness only exposes the owner endpoint; it cannot create Core authority.

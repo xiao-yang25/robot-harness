@@ -2580,3 +2580,45 @@ physical goal verdict. The [Agent qualification](https://github.com/xiao-yang25/
 owns the task result and limits. This single controlled run made no model calls
 and does not qualify other scenes/profiles or hardware. Existing recordings
 retain their original provenance.
+
+### Explicit Nav2 terminal-window software checks
+
+[Endpoint/window tests](../bindings/python/tests/test_nav2_terminal.py) exercise
+real Core/Unix-socket cancellation and status, exact replay/conflict, new-request
+refusal without record growth, fixed expiry, EOF and close-response backpressure.
+[CLI checks](../bindings/python/tests/test_nav2_caller_budget.py) preserve defaults
+and reject invalid budgets or unsupported profiles before ROS startup.
+Existing Python discovery includes these cases.
+
+[Humble Owner checks](../integrations/ros2/nav2_session/tests/linux_terminal_checks.py)
+invoke actual abort and terminal-query methods using real Core/socket requests
+and synthetic ROS edges. They distinguish disabled behavior, status/close during
+native cleanup progress, reply backpressure, expiry without caller close, and
+cleanup progress after partial preparation before the request service exists.
+The existing Humble workflow now invokes this focused script after the original
+driver/revision/failure checks. This software CI does not qualify Gazebo movement,
+native physical stopping, model behavior or restart recovery. The selected real
+scene must be recorded separately for this explicit option.
+
+
+#### Selected opt-in navigation stop scene (2026-10-10)
+
+A fresh installation of this candidate and Agent
+`b8ba3c537930b82d7018b7b8ce65c5312dbbd1e3` ran one real default-profile
+Nav2/Gazebo final-decision-stop scene with `--terminal-query-seconds 8`.
+The retained Ubuntu22.04/amd64 Humble/Nav2/Gazebo recording image was reused,
+with network disabled and 2 CPU/4GB limits. The unchanged boundary evaluator
+ran once and passed; a focused independent check of raw safety-decision facts
+approved the limited interpretation.
+
+The original B cancellation was acknowledged and its revoked/pending record
+remained queryable. Close intent returned before the held late decision was
+released; that completion was retained without a new submission. Agent threads
+finished and their resource report was closed. Remote closure and native cleanup
+remain unknown, the close reply does not claim Owner reaping, and the withdrawn
+task has no physical-success or hard-stop verdict. Collector exit/reaping and
+container exit 0/noOOM/removal are separate launcher observations. The status
+query has no independent timestamp event; its result and installed call order
+establish completion, not precise query timing. Same-scene video is retained as
+local evidence. This does not qualify other profiles, models, hardware, default
+migration or restart recovery; the earlier failed closing run remains failed.

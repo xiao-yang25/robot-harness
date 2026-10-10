@@ -26,6 +26,8 @@ class BudgetTests(unittest.TestCase):
                 self.visit(stage)
                 self.close_visit(stage)
             def abort(self): calls.append('abort')
+            def finish_terminal_queries(self):
+                calls.append(('terminal', self.terminal_window.seconds))
             def wait(self, predicate, seconds, **kwargs):
                 calls.append((seconds, kwargs.get('require_fresh', False)))
                 if len([c for c in calls if isinstance(c, tuple)]) == 3 and final_delay > seconds:
@@ -88,6 +90,29 @@ class BudgetTests(unittest.TestCase):
         code, calls = self.exercise(['--caller-wait-seconds', '45'], final_delay=46)
         self.assertEqual(code, 1)
         self.assertEqual(calls[-1], 'abort')
+
+    def test_terminal_window_is_explicit_and_keeps_existing_idle_waits(self):
+        code, calls = self.exercise(['--terminal-query-seconds', '8'])
+        self.assertEqual(code, 0)
+        self.assertEqual(calls, [(15, True), (15, True), (10, False), 'abort', ('terminal', 8)])
+
+    def test_invalid_terminal_settings_rejected_before_isolation(self):
+        for options in (['--terminal-query-seconds', value] for value in
+                        ('0', '-1', '11', 'nan', 'inf', 'bad')):
+            with self.subTest(options=options), patch.object(sys, 'argv', ['owner', *options]), \
+                    patch.object(entry, 'require_isolation') as isolation, patch('sys.stderr'):
+                with self.assertRaises(SystemExit):
+                    entry.main()
+                isolation.assert_not_called()
+        for profile in ('scoped-two-context-nav2-revision-v1',
+                        'scoped-two-context-nav2-failure-recovery-v1',
+                        'scoped-two-context-nav2-owner-permit-v1'):
+            with self.subTest(profile=profile), patch.object(sys, 'argv',
+                    ['owner', '--profile', profile, '--terminal-query-seconds', '8']), \
+                    patch.object(entry, 'require_isolation') as isolation, patch('sys.stderr'):
+                with self.assertRaises(SystemExit):
+                    entry.main()
+                isolation.assert_not_called()
 
     def test_invalid_budget_rejected_before_ros_or_isolation(self):
         for value in ('0', '-1', '61', 'nan', 'inf', 'not-a-number'):

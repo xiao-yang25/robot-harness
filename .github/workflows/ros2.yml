@@ -53,6 +53,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_driver_checks.py"
           python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_revision_checks.py"
           python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_failure_checks.py"
+          python3 "$GITHUB_WORKSPACE/integrations/ros2/nav2_session/tests/linux_terminal_checks.py"
       - name: Check simulation launcher and diagnostics
         run: python3 -m unittest discover -s integrations/ros2/simulation -p 'test_*.py'
       # Gazebo movement runs use the separate manual simulation workflow.

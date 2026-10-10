@@ -54,6 +54,13 @@ def caller_wait_seconds(value):
     return seconds
 
 
+def terminal_query_seconds(value):
+    seconds = float(value)
+    if not math.isfinite(seconds) or not 0 < seconds <= 10:
+        raise argparse.ArgumentTypeError('terminal query wait must be finite and in (0, 10] seconds')
+    return seconds
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     from ._profile import PROFILE_ID, PERMISSION_PROFILE_ID, REVISION_PROFILE_ID, FAILURE_PROFILE_ID, PROFILES, SCENE_MAP_IDS, scene_map_id
@@ -62,8 +69,12 @@ def main():
     parser.add_argument('--caller-wait-seconds', type=caller_wait_seconds,
                         help='bounded idle wait for each admission and final client close; '
                              'default admission 15s / final close 10s')
+    parser.add_argument('--terminal-query-seconds', type=terminal_query_seconds,
+                        help='opt-in default-profile terminal query window; disabled by default')
     parser.add_argument('--scene', choices=SCENE_MAP_IDS, default='normal')
     args = parser.parse_args()
+    if args.terminal_query_seconds is not None and args.profile != PROFILE_ID:
+        parser.error('terminal queries currently require the default navigation profile')
     try:
         scene_map_id(args.scene, args.profile)
     except ValueError as error:
@@ -86,6 +97,9 @@ def main():
     code = 0
     try:
         owner.__init__()
+        if args.terminal_query_seconds is not None:
+            from ._terminal import TerminalWindow
+            owner.terminal_window = TerminalWindow(args.terminal_query_seconds)
         if args.scene != 'normal':
             owner.configure_scene(args.scene)
         owner.ready()
@@ -99,10 +113,14 @@ def main():
         owner.completed = True
         owner.wait(lambda: owner.requests.closing, args.caller_wait_seconds or 10)
         owner.abort()
+        if args.terminal_query_seconds is not None:
+            owner.finish_terminal_queries()
         emit('caller_complete')
     except ClientClosed as error:
         try:
             owner.abort()
+            if args.terminal_query_seconds is not None:
+                owner.finish_terminal_queries()
         except Exception as cleanup_error:
             code = 1
             diagnose('core_abort_error', error=str(cleanup_error), stop='unknown')

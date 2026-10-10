@@ -1903,3 +1903,27 @@ container creation, partial startup, slow/failed queries, and interrupt/timeout
 with live query children. Normal shutdown must stop/reap the collector while
 Gazebo is still available, before the existing scene teardown; failure cleanup
 must also observe query-child exit/reaping within the existing budgets.
+
+
+### Bounded post-cancel query service for the isolated Nav2 Owner
+
+An explicit default-profile option retains endpoint service after cancellation;
+omission preserves shutdown behavior. Robot Harness owns the retained request
+and revocation facts; the capability Owner remains their single ROS/Core writer,
+and the Agent owns business stop and its local I/O report. A fixed monotonic
+query deadline is set once at the first current cancellation. During native abort,
+endpoint pumping continues; new requests/observations are refused, exact retained
+replay/status remain read-only, and capabilities are unavailable. Repeated queries
+cannot extend the window, renew budgets or regain authority.
+
+Close intent replies are sent subject to transport health and the fixed deadline;
+EOF/expiry terminates endpoint service. Native cancellation and exact outlet-close
+attempts remain separate from local disposal, remote process reaping, motion-stop
+confirmation and Core settlement. The original two-second native abort attempt
+is retained; this query budget is not a process or physical hard-stop deadline.
+No extra owner, thread, persistent ledger or long-lived task service is introduced.
+Only the isolated default profile accepts the option; revision, recovery and
+finite-permission profiles retain their contracts. See the
+[Owner entry](../integrations/ros2/nav2_session/README.md#explicit-terminal-query-window)
+for configuration and [software checks](TESTING.md#explicit-nav2-terminal-window-software-checks)
+for verification limits. Fresh real-scene qualification remains distinct.

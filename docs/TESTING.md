@@ -2590,6 +2590,14 @@ refusal without record growth, fixed expiry, EOF and close-response backpressure
 and reject invalid budgets or unsupported profiles before ROS startup.
 Existing Python discovery includes these cases.
 
+The [host launcher checks](../integrations/ros2/simulation/test_launcher.py)
+exercise the actual `session --terminal-query-seconds` parser and Docker-command
+construction with a controlled Docker substitute. They check fractional and
+maximum budgets, the recorded value, omission despite an ambient host variable,
+and rejection of invalid values or unsupported profiles before output creation
+or Docker calls. The existing Humble simulation-test discovery includes them;
+these software checks do not start Docker or add a physical-scene qualification.
+
 [Humble Owner checks](../integrations/ros2/nav2_session/tests/linux_terminal_checks.py)
 invoke actual abort and terminal-query methods using real Core/socket requests
 and synthetic ROS edges. They distinguish disabled behavior, status/close during

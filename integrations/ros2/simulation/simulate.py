@@ -63,6 +63,13 @@ def write_host_record(path, text):
 
 
 def run_case(args):
+    terminal_query = getattr(args, 'terminal_query_seconds', None)
+    if terminal_query is not None:
+        if not math.isfinite(terminal_query) or not 0 < terminal_query <= 10:
+            raise ValueError('terminal query window must be finite and in (0, 10]')
+        if (not getattr(args, 'session', False)
+                or getattr(args, 'profile', PROFILES[0]) != PROFILES[0]):
+            raise ValueError('terminal query window requires the default-profile Session')
     scene = getattr(args, 'scene', 'normal')
     collect = getattr(args, 'record_evaluation', False)
     if collect and (not getattr(args, 'session', False) or scene != 'normal'
@@ -117,6 +124,9 @@ def run_case(args):
             status['profile'] = profile
             status['scene'] = scene
             command.extend(['-e', 'M6_NAVIGATION_PROFILE='+profile, '-e', 'M6_NAVIGATION_SCENE='+scene])
+            if terminal_query is not None:
+                status['terminal_query_seconds'] = terminal_query
+                command.extend(['-e', f'M6_TERMINAL_QUERY_SECONDS={terminal_query}'])
             if collect:
                 status['evaluation_collection'] = True
                 command.extend(['--hostname', container_name, '-e', 'M6_COLLECT_EVALUATION=1'])
@@ -242,6 +252,8 @@ def main():
     session.add_argument('--client-script', help='trusted Python client receiving the endpoint as its only argument')
     session.add_argument('--client-prefix', help='optional read-only Python packages for that client only')
     session.add_argument('--caller-wait-seconds', type=float, help='explicit owner idle wait in (0, 60], not an operation deadline')
+    session.add_argument('--terminal-query-seconds', type=float,
+                         help='opt-in terminal query window in (0, 10], default scoped profile only; not a stop deadline')
     args = parser.parse_args()
     args.session = args.command == 'session'
     if args.session:

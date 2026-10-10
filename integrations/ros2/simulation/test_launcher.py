@@ -1,6 +1,9 @@
 """Host result/cleanup boundaries; these do not simulate robot motion."""
 import argparse
+import contextlib
+import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -12,7 +15,8 @@ import simulate
 
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
-                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal', record_evaluation=False):
+                 output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal', record_evaluation=False,
+                 terminal_query_seconds=None, through_cli=False):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -60,11 +64,20 @@ class LauncherTest(unittest.TestCase):
             attached.poll.return_value = 0
             with patch.object(simulate.subprocess, 'run', side_effect=docker), \
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
-                code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
-                    session=session, profile=profile, scene=scene, record_evaluation=record_evaluation, python_prefix=str(prefix),
-                    client_script=str(client) if custom_client else None,
-                    client_prefix=str(client_prefix) if custom_client else None,
-                    caller_wait_seconds=45 if custom_client else None))
+                if through_cli:
+                    argv = ['simulate.py', 'session', '--image', 'image', '--output', str(output),
+                            '--python-prefix', str(prefix)]
+                    if terminal_query_seconds is not None:
+                        argv.extend(['--terminal-query-seconds', str(terminal_query_seconds)])
+                    with patch.object(simulate.sys, 'argv', argv):
+                        code = simulate.main()
+                else:
+                    code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case=case,
+                        session=session, profile=profile, scene=scene, record_evaluation=record_evaluation, python_prefix=str(prefix),
+                        client_script=str(client) if custom_client else None,
+                        client_prefix=str(client_prefix) if custom_client else None,
+                        caller_wait_seconds=45 if custom_client else None,
+                        terminal_query_seconds=terminal_query_seconds))
             status = json.loads((output / 'run.json').read_text())
             self.assertIn(['docker', 'rm', '--force', container], calls)
             self.assertEqual(outside.read_text(), 'untouched')
@@ -75,6 +88,12 @@ class LauncherTest(unittest.TestCase):
                 self.assertIn('M6_NATIVE_ISOLATED=1', command)
                 self.assertIn('M6_NAVIGATION_PROFILE='+profile, command)
                 self.assertIn('M6_NAVIGATION_SCENE='+scene, command)
+                if terminal_query_seconds is None:
+                    self.assertNotIn('terminal_query_seconds', status)
+                    self.assertFalse(any(part.startswith('M6_TERMINAL_QUERY_SECONDS=') for part in command))
+                else:
+                    self.assertEqual(status['terminal_query_seconds'], terminal_query_seconds)
+                    self.assertIn(f'M6_TERMINAL_QUERY_SECONDS={terminal_query_seconds}', command)
                 if record_evaluation:
                     self.assertIn('M6_COLLECT_EVALUATION=1', command)
                     self.assertEqual(command[command.index('--hostname')+1], status['container_name'])
@@ -93,6 +112,49 @@ class LauncherTest(unittest.TestCase):
                     self.assertNotIn('M6_CLIENT_PREFIX=/client-prefix', command)
                     self.assertFalse(any(part.startswith('M6_CALLER_WAIT_SECONDS=') for part in command))
             return code, status
+
+    def test_terminal_query_cli_forwards_value_and_records_budget(self):
+        for value in (0.125, 8.0, 10.0):
+            with self.subTest(value=value):
+                code, _ = self.exercise(session=True, terminal_query_seconds=value, through_cli=True)
+                self.assertEqual(code, 0)
+
+    def test_ambient_terminal_query_does_not_opt_in(self):
+        with patch.dict(os.environ, {'M6_TERMINAL_QUERY_SECONDS': '8'}):
+            code, _ = self.exercise(session=True, through_cli=True)
+        self.assertEqual(code, 0)
+
+    def test_invalid_terminal_query_cli_starts_no_resources(self):
+        cases = [(str(value), simulate.PROFILES[0]) for value in (0, -1, 'nan', 'inf', '-inf', 10.01)]
+        cases += [('8', profile) for profile in simulate.PROFILES[1:]]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'new'
+            for value, profile in cases:
+                argv = ['simulate.py', 'session', '--image', 'unused', '--output', str(output),
+                        '--python-prefix', 'unused', '--profile', profile,
+                        '--terminal-query-seconds=' + value]
+                with self.subTest(value=value, profile=profile), \
+                        patch.object(simulate.sys, 'argv', argv), \
+                        patch.object(simulate.subprocess, 'run') as docker, \
+                        patch.object(simulate.subprocess, 'Popen') as attached, \
+                        contextlib.redirect_stderr(io.StringIO()) as error:
+                    with self.assertRaises(SystemExit) as exit_result:
+                        simulate.main()
+                    self.assertEqual(exit_result.exception.code, 2)
+                    self.assertIn('terminal query window', error.getvalue())
+                    self.assertFalse(output.exists())
+                    docker.assert_not_called()
+                    attached.assert_not_called()
+
+    def test_terminal_query_requires_session_before_output_creation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'new'
+            with patch.object(simulate.subprocess, 'run') as docker:
+                with self.assertRaisesRegex(ValueError, 'default-profile Session'):
+                    simulate.run_case(argparse.Namespace(output=str(output), session=False,
+                                                        terminal_query_seconds=8))
+                self.assertFalse(output.exists())
+                docker.assert_not_called()
 
     def test_optional_collection_has_explicit_same_run_identity(self):
         code, status = self.exercise(session=True, record_evaluation=True)

@@ -123,8 +123,13 @@ The default profile retains cancellation-driven shutdown. For the isolated
 `scoped-two-context-nav2-shim-v1` profile only, an operator can explicitly select
 `--terminal-query-seconds 8`. Finite values in `(0, 10]` are accepted; omission
 keeps the existing behavior. Other profiles reject the option before ROS startup.
-The in-container launcher forwards `M6_TERMINAL_QUERY_SECONDS`; the host
-`simulate.py session` entry does not forward this host variable.
+The host `simulate.py session --terminal-query-seconds 8` entry explicitly
+forwards the value through `M6_TERMINAL_QUERY_SECONDS` to the in-container
+launcher and records `terminal_query_seconds` in `run.json`. Invalid values or
+unsupported profiles are rejected before output creation or Docker calls.
+An ambient host environment variable does not select the option; omission
+preserves the existing launch behavior. This budget is a deployment choice,
+distinct from the caller wait and operation deadlines.
 
 The first current-request cancellation starts one fixed monotonic deadline.
 Authority is revoked immediately under the existing request contract. The same

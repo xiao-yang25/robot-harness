@@ -285,6 +285,15 @@ It checks process completion, while physical task evaluation remains external.
 The fixed heading profile completed standalone normal reproduction locally; see the owner README
 and [Testing](../../../docs/TESTING.md#navigation-request-entry) for current limits.
 
+For a caller that needs to query retained records after cancellation, append
+`--terminal-query-seconds 8` to `simulate.py session`. This explicit
+[terminal query window](../nav2_session/README.md#explicit-terminal-query-window)
+accepts finite seconds in `(0, 10]` only with the default scoped profile. The
+launcher rejects invalid combinations before creating output or calling Docker,
+forwards the selected value to the Owner and records it in `run.json`.
+Omission preserves the default; ambient host `M6_TERMINAL_QUERY_SECONDS` is not
+copied. This bounds query service, not physical stopping or process exit.
+
 For the installed business Agent, use the separate
 [navigation tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md).
 It selects a fixed Harness dependency and reuses this launcher with a read-only

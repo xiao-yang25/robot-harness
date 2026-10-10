@@ -106,3 +106,12 @@ public versions and hosted checks are listed under
 [M6b delivery CI coverage](TESTING.md#m6b-delivery-ci-coverage).
 See [the request boundary](RUNTIME_SLICE.md#navigation-request-entry-increment)
 and [validation](TESTING.md#navigation-request-entry).
+
+### Opt-in Nav2 terminal request availability
+
+The isolated default-profile Owner can explicitly use
+[`--terminal-query-seconds`](../integrations/ros2/nav2_session/README.md#explicit-terminal-query-window).
+It changes post-cancel endpoint availability, not the Session wire contract:
+retained requests remain queryable within a fixed window; new work is refused.
+Close still acknowledges intent with unknown native closure and no Owner-reaping
+claim. Default shutdown and other profiles keep their existing behavior.

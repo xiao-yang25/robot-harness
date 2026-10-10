@@ -8,8 +8,9 @@ from robot_harness._transport import Channel, integer
 
 
 class RequestEndpoint:
-    def __init__(self, requests, on_reply=lambda message, result: None):
+    def __init__(self, requests, on_reply=lambda message, result: None, *, terminal=None):
         self.requests = requests
+        self.terminal = terminal
         self.on_reply = on_reply
         self.peer = self.listener = self.directory = None
         self.closed = False
@@ -26,8 +27,17 @@ class RequestEndpoint:
             self.dispose()
             raise
 
+    @property
+    def replies_drained(self):
+        """Bytes sent to the local socket, not a remote acknowledgement."""
+        return self.peer is not None and not self.peer.outgoing
+
     def pump(self):
         if self.closed:
+            return
+        if self.terminal is not None and self.terminal.expired:
+            self.requests.close()
+            self.dispose()
             return
         if self.peer is None and self.listener is not None:
             try:
@@ -44,9 +54,14 @@ class RequestEndpoint:
             # received while flushing a prior intent response.
             for _ in range(2):
                 for message in self.peer.pump():
+                    if self.terminal is not None and self.terminal.expired:
+                        self.requests.close()
+                        self.dispose()
+                        return
                     rpc = integer(message.get('rpc'), 'rpc', 1, 2**53)
                     try:
-                        result = self.requests.command(message)
+                        result = (self.requests.command(message) if self.terminal is None else
+                                  self.terminal.command(self.requests, message))
                         self.on_reply(message, result)
                         self.peer.queue(dict(rpc=rpc, result=result))
                     except (ValueError, KeyError) as error:

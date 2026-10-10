@@ -27,7 +27,7 @@ class NavigationOwner(ScopedDriver):
     map_id = SCENE_MAP_IDS['normal']
 
     def __init__(self):
-        self.requests = self.endpoint = None
+        self.requests = self.endpoint = self.terminal_window = None
         self.stop_requested = self.completed = False
         self.stage_index = 0
         self.gate = self.execution = None
@@ -86,7 +86,7 @@ class NavigationOwner(ScopedDriver):
                 and self.context_process.poll() is None
                 and (self.a_client if self.stage_index == 0 else self.b_client).server_is_ready(),
             context=self.next_context, request_stop=self.request_stop)
-        self.endpoint = RequestEndpoint(self.requests, self.request_event)
+        self.endpoint = RequestEndpoint(self.requests, self.request_event, terminal=self.terminal_window)
         (OUT/'navigation-endpoint.json').write_text(json.dumps(dict(endpoint=self.endpoint.path)))
         emit('request_endpoint_ready')
 
@@ -105,6 +105,9 @@ class NavigationOwner(ScopedDriver):
     def request_stop(self, record):
         # No ROS wait in the public intent handler. tick initiates abort cleanup.
         self.stop_requested = True
+        window = getattr(self, 'terminal_window', None)
+        if window is not None:
+            window.begin()
 
     def request_event(self, message, result):
         if (message.get('command') == 'cancel' and message.get('request_id') == 'A'
@@ -254,10 +257,30 @@ class NavigationOwner(ScopedDriver):
                 except Exception as error:
                     diagnose('cleanup_native_cancel_error', error=str(error), goal_id=pending['goal_id'])
 
+    def finish_terminal_queries(self):
+        """Same writer serves retained facts until close flush, EOF or expiry."""
+        window = self.terminal_window
+        if window is None or not window.started or self.endpoint is None:
+            return
+        while not self.endpoint.closed:
+            self.endpoint.pump()
+            if self.requests.closing and self.endpoint.replies_drained:
+                return
+            if self.endpoint.closed:
+                return
+            rclpy.spin_once(self, timeout_sec=.05)
+            if self.execution is not None:
+                self.execution.tick()
+            self.cancel_pending()
+
     def abort(self):
         self.aborting = True
         if self.execution is not None and self.execution.active is not None:
             self.execution.cancel(self.execution.active)
+        window = getattr(self, 'terminal_window', None)
+        if window is not None and (self.stop_requested
+                or (self.requests is not None and self.requests.closing)):
+            window.begin()
         # Start cancellation and the exact outlet close without awaiting either.
         try:
             self.cancel_pending()
@@ -285,6 +308,8 @@ class NavigationOwner(ScopedDriver):
             except Exception as error:
                 diagnose('cleanup_progress_error', error=str(error), stop='unknown')
             self.cancel_pending()
+            if window is not None and window.started and self.endpoint is not None:
+                self.endpoint.pump()
         diagnose('core_abort', stop='unknown', outlet_response_received=future is not None and future.done(),
              record=None if self.execution is None or self.execution.active is None else
              self.execution.snapshot(self.execution.active))

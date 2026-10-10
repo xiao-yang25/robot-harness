@@ -116,6 +116,42 @@ the successful result remains accepted while authority is revoked and settlement
 stays pending. A normal close already received can still finish the terminal
 wait. Neither path promotes an intent response to complete native cleanup.
 
+
+### Explicit terminal query window
+
+The default profile retains cancellation-driven shutdown. For the isolated
+`scoped-two-context-nav2-shim-v1` profile only, an operator can explicitly select
+`--terminal-query-seconds 8`. Finite values in `(0, 10]` are accepted; omission
+keeps the existing behavior. Other profiles reject the option before ROS startup.
+The in-container launcher forwards `M6_TERMINAL_QUERY_SECONDS`; the host
+`simulate.py session` entry does not forward this host variable.
+
+The first current-request cancellation starts one fixed monotonic deadline.
+Authority is revoked immediately under the existing request contract. The same
+Owner continues native cancellation/outlet-close progress and serves retained
+status, repeated cancel, capabilities with available=false, and close. Exact
+submit replay reads the old record; conflicting arguments are rejected. New
+request IDs and new observation issuance are rejected before reserving records.
+Repeated queries do not extend the deadline or restore authority.
+
+A close reply is flushed to the local socket before normal terminal disposal,
+subject to the fixed query deadline and transport health. Sent bytes are not a
+remote acknowledgement. EOF/failure or expiry closes the endpoint; missing
+confirmation remains unknown. The existing two-second native abort attempt is
+retained even when the query window expires earlier. The query limit is neither
+a total process-exit deadline nor a physical-stop guarantee; final process reaping
+belongs to the launcher. Core settlement remains pending without its original
+closure evidence. This introduces no new thread, ledger or reusable task service.
+
+```sh
+PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 -m robot_harness_nav2 --caller-wait-seconds 45 --terminal-query-seconds 8
+```
+
+Software checks cover actual Core/socket requests and actual Owner cleanup
+methods with synthetic ROS edges. New simulation qualification is separate;
+existing default-profile results do not establish this option's physics behavior.
+
 Pure endpoint/package checks run with the Python test suite. With Humble and the
 custom drive interfaces available, run the focused actual owner methods:
 

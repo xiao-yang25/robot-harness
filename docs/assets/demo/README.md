@@ -1,5 +1,41 @@
 # Simulation recordings
 
+## Shared Agent coordination
+
+These three separate qualified recordings use the shared private Agent
+coordinator with distinct navigation and manipulation contracts. Task decisions
+are controlled in all three; ACT supplies actual learned manipulation targets.
+They are not one continuous run or a real-model decision qualification.
+Existing public task defaults remain unchanged.
+
+| Clip | Recorded sources | Scope |
+|---|---|---|
+| [Navigation](coordination-navigation.mp4), 41.4s | Agent runtime `930eaf8273772b145f290b407a372950eed678f2`, delivered in PR36 / `96edf715b41e41ac3127ef4a88b214153d4a31c3`; consumed Harness `747d7d48a846ad361cf7260d2339b010c0b92a00` | Public `experimental-coordination` normal A→B; separate physical evaluation succeeded, A0.207816m/B0.183400m. Final B pending/current; native cleanup unknown |
+| [Waiting-decision withdrawal](coordination-withdrawal.mp4), 39.7s | Same Agent/Harness pair, a separate actual public-entry run | After B native success, final controlled decision is held. Original B cancel/query and local Session close precede late-answer release; no new submit. Final B pending/revoked, native cleanup unknown |
+| [ACT transfer and hold](coordination-aloha.mp4), 9.02s | Agent `f708afa1c4577d2b8266ddc2ad0ec34e3edbfd93` / consumed Harness `4b4bc5bf28c249016cfe4d7e272fa9877766a838` | Earlier private ALOHA assembly, MuJoCo, actual ACT400-step transfer then fresh feedback and a separate50-step hold. Both operations settled/released; separate one-second hold evaluation succeeded |
+
+Navigation was recorded on2026-10-10 in the retained ROS Humble/Nav2/Gazebo
+amd64 image, offline at2CPU/4GiB with an explicit eight-second Owner terminal
+query window. A passive same-container RViz observer recorded these exact public
+runs; it did not drive decisions. Startup is trimmed near first submit, without
+internal cuts or speed changes. The1600×900 clips contain413/396 decoded frames
+at nominal10fps; screen-capture startup uncertainty and dropped frames remain,
+so these clips are not timing instruments. Withdrawal ordering is established by
+same-run trace and a focused independent safety check, not visually inferred
+from a stationary robot. This sample does not demonstrate stopping during motion,
+a hard stop deadline, remote/native cleanup or hardware safety.
+
+ALOHA was recorded on2026-10-09 in its retained MuJoCo/ACT environment, offline
+at6CPU/6GiB. The complete451-frame,640×480 episode plays at50fps in simulation
+time; inference/decision waits are omitted. It retains its original separately
+qualified version and evidence, not the newer public navigation tutorial's
+qualification. Task reports remain unassessed; the separate domain evaluators
+own physical-success verdicts. No old physics evaluator was rerun for publication.
+
+Reproduce navigation using the [explicit coordination tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md#experimental-coordination).
+See [Agent qualification](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#explicit-coordination-tutorial)
+and the [private assembly design](https://github.com/xiao-yang25/robot-agent/blob/master/docs/DESIGN.md#current-shared-mechanism-candidate).
+
 ## In-motion business revision
 
 Two new recordings use installed Agent

@@ -33,12 +33,14 @@ for local uncommitted work it identifies HEAD, so publish only a committed build
 The homepage's Docs link opens the generated reading guide. Its existing asset
 and video URLs stay unchanged.
 
-The homepage leads with manipulation, then displays navigation handoff and
-cancellation as two compact cards (one column on small screens). Navigation
-videos load on demand; posters remain visible without downloading both clips
-at startup. README uses two linked covers rather than duplicating a video player.
-Keep each run separately playable with its own recording notes and evidence;
-a combined montage must not imply one continuous run across these scenarios.
+The homepage leads with actual model-guided navigation, then groups related
+recordings into compact cards (one column on small screens). The shared
+coordination group separates navigation, manipulation and waiting-decision
+withdrawal, with recorded versions and scope in the recording notes. Video
+players load metadata and posters initially; users choose playback. README
+keeps one inline model video and links to the grouped demonstrations. Keep each
+run separately playable; a montage must not imply one continuous run across
+these scenarios.
 
 The final HTML check rejects broken local pages, media and anchors. External
 links are not fetched; source availability is checked against the checkout.

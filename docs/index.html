@@ -66,6 +66,36 @@
         </article>
       </div>
     </section>
+    <section class="section" id="coordination-demos" aria-label="Shared Agent coordination with distinct navigation and manipulation contracts">
+      <div class="section-title"><h2>One coordinator. Distinct skills.</h2><span>EXPERIMENTAL · CONTROLLED TASK DECISIONS</span></div>
+      <div class="demo-grid">
+        <article class="demo">
+          <div class="demo-top"><strong>Navigate A → B</strong><span>Controlled proposals · Nav2</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/coordination-navigation-poster.png" aria-label="Actual public experimental coordination tutorial visiting A then B in Gazebo">
+            <source src="assets/demo/coordination-navigation.mp4" type="video/mp4">
+            <p><a href="assets/demo/coordination-navigation.mp4">Download this recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>Navigation under the shared Agent coordinator, through the public tutorial. A releases before B starts.</p><p>41.4 s · original speed. B remains pending; separate arrival evaluation succeeded.</p><a href="guide/docs/assets/demo/index.html#shared-agent-coordination">Recording &amp; scope ↗</a></div>
+        </article>
+        <article class="demo">
+          <div class="demo-top"><strong>Transfer → fresh feedback → hold</strong><span>Controlled proposals · actual ACT</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/coordination-aloha-poster.png" aria-label="Actual ACT transfer and separately admitted hold under the shared private Agent coordinator">
+            <source src="assets/demo/coordination-aloha.mp4" type="video/mp4">
+            <p><a href="assets/demo/coordination-aloha.mp4">Download this recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>The same coordination mechanism, with the ALOHA domain contract: 400 ACT transfer steps, then a separately admitted 50-step hold.</p><p>9.02 s · simulation time. Inference waits omitted; separate bounded hold evaluation succeeded.</p><a href="guide/docs/assets/demo/index.html#shared-agent-coordination">Recording &amp; scope ↗</a></div>
+        </article>
+        <article class="demo">
+          <div class="demo-top"><strong>Withdraw a waiting decision</strong><span>Controlled proposals · Nav2</span></div>
+          <video controls playsinline preload="metadata" poster="assets/demo/coordination-withdrawal-poster.png" aria-label="Navigation before final-decision withdrawal after B success, not cancellation during motion">
+            <source src="assets/demo/coordination-withdrawal.mp4" type="video/mp4">
+            <p><a href="assets/demo/coordination-withdrawal.mp4">Download this recording</a>.</p>
+          </video>
+          <div class="demo-bottom"><p>After B succeeds, its final decision is held. Original B cancel/query and Session close proceed independently; the late answer is retained.</p><p>39.7 s · original speed. No new submission. B pending/revoked; native cleanup unknown.</p><a href="guide/docs/assets/demo/index.html#shared-agent-coordination">Recording &amp; scope ↗</a></div>
+        </article>
+      </div>
+      <p class="recording-note">Three separate qualified runs, with their own versions. The normal navigation and withdrawal clips use the new public opt-in tutorial; ALOHA uses the earlier private assembly. Withdrawal order comes from same-run trace, not video alone. No real-model decision or in-motion stop qualification in this group.</p>
+    </section>
     <section class="section" id="more-demos" aria-label="More recorded robot demonstrations">
       <div class="section-title"><h2>More ways to act.</h2><span>MANIPULATION / HANDOFF / CANCELLATION</span></div>
       <div class="demo-grid">

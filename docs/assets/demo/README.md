@@ -1,5 +1,47 @@
 # Simulation recordings
 
+## Real-model shared coordination
+
+Recorded on 2026-10-11 with installed Robot Agent
+`0a91a2f0f0018aaadcb14587795a58ff2c9cb154`, consuming immutable Harness
+`747d7d48a846ad361cf7260d2339b010c0b92a00`. Both runs explicitly select the
+experimental coordination assembly and eight-second Owner terminal query window.
+GPT-6.1 Sol/high proposals use Codex CLI 0.159.0 on the host; the retained
+Ubuntu 22.04/Humble/Nav2/Gazebo amd64 scene stays offline at 2 CPUs/4 GiB.
+The model receives public map measurements and task context, without Session,
+execution authority or independent simulator truth.
+
+| Separate same-run clip | Observed result and qualification |
+| --- | --- |
+| [Normal navigation](model-coordination-navigation.mp4), 72.5 s | Three actual proposals; A releases before B admission. Independent arrival evaluation succeeded, errors A 0.204 m/B 0.198 m. Final B remains pending/current. Original speed, followed by a two-second final-frame hold |
+| [Waiting-task withdrawal](model-coordination-withdrawal.mp4), 60.2 s | Two complete proposals; the real final CLI turn is pending when the identified business Task receives SIGINT. Original B cancel/query and Session close, no final answer or new submit. B remains pending/revoked |
+
+Each 1600×900 recording uses a passive RViz observer in the actual scene.
+Startup is trimmed just before the first decision, model waits remain, and
+there are no internal cuts or speed changes. Captions use approximate same-run
+event times; the normal final-frame hold reports the recorded final state, not
+extra physical execution. Original/exported clips fully decode, representative
+frames are inspected and a focused independent check covers admission/withdrawal
+ordering and local process exit. The separate runs are not spliced together.
+
+Task verdicts remain unassessed; the separate normal evaluator owns physical
+success. The withdrawal scene is not given a physical-success or hard-stop
+verdict. Native ROS cleanup reported shutdown-context errors, so complete native
+closure remains unknown. Remote inference cleanup is also unknown; local child/
+process-group and container absence does not promote either. This sample is
+withdrawal after B's result while final assessment waits, not stopping in motion,
+outer-launcher graceful shutdown, hardware safety or broad model reliability.
+The earlier no-proxy model timeout and first evaluation import error remain
+recorded failures, not passed samples. Host deployment must separately verify
+its network path with TLS validation enabled.
+
+Reproduce with the [opt-in host-model tutorial](https://github.com/xiao-yang25/robot-agent/blob/master/examples/navigation/README.md#experimental-coordination).
+The withdrawal observer is a research qualification tool; the tutorial's
+controlled final-decision-stop cannot be combined with host-codex.
+[Agent qualification](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#real-model-shared-coordination)
+records the corresponding source and limits. Existing videos below retain their
+own versions; none is relabeled as the newer model run.
+
 ## Shared Agent coordination
 
 These three separate qualified recordings use the shared private Agent
@@ -14,8 +56,8 @@ Existing public task defaults remain unchanged.
 | [Waiting-decision withdrawal](coordination-withdrawal.mp4), 39.7s | Same Agent/Harness pair, a separate actual public-entry run | After B native success, final controlled decision is held. Original B cancel/query and local Session close precede late-answer release; no new submit. Final B pending/revoked, native cleanup unknown |
 | [ACT transfer and hold](coordination-aloha.mp4), 9.02s | Agent `f708afa1c4577d2b8266ddc2ad0ec34e3edbfd93` / consumed Harness `4b4bc5bf28c249016cfe4d7e272fa9877766a838` | Earlier private ALOHA assembly, MuJoCo, actual ACT400-step transfer then fresh feedback and a separate50-step hold. Both operations settled/released; separate one-second hold evaluation succeeded |
 
-Navigation was recorded on2026-10-10 in the retained ROS Humble/Nav2/Gazebo
-amd64 image, offline at2CPU/4GiB with an explicit eight-second Owner terminal
+Navigation was recorded on 2026-10-10 in the retained ROS Humble/Nav2/Gazebo
+amd64 image, offline at 2 CPUs/4 GiB with an explicit eight-second Owner terminal
 query window. A passive same-container RViz observer recorded these exact public
 runs; it did not drive decisions. Startup is trimmed near first submit, without
 internal cuts or speed changes. The1600×900 clips contain413/396 decoded frames
@@ -25,7 +67,7 @@ same-run trace and a focused independent safety check, not visually inferred
 from a stationary robot. This sample does not demonstrate stopping during motion,
 a hard stop deadline, remote/native cleanup or hardware safety.
 
-ALOHA was recorded on2026-10-09 in its retained MuJoCo/ACT environment, offline
+ALOHA was recorded on 2026-10-09 in its retained MuJoCo/ACT environment, offline
 at6CPU/6GiB. The complete451-frame,640×480 episode plays at50fps in simulation
 time; inference/decision waits are omitted. It retains its original separately
 qualified version and evidence, not the newer public navigation tutorial's
@@ -41,7 +83,7 @@ and the [private assembly design](https://github.com/xiao-yang25/robot-agent/blo
 Two new recordings use installed Agent
 `189145996d2c7811ecd5d70641bc01c3e575a3d5` and its immutable Harness
 `7279cd12ae48d01384e081757c54c38b7858557b` dependency, explicitly selecting
-`scoped-two-context-nav2-revision-v1`. The retained Ubuntu22.04/Humble/Nav2/Gazebo
+`scoped-two-context-nav2-revision-v1`. The retained Ubuntu 22.04/Humble/Nav2/Gazebo
 amd64 image runs without network, at 2CPU/4GiB. No physical robot is used.
 
 Both business instructions are controlled and delivered once after the single
@@ -87,7 +129,7 @@ and [qualification scope](https://github.com/xiao-yang25/robot-agent/blob/master
 Two new same-run recordings exercise Robot Agent's explicit checkpoint task with
 the existing fixed Harness `13bc75e903f6005da3dd5d969f8242ce211d182f` dependency.
 Recorded application code is `2ac951b0cafedf5e4871e689dbd5d6ec4d7e749c`; new Linux
-Core and Agent installations use an existing qualified Ubuntu22.04/Humble amd64
+Core and Agent installations use an existing qualified Ubuntu 22.04/Humble amd64
 image. The scene has no network, 2 CPU and 4 GiB. No physical robot is used.
 
 | Clip | Business and proposal sources | Recorded outcome |
@@ -155,7 +197,7 @@ checks. Raw experiment records and unsuccessful runs remain retained separately.
 
 ## Navigation recordings
 
-The clips below show TurtleBot3 / Gazebo Classic through RViz on Ubuntu22.04 /
+The clips below show TurtleBot3 / Gazebo Classic through RViz on Ubuntu 22.04 /
 ROS2 Humble. Their checker reads Gazebo poses and native/Owner observations.
 
 ## Moving handoff
@@ -283,7 +325,7 @@ Small fixes do not require a new recording unless the displayed behavior changes
 Recorded on 2026-10-03 from a local Harness candidate based on `a145364` and
 Agent candidate based on `5e8b63b`. The corresponding runtime and application are
 now delivered in Harness `6f32578` and Agent `9516daf`; this recording retains its
-original local candidate scope. In isolated Ubuntu22.04/Humble amd64 Gazebo simulation, the installed
+original local candidate scope. In isolated Ubuntu 22.04/Humble amd64 Gazebo simulation, the installed
 business Agent consumed public NavigationSession feedback. Host Codex0.159.0
 requested `gpt-6-sol` / high and supplied three actual text proposals: visit A,
 visit B, observed complete. Model input was task context and public navigation
@@ -402,7 +444,7 @@ and the [fixed Agent checks](https://github.com/xiao-yang25/robot-agent/blob/ffa
 The installed product candidate uses `scoped-two-context-nav2-owner-permit-v1`,
 based on `f43f4c3` with the corrected Owner patch delivered alongside these assets. The final
 installation passed21 focused Owner/Core checks and a new normal A→B run.
-In one isolated Ubuntu22.04/Humble/Gazebo run, A settles/releases, B starts
+In one isolated Ubuntu 22.04/Humble/Gazebo run, A settles/releases, B starts
 moving, and the actual Owner is killed with SIGKILL. Native command production
 continues; the drive independently expires the issue-stamped permission and
 actually writes every wheel target to zero. Late renewal and a fresh generation

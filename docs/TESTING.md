@@ -114,7 +114,7 @@ an actual native effect with a retained partial trace/video. Host and worker
 process reaping was observed. This is bounded local evidence, not reliability,
 complete handoff, live Agent or Linux model/renderer qualification.
 
-A later Linux consumer qualification used Ubuntu22.04/aarch64, Python3.12.14,
+A later Linux consumer qualification used Ubuntu 22.04/aarch64, Python3.12.14,
 CPU ACT and OSMesa, Agent3a5a4d4 (including its Linux platform-lock extension),
 and Harness3acc9aa. It used independent source copies, a new skill environment,
 a fresh Harness build/install and read-only public originals migrated in Linux;
@@ -218,7 +218,7 @@ model/library diagnostics out of protocol output;23 session tests passed again.
 
 The reusable [local MCP module](../integrations/mcp/README.md) now packages this
 tool boundary independently of the research paths/model configuration. Its15 focused
-tests passed on macOS/Python3.12 and locally in Ubuntu22.04/Python3.10. They exercise
+tests passed on macOS/Python3.12 and locally in Ubuntu 22.04/Python3.10. They exercise
 real stdio/Core tasks, same-owner reset/retained receipts, schema
 rejection, task cancellation and EOF during active work. Actual MCP cancellation
 notifications are also checked with a controlled startup barrier: a started call
@@ -235,7 +235,7 @@ not prove a live Agent or an embodied business Agent has run.
 A fresh live Codex consumer also passed against the product module:14 actual tool
 calls, two trials at258/260 steps, four camera samples, one session/host/worker,
 retained prior receipt, explicit close and observed process absence. Its answer
-kept full handoff/stable holding unassessed. This used CLI0.159.0, requested
+kept full handoff/stable holding unassessed. This used CLI 0.159.0, requested
 `gpt-6-sol/high`; the service-resolved model snapshot is unknown. The first attempt
 completed two native trials but timed out after network retries before final
 consumer verification; it remains a failed run. A bounded same-budget proxy-enabled
@@ -243,13 +243,13 @@ retry passed. Independent review covered the module, protocol/installed consumer
 and final live traces/images. These are existing-Agent access results, not a
 business Agent application or reliability/performance estimates.
 
-The separate Ubuntu22.04 optional-Python job builds the extension, runs session
+The separate Ubuntu 22.04 optional-Python job builds the extension, runs session
 tests, runs the three lightweight backend checks with distro NumPy, and consumes
 the installed package after relocation. It additionally installs the optional MCP
 requirements, runs its protocol tests and consumes the relocated MCP package.
 Hosted results are reported in PR checks; these jobs do not run ACT or MuJoCo.
 The prior Session/backend build/test/install sequence passed
-locally on2026-09-30 in an amd64 Ubuntu22.04 container, using Python3.10.12,
+locally on 2026-09-30 in an amd64 Ubuntu 22.04 container, using Python3.10.12,
 GCC11.4.0, CMake3.22.1 and distro NumPy1.21.5. The source was mounted read-only;
 build/install directories stayed in the disposable container. The relocated
 consumer completed two operations with values7/4 and retained the first result.
@@ -259,7 +259,7 @@ separately in the pull request checks.
 The same amd64-emulated container's additional default-Core run passed56/57;
 `compute_prelaunch` failed its invalid-executable spawn expectation. A focused
 probe returned spawn success followed by child exit127 for an executable text
-file without a valid format. On native ARM64 Ubuntu22.04, the same probe returned
+file without a valid format. On native ARM64 Ubuntu 22.04, the same probe returned
 `ENOEXEC` without a child, and all57 default-Core tests passed. Keep the failed
 emulated result distinct; do not weaken that test or infer native x86 CI failure.
 No Core implementation or behavioral test was changed for this difference.
@@ -1672,7 +1672,7 @@ and a valid candidate carrying extra metadata followed by all400 transfer steps.
 The existing normal, cancellation and stale-candidate checks remain enabled.
 
 The final patch passed12 handoff checks on Mac/Python3.12, and15 optional backend
-checks plus23 ordinary Session checks on Ubuntu22.04 ARM64/Python3.12 through its
+checks plus23 ordinary Session checks on Ubuntu 22.04 ARM64/Python3.12 through its
 installed package. These are explicit no-physics fixtures. The existing Ubuntu
 Core workflow discovers the new regressions in `integrations/mujoco/tests`;
 no workflow expansion is needed. The patch merged through Harness PR32 as
@@ -1687,7 +1687,7 @@ the published Agent manifest pinned Harness3acc9aa. The later installed-combinat
 check below is separate from these measurements. Native owns its own framing, scene, queue and
 shutdown path; its completion facts are not Core receipts.
 
-Both used Ubuntu22.04 ARM64, Python3.12.14, CPU ACT/OSMesa, seed0,
+Both used Ubuntu 22.04 ARM64, Python3.12.14, CPU ACT/OSMesa, seed0,
 float32/batch1/chunk100 and four Torch threads, in sequential fresh offline Docker
 containers launched with6GiB/6CPU. Both recorded640×480 video and physics for
 400 transfer plus50 saved-target hold steps. The task polling interval was10ms.
@@ -1736,12 +1736,12 @@ decisions, Owner death/recovery, hard physical stops, other bodies or GPU paths.
 Agent PR5 merged as `c3b291c`, with a file tree identical to reviewed `8f38cd0`;
 its [manifest](https://github.com/xiao-yang25/robot-agent/blob/c3b291c5d39c5ce32df472acfc071a457f509b77/workspace.repos)
 pins Harness `0de9eb0`. Both implementation deliveries are on main, and applicable
-main CI passed. Agent Ubuntu22.04/Python3.10 ran all30 task/preparation/subprocess
+main CI passed. Agent Ubuntu 22.04/Python3.10 ran all30 task/preparation/subprocess
 checks and installed command entry points. This does not run the model/simulator.
 
 The new pin was separately consumed through a fresh public Harness checkout,
 Release build/install and an installed Agent/default ACT worker outside source
-checkouts. In offline Ubuntu22.04 ARM64 CPU/OSMesa, seed0 deterministic proposals
+checkouts. In offline Ubuntu 22.04 ARM64 CPU/OSMesa, seed0 deterministic proposals
 completed observations0/400/450 in epoch0,400+50 steps, two accepted/settled/released
 operations,451 decoded640×480 frames and observed process cleanup. The single
 same-run fixed evaluator passed the bounded one-second hold; `task_verdict` stayed
@@ -1790,7 +1790,7 @@ This workflow is read-only, inherits no secrets, and adds no model/Agent depende
 to the Core package. The compatibility test implementation remains in Agent;
 Harness does not copy it or introduce reverse runtime dependencies.
 
-Local macOS and Ubuntu22.04 ARM64/Python3.12.14 installed-boundary checks each
+Local macOS and Ubuntu 22.04 ARM64/Python3.12.14 installed-boundary checks each
 passed all three cases against runtime pin `0de9eb0`; the current Harness changes
 only CI/docs. Agent's30 unchanged checks plus11 evaluation regressions passed;
 the final resource fix reran the affected11 in both environments. Hosted
@@ -2144,7 +2144,7 @@ Original proposal references were retained, then fresh references revalidated at
 submission; the owner still enforced its one-second admission reference lifetime.
 No simulator ground truth or physical evaluator output drove the application.
 
-The final isolated Ubuntu22.04/Humble amd64 run completed in 87.722 seconds under
+The final isolated Ubuntu 22.04/Humble amd64 run completed in 87.722 seconds under
 2 CPU/4 GiB, network disabled and a 420-second host budget. The single independent
 physical evaluator confirmed A/B distances 0.205273/0.173651m. A was settled and
 released before B admission. B output was accepted but settlement remained pending;
@@ -2200,7 +2200,7 @@ It demonstrates one normal loop, not broader model reliability or hardware safet
 The runtime changes are delivered in Harness
 [`6f32578`](https://github.com/xiao-yang25/robot-harness/commit/6f32578f8d9157fa7c26c1f4e2ece13e05ec6211).
 Agent [`9516daf`](https://github.com/xiao-yang25/robot-agent/commit/9516dafb13d5df8e64c0491d9c8f01cce54a4ff8)
-pins that Harness revision. Its Ubuntu22.04/Python3.10 mainline
+pins that Harness revision. Its Ubuntu 22.04/Python3.10 mainline
 [application workflow](https://github.com/xiao-yang25/robot-agent/actions/runs/37107518275)
 passed 56 checks and installed CLI validation; its
 [installed combination workflow](https://github.com/xiao-yang25/robot-agent/actions/runs/37107518308)
@@ -2518,7 +2518,7 @@ already qualified actual-model runs from the original Harness/Agent pairing.
 They are not recordings or qualification of the new public scene command.
 
 
-The current public image recipe rebuilt successfully on Ubuntu22.04/Humble with
+The current public image recipe rebuilt successfully on Ubuntu 22.04/Humble with
 Nav2 1.1.20, including both failure leaves and the current drive interfaces.
 An initial archive connection failure was retained; an explicit HTTPS Ubuntu
 mirror supplied the successful build without changing package/signature checks.
@@ -2569,7 +2569,7 @@ The 2026-10-06 public controlled tutorial consumed Harness
 normal A→B run explicitly enabled collection. The installed Agent evaluator ran
 once, reporting `succeeded` with A/B errors 0.208517/0.188799m under its fixed
 0.25m predicate; a focused independent safety-decision check accompanied it.
-The retained qualified Ubuntu22.04/amd64 Humble/Nav2 1.1.20/Gazebo Classic image
+The retained qualified Ubuntu 22.04/amd64 Humble/Nav2 1.1.20/Gazebo Classic image
 was reused with the current source-mounted collector, not rebuilt at this revision.
 
 The collector and three query children exited zero and were reaped without
@@ -2614,7 +2614,7 @@ scene must be recorded separately for this explicit option.
 A fresh installation of this candidate and Agent
 `b8ba3c537930b82d7018b7b8ce65c5312dbbd1e3` ran one real default-profile
 Nav2/Gazebo final-decision-stop scene with `--terminal-query-seconds 8`.
-The retained Ubuntu22.04/amd64 Humble/Nav2/Gazebo recording image was reused,
+The retained Ubuntu 22.04/amd64 Humble/Nav2/Gazebo recording image was reused,
 with network disabled and 2 CPU/4GB limits. The unchanged boundary evaluator
 ran once and passed; a focused independent check of raw safety-decision facts
 approved the limited interpretation.
@@ -2630,3 +2630,18 @@ query has no independent timestamp event; its result and installed call order
 establish completion, not precise query timing. Same-scene video is retained as
 local evidence. This does not qualify other profiles, models, hardware, default
 migration or restart recovery; the earlier failed closing run remains failed.
+
+## Real-model shared Agent coordination
+
+Two 2026-10-11 scenes use installed Agent 0a91a2f and its explicit Harness 747d7d4
+dependency through the existing public Session/Core/Owner, with actual
+GPT-6.1 Sol/high host proposals. The normal A→B physical evaluation succeeded;
+the separate actual-final-wait Task withdrawal qualified original B cancel/query,
+Session close, no new admission/final answer and local process/container exit.
+These are model/scene-specific qualifications, not hosted CI or a new default.
+Normal B is pending/current; withdrawn B is pending/revoked. Native ROS shutdown
+cleanup errors and native/remote cleanup unknown are retained. There is no
+in-motion stop, outer-launcher graceful shutdown, hardware or reliability claim.
+See [same-run recording notes](assets/demo/README.md#real-model-shared-coordination)
+and [Agent validation](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#real-model-shared-coordination)
+for the exact versions and reproduction boundary.

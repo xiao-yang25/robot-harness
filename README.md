@@ -33,10 +33,11 @@ proposals to visit A, visit B and assess completion through Harness and Nav2.
 
 https://github.com/user-attachments/assets/91a164f6-653c-41e2-ae12-b494489ea3b4
 
-*Local M6 candidate · Gazebo simulation · 70.9 seconds at original speed.*
+*Earlier local M6 candidate · Gazebo simulation · 70.9 seconds at original speed.*
 A releases before B starts; B settlement remains pending at the end.
 
-[Shared coordination: navigation, ACT manipulation and decision withdrawal](https://xiao-yang25.github.io/robot-harness/#coordination-demos)
+[Current real-model shared coordination and waiting-task withdrawal](https://xiao-yang25.github.io/robot-harness/#model-withdrawal)
+· [Shared coordination: navigation, ACT manipulation and decision withdrawal](https://xiao-yang25.github.io/robot-harness/#coordination-demos)
 · [In-motion instructions: stop or redirect to B](https://xiao-yang25.github.io/robot-harness/#revision-demos)
 · [Checkpoint: finish at A or continue to B](https://xiao-yang25.github.io/robot-harness/#checkpoint-demos)
 · [More demos: manipulation, cancellation, handoff and Owner loss](https://xiao-yang25.github.io/robot-harness/#more-demos)

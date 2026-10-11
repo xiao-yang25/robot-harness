@@ -33,7 +33,9 @@ for local uncommitted work it identifies HEAD, so publish only a committed build
 The homepage's Docs link opens the generated reading guide. Its existing asset
 and video URLs stay unchanged.
 
-The homepage leads with actual model-guided navigation, then groups related
+The homepage leads with actual model-guided navigation under shared coordination,
+followed by a separate real-model waiting-task withdrawal recording. Historical
+controlled coordination clips retain their own group and scope. It then groups related
 recordings into compact cards (one column on small screens). The shared
 coordination group separates navigation, manipulation and waiting-decision
 withdrawal, with recorded versions and scope in the recording notes. Video

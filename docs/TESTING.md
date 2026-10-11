@@ -2581,6 +2581,24 @@ owns the task result and limits. This single controlled run made no model calls
 and does not qualify other scenes/profiles or hardware. Existing recordings
 retain their original provenance.
 
+### Native Owner shutdown software checks
+
+[Installed Humble shutdown checks](../integrations/ros2/nav2_session/tests/linux_shutdown_checks.py)
+exercise actual context/node initialization, SIGINT and SIGTERM, repeated signals
+during abort/dispose and interruption just after context creation. Context must
+remain usable through cleanup, the node must be destroyed, and explicit context
+shutdown must follow. The existing Humble workflow invokes the script on its
+relocated installation; configuring that step does not establish remote CI success.
+
+[Supervisor checks](../integrations/ros2/simulation/test_navigation_cleanup.py)
+use real subprocesses to require scene dependencies alive while Owner finishes,
+and to require a nonresponsive Owner be killed/reaped after a finite grace.
+Existing simulation discovery covers them and the collector/scene ordering
+regressions. Use an executable temporary directory for test-generated fake tools.
+These checks qualify software lifecycle handling, not native motion, physical stop,
+remote inference termination or outer-host force-removal behavior. Keep the original
+failed scene and pending/unknown receipts; a new scene needs separate qualification.
+
 ### Explicit Nav2 terminal-window software checks
 
 [Endpoint/window tests](../bindings/python/tests/test_nav2_terminal.py) exercise

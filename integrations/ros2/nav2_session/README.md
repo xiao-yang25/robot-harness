@@ -161,13 +161,24 @@ Pure endpoint/package checks run with the Python test suite. With Humble and the
 custom drive interfaces available, run the focused actual owner methods:
 
 ```sh
-PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}" \
-  python3 integrations/ros2/nav2_session/tests/linux_driver_checks.py
+export PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}"
+python3 integrations/ros2/nav2_session/tests/linux_driver_checks.py
+python3 integrations/ros2/nav2_session/tests/linux_shutdown_checks.py
 ```
 
-These use the real Core and synthetic ROS edges; they test scheduling and error
-isolation, not physical stop. See [Runtime design](../../../docs/RUNTIME_SLICE.md#installed-bounded-nav2-owner)
+The driver checks use real Core with synthetic ROS edges. The shutdown checks
+use an actual Humble context/node and SIGINT/SIGTERM through the entry's cleanup
+path, including repeated interrupts and interrupted initialization. They do not
+run a navigation goal or establish physical stopping. See [Runtime design](../../../docs/RUNTIME_SLICE.md#installed-bounded-nav2-owner)
 and [Testing](../../../docs/TESTING.md#navigation-request-entry) for qualification limits.
+
+Owner handles termination before ROS context shutdown, then performs bounded
+abort, local disposal and explicit shutdown. The session supervisor retains
+scene/bridge dependencies until Owner exits or its 19-second local cleanup grace
+expires, then records forced exit if needed. This grace includes abort, the optional
+terminal-query window and native-process reaping; it is not a physical-stop bound.
+Interrupting the outer host launcher can still force-remove the container, bypassing
+this inner cleanup path. Pending/unknown execution and closure remain pending/unknown.
 
 ### Explicit finite motion profile
 

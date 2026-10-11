@@ -33,7 +33,11 @@ class BudgetTests(unittest.TestCase):
                 if len([c for c in calls if isinstance(c, tuple)]) == 3 and final_delay > seconds:
                     raise TimeoutError('native wait budget expired')
         ros = ModuleType('rclpy')
-        ros.init = lambda: None
+        signals = ModuleType('rclpy.signals')
+        signals.SignalHandlerOptions = SimpleNamespace(NO='no-native-handler')
+        def init(*, signal_handler_options):
+            self.assertEqual(signal_handler_options, signals.SignalHandlerOptions.NO)
+        ros.init = init
         ros.shutdown = lambda: None
         owner = ModuleType('robot_harness_nav2._owner')
         owner.NavigationOwner, owner.ClientClosed = Owner, ClientClosed
@@ -52,7 +56,7 @@ class BudgetTests(unittest.TestCase):
         observations = ModuleType('robot_harness_nav2._observations')
         observations.emit = lambda *a, **kw: None
         observations.diagnose = lambda *a, **kw: None
-        with patch.dict(sys.modules, {'rclpy': ros, owner.__name__: owner,
+        with patch.dict(sys.modules, {'rclpy': ros, 'rclpy.signals': signals, owner.__name__: owner,
                                       revision.__name__: revision,
                                       failure.__name__: failure,
                                       observations.__name__: observations}), \

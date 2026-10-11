@@ -133,7 +133,8 @@ class TruthTest(unittest.TestCase):
     @unittest.skipUnless(sys.platform=='linux', 'Session process groups use Linux setsid')
     def test_partial_startup_before_group_formation_keeps_cleanup_budget(self):
         source = Path(truth.__file__).with_name('navigation_session.sh').read_text()
-        cleanup = source[source.index('cleanup() {'):source.index('trap cleanup EXIT')]
+        cleanup = (Path(truth.__file__).with_name('navigation_cleanup.sh').read_text()
+                   + '\n' + source[source.index('cleanup() {'):source.index('trap cleanup EXIT')])
         cleanup = cleanup.replace("Path('/output/collector-process.json')", f'Path({str(self.output/"collector-process.json")!r})')
         # Deterministically expose the window before setsid establishes its group.
         # Background children inherit ignored SIGINT before Python installs handlers.
@@ -156,7 +157,8 @@ class TruthTest(unittest.TestCase):
         # Exercise the actual supervisor cleanup function with real processes.
         # Only its fixed artifact path is redirected to this isolated fixture.
         source = Path(truth.__file__).with_name('navigation_session.sh').read_text()
-        cleanup = source[source.index('cleanup() {'):source.index('trap cleanup EXIT')]
+        cleanup = (Path(truth.__file__).with_name('navigation_cleanup.sh').read_text()
+                   + '\n' + source[source.index('cleanup() {'):source.index('trap cleanup EXIT')])
         cleanup = cleanup.replace("Path('/output/collector-process.json')", f'Path({str(self.output/"collector-process.json")!r})')
         sentinel = self.output/'scene-stopped'
         query_pid = self.output/'query.pid'

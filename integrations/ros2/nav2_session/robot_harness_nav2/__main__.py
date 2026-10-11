@@ -42,7 +42,7 @@ def dispose(owner):
     if gate is not None:
         attempt(gate.close)
     # destroy_node releases partially initialized ROS clients/subscriptions too.
-    if hasattr(owner, '_handle'):
+    if getattr(owner, 'handle', None) is not None:
         attempt(owner.destroy_node)
     return errors
 
@@ -92,10 +92,21 @@ def main():
         from ._failure import FailureOwner
         NavigationOwner = FailureOwner
     from ._observations import emit, diagnose
-    rclpy.init()
+    from ._shutdown import ShutdownSignals
+    with ShutdownSignals() as shutdown:
+        return run_owner(args, NavigationOwner, rclpy, emit, diagnose, shutdown)
+
+
+def run_owner(args, NavigationOwner, rclpy, emit, diagnose, shutdown):
+    from rclpy.signals import SignalHandlerOptions
+    from ._owner import ClientClosed
     owner = NavigationOwner.__new__(NavigationOwner)
     code = 0
+    initialized = False
     try:
+        # Humble's native handler shuts context down before Python abort runs.
+        rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+        initialized = True
         owner.__init__()
         if args.terminal_query_seconds is not None:
             from ._terminal import TerminalWindow
@@ -112,11 +123,13 @@ def main():
             owner.visit_and_close(stage)
         owner.completed = True
         owner.wait(lambda: owner.requests.closing, args.caller_wait_seconds or 10)
+        shutdown.begin_cleanup()
         owner.abort()
         if args.terminal_query_seconds is not None:
             owner.finish_terminal_queries()
         emit('caller_complete')
     except ClientClosed as error:
+        shutdown.begin_cleanup()
         try:
             owner.abort()
             if args.terminal_query_seconds is not None:
@@ -127,15 +140,18 @@ def main():
         diagnose('client_closed', error=str(error), stop='unknown')
     except BaseException as error:
         code = 1
+        shutdown.begin_cleanup()
         try:
             owner.abort()
         except Exception as cleanup_error:
             diagnose('core_abort_error', error=str(cleanup_error), stop='unknown')
         diagnose('caller_error', error=str(error), stop='unknown')
     finally:
+        shutdown.begin_cleanup()
         errors = dispose(owner)
         try:
-            rclpy.shutdown()
+            if initialized or rclpy.ok():
+                rclpy.shutdown()
         except Exception as error:
             errors.append(str(error))
         if errors:

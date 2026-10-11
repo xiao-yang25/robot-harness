@@ -6,6 +6,7 @@ mkdir -p "$HOME"
 source /opt/ros/humble/setup.bash
 source /drive/share/m4_drive_probe/local_setup.bash
 source /simulation/navigation_startup.sh
+source /simulation/navigation_cleanup.sh
 export PYTHONPATH="/installed/lib/robot-harness/python${PYTHONPATH:+:$PYTHONPATH}"
 export M4_ISOLATED_SIMULATION=1
 export M4_WORK_SCOPE_CASE=normal
@@ -72,12 +73,13 @@ owner_pid='' client_pid='' launch_pid='' bridge_pid='' collector_pid=''
 cleanup() {
   local status=$?
   trap - EXIT
+  # Preserve scene/bridge until Owner finishes: abort 2s, terminal query <=10s,
+  # context-process reap <=6s, plus 1s supervisor margin. No stop guarantee.
+  [[ -z $client_pid ]] || kill -INT "$client_pid" 2>/dev/null || true
+  stop_navigation_owner "$owner_pid" 19
   local until=$((SECONDS+4)) live
   if [[ -n $collector_pid ]]; then
-    # Revoke/interrupt the control side immediately even while truth is finishing.
-    for pid in "$owner_pid" "$client_pid"; do
-      [[ -n $pid ]] && kill -INT "$pid" 2>/dev/null || true
-    done
+    # Observation can finish only after Owner's native cleanup window.
     kill -INT -- "-$collector_pid" 2>/dev/null || true
     # setsid may not have formed the group yet during partial startup.
     kill -INT "$collector_pid" 2>/dev/null || true
@@ -97,19 +99,19 @@ Path('/output/collector-process.json').write_text(json.dumps(dict(
     pid=int(sys.argv[1]), returncode=int(sys.argv[2]), group_forced=bool(int(sys.argv[3])), reaped=True)))
 COLLECTOR_EXIT
   fi
-  for pid in "$owner_pid" "$client_pid" "$launch_pid" "$bridge_pid"; do
+  for pid in "$client_pid" "$launch_pid" "$bridge_pid"; do
     [[ -n $pid ]] || continue
     kill -INT "$pid" 2>/dev/null || true
   done
   while (( SECONDS < until )); do
     live=0
-    for pid in "$owner_pid" "$client_pid" "$launch_pid" "$bridge_pid"; do
+    for pid in "$client_pid" "$launch_pid" "$bridge_pid"; do
       [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null && live=1
     done
     (( live )) || break
     sleep .1
   done
-  for pid in "$owner_pid" "$client_pid" "$launch_pid" "$bridge_pid"; do
+  for pid in "$client_pid" "$launch_pid" "$bridge_pid"; do
     [[ -n $pid ]] || continue
     kill -KILL "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true

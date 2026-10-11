@@ -83,6 +83,23 @@ handling to survive a stalled model call or failed caller needs an explicitly
 validated deployment for that requirement; adding a process alone is not evidence
 that it is met. The current profile limits remain unchanged.
 
+### Selected inspection boundary (design, not qualification)
+
+The selected next inspection task remains a per-capability consumer. Agent owns
+the A/inspection/optional-B business sequence; Harness owns accepted operations,
+their native resources and profile-specific settlement. Camera facts may reach
+the caller through a separate read-only source; this adds no pixels or inspection
+branches to the current navigation Session contract. A camera failure permits
+accepted navigation to continue only when navigation is independent of that camera
+and all its own execution conditions remain valid. Explicit stop still requests
+cancellation of the original operation. No new task or physical-stop guarantee
+is qualified by this design.
+
+Explicit execution-fragment delegation is deferred until a concrete delegated-
+progression requirement justifies it. Existing source/profile/dependency
+qualifications remain unchanged; native shutdown ordering must be investigated
+and validated before claiming complete cleanup for a new combination.
+
 ### User components, task examples and internal mechanisms
 
 The following classification describes what exists today. Installation does not

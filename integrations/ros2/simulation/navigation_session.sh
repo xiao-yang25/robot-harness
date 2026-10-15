@@ -70,55 +70,84 @@ PY
 # The launcher owns the scene and separate example process. The installed owner
 # creates only its native B context and its private local request endpoint.
 owner_pid='' client_pid='' launch_pid='' bridge_pid='' collector_pid=''
+session_completed=0
 cleanup() {
   local status=$?
   trap - EXIT
+  trap '' INT TERM
   # Preserve scene/bridge until Owner finishes: abort 2s, terminal query <=10s,
   # context-process reap <=6s, plus 1s supervisor margin. No stop guarantee.
   [[ -z $client_pid ]] || kill -INT "$client_pid" 2>/dev/null || true
-  stop_navigation_owner "$owner_pid" 19
-  local until=$((SECONDS+4)) live
+  stop_navigation_owner "$owner_pid" 19 /output/owner-process.json
+  local deadline failed=0
+  deadline=$(python3 -c 'import time; print(time.monotonic()+4)')
   if [[ -n $collector_pid ]]; then
     # Observation can finish only after Owner's native cleanup window.
-    kill -INT -- "-$collector_pid" 2>/dev/null || true
-    # setsid may not have formed the group yet during partial startup.
-    kill -INT "$collector_pid" 2>/dev/null || true
-    while { kill -0 "$collector_pid" 2>/dev/null || kill -0 -- "-$collector_pid" 2>/dev/null; } \
-      && (( SECONDS < until )); do sleep .05; done
-    local forced=0 code=0
-    if kill -0 "$collector_pid" 2>/dev/null || kill -0 -- "-$collector_pid" 2>/dev/null; then
-      forced=1
-      kill -KILL -- "-$collector_pid" 2>/dev/null || true
-      kill -KILL "$collector_pid" 2>/dev/null || true
+    python3 /simulation/navigation_groups.py /output/collector-process.json "$$" "$deadline" \
+      "collector=$collector_pid" || failed=1
+    local code=0 joined=0
+    if ! kill -0 "$collector_pid" 2>/dev/null; then
+      wait "$collector_pid" || code=$?
+      joined=1
+    else
+      failed=1
     fi
-    wait "$collector_pid" || code=$?
-    python3 - "$collector_pid" "$code" "$forced" <<'COLLECTOR_EXIT' || true
+    python3 - "$code" "$joined" <<'COLLECTOR_EXIT' || failed=1
 import json, sys
 from pathlib import Path
-Path('/output/collector-process.json').write_text(json.dumps(dict(
-    pid=int(sys.argv[1]), returncode=int(sys.argv[2]), group_forced=bool(int(sys.argv[3])), reaped=True)))
+path = Path('/output/collector-process.json')
+result = json.loads(path.read_text())
+fact = result['groups'][0]
+fact.update(returncode=int(sys.argv[1]), group_forced=fact['forced'],
+            reaped=sys.argv[2] == '1', errors=result['errors'])
+path.write_text(json.dumps(fact, indent=2) + '\n')
 COLLECTOR_EXIT
   fi
-  for pid in "$client_pid" "$launch_pid" "$bridge_pid"; do
-    [[ -n $pid ]] || continue
-    kill -INT "$pid" 2>/dev/null || true
+  # B inherits Owner's group. Reap all known groups even after their leader exits.
+  local groups=() reaped=() role pid code joined
+  for role in client launch bridge owner; do
+    case $role in client) pid=$client_pid;; launch) pid=$launch_pid;;
+      bridge) pid=$bridge_pid;; owner) pid=$owner_pid;; esac
+    [[ -n $pid ]] && groups+=("$role=$pid")
   done
-  while (( SECONDS < until )); do
-    live=0
-    for pid in "$client_pid" "$launch_pid" "$bridge_pid"; do
-      [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null && live=1
-    done
-    (( live )) || break
-    sleep .1
+  python3 /simulation/navigation_groups.py /output/launcher-processes.json "$$" "$deadline" \
+    "${groups[@]}" || failed=1
+  for pair in "${groups[@]}"; do
+    pid=${pair#*=} code=0 joined=0
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" 2>/dev/null || code=$?
+      joined=1
+    else
+      failed=1
+    fi
+    reaped+=("${pair%%=*}:$code:$joined")
   done
-  for pid in "$client_pid" "$launch_pid" "$bridge_pid"; do
-    [[ -n $pid ]] || continue
-    kill -KILL "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-  done
+  python3 - "${reaped[@]}" <<'GROUP_EXIT' || failed=1
+import json, sys
+from pathlib import Path
+path = Path('/output/launcher-processes.json')
+result = json.loads(path.read_text())
+exits = {role: dict(returncode=int(code), reaped=joined == '1')
+         for role, code, joined in (arg.split(':') for arg in sys.argv[1:])}
+for fact in result['groups']:
+    fact.update(exits[fact['role']])
+result['clean'] = result['clean'] and all(f['reaped'] for f in result['groups'])
+path.write_text(json.dumps(result, indent=2) + '\n')
+GROUP_EXIT
+  if (( failed && status == 0 )); then status=1; fi
+  if (( status == 0 && ${session_completed:-0} )); then
+    # Local process closure only, never physical/Core success.
+    python3 - <<'PYSTATUS' || status=1
+import json
+from pathlib import Path
+Path('/output/verification.json').write_text(json.dumps(dict(passed=True, case='installed-nav2-session')))
+PYSTATUS
+  fi
   exit "$status"
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 scene=${M6_NAVIGATION_SCENE:-normal}
 python3 /simulation/navigation_scene.py "$scene"
 map_file=$(python3 -c 'import json; print(json.load(open("/output/navigation-scene.json"))["map_file"])')
@@ -146,12 +175,12 @@ p.write_text(yaml.safe_dump(v, sort_keys=False))
 VIEW
   rviz_options=(use_rviz:=True rviz_config_file:=/output/live-view.rviz)
 fi
-ros2 launch /simulation/native_worker/producer_scope.launch.py headless:=True "${rviz_options[@]}" \
+setsid ros2 launch /simulation/native_worker/producer_scope.launch.py headless:=True "${rviz_options[@]}" \
   use_sim_time:=True use_respawn:=False use_composition:=False "${collection_options[@]}" \
   params_file:=/output/native-params.yaml map:="$map_file" robot_sdf:=/output/scoped-waffle.model \
   > /output/launch.log 2>&1 &
 launch_pid=$!
-python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
+setsid python3 /simulation/producer_bridge.py > /output/producer-bridge.jsonl 2>&1 &
 bridge_pid=$!
 if [[ ${M6_COLLECT_EVALUATION:-0} == 1 ]]; then
   # A separate group contains only this collector and its passive query children.
@@ -168,14 +197,14 @@ fi
 if [[ -n ${M6_TERMINAL_QUERY_SECONDS:-} ]]; then
   owner_options+=(--terminal-query-seconds "$M6_TERMINAL_QUERY_SECONDS")
 fi
-python3 -m robot_harness_nav2 "${owner_options[@]}" > /output/caller.log 2>&1 &
+setsid python3 -m robot_harness_nav2 "${owner_options[@]}" > /output/caller.log 2>&1 &
 owner_pid=$!
 # Readiness only exposes the owner endpoint; it cannot create Core authority.
 wait_navigation_endpoint /output/navigation-endpoint.json 160 \
   owner "$owner_pid" scene "$launch_pid" bridge "$bridge_pid"
 endpoint=$(python3 -c 'import json; print(json.load(open("/output/navigation-endpoint.json"))["endpoint"])')
 PYTHONPATH="${M6_CLIENT_PREFIX:+${M6_CLIENT_PREFIX}:}${PYTHONPATH:-}" \
-  python3 /navigation-example.py "$endpoint" > /output/request-client.log 2>&1 &
+  setsid python3 /navigation-example.py "$endpoint" > /output/request-client.log 2>&1 &
 client_pid=$!
 wait "$client_pid"
 python3 - <<'PYCLIENT'
@@ -185,9 +214,4 @@ with open('/output/caller.jsonl', 'a') as stream:
 PYCLIENT
 wait "$owner_pid"
 navigation_processes_alive scene "$launch_pid" bridge "$bridge_pid"
-python3 - <<'PYSTATUS'
-# Process completion only. Physical/Core qualification is outside the launcher.
-import json
-from pathlib import Path
-Path('/output/verification.json').write_text(json.dumps(dict(passed=True, case='installed-nav2-session')))
-PYSTATUS
+session_completed=1

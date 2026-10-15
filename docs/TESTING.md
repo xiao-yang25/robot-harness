@@ -2663,3 +2663,44 @@ in-motion stop, outer-launcher graceful shutdown, hardware or reliability claim.
 See [same-run recording notes](assets/demo/README.md#real-model-shared-coordination)
 and [Agent validation](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#real-model-shared-coordination)
 for the exact versions and reproduction boundary.
+
+
+### Supported Session process-group lifecycle
+
+[Group checks](../integrations/ros2/simulation/test_navigation_groups.py) use real
+Linux processes to keep descendants alive after scene and Owner leaders exit,
+then require their groups to close without touching an unrelated group. They
+also exercise pre-setsid startup, a nonresponsive tree, normal and failed Session
+cleanup, repeated TERM, INT followed by TERM, and a forced collector with all
+other groups absent. The last case must fail without a success marker. Existing
+collector/Owner/scene dependency-order tests continue through the production
+cleanup function and helper.
+
+Final local Linux discovery passed87 tests with the declared dependencies,
+including all9new group checks and4controlled bridge checks; macOS/Python3.12
+passed87 with16platform/tool skips. Two additional actual Humble bridge checks
+passed without input commands or robot movement. Linux used an offline2CPU/2GiB
+container, exited zero without OOM and was removed. The existing Humble push/PR
+workflow discovers the software cases and runs the actual bridge checks after
+sourcing the built fixture; no new workflow is needed.
+
+The bridge uses one explicit ROS Context, handles INT/TERM with a stop latch, and
+keeps that Context alive through executor and node disposal. Checks cover inherited
+ignored signals, repeated signals during cleanup, initialization failure and
+best-effort disposal after an error. A50ms spin wait does not bound callback or
+output duration. Partial-node construction is not exhaustively qualified.
+
+An initial full ROS Session with the group-only patch closed scene/Owner/collector
+groups but forced the old bridge; it correctly returned failure without a success
+marker. The subsequent bridge fix has the software coverage above. Complete normal
+and partial-start ROS Session qualification and remote CI remain pending; these
+local results do not promote the failed Session to success.
+
+The implementation observes non-zombie members of only its fixed owned sessions
+and records direct-child reaping separately; the isolated container's init owns
+reaping adopted descendants. Unknown membership and signal errors prevent normal
+success. Collector and remaining groups share one absolute cleanup deadline,
+Owner finishes with scene dependencies alive, and verification follows successful
+cleanup. Force is retained as failure-path evidence, not normal completion.
+These checks do not establish native settlement, physical stopping, escaped-daemon
+ownership, hardware safety or worst-case timing.

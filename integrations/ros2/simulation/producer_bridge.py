@@ -4,13 +4,16 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import time
 
 import rclpy
 from geometry_msgs.msg import Twist
 from m4_drive_probe.msg import ScopedTwist
+from rclpy.context import Context
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 
 
 def contexts():
@@ -23,8 +26,8 @@ def contexts():
 
 
 class Bridge(Node):
-    def __init__(self, scope, generation):
-        super().__init__('producer_bridge_' + str(generation))
+    def __init__(self, scope, generation, *, context=None):
+        super().__init__('producer_bridge_' + str(generation), context=context)
         topic = '/m4_motion/s_' + scope + '/smoothed'
         finite = os.environ.get('M6_NAVIGATION_PROFILE') == 'scoped-two-context-nav2-owner-permit-v1'
         if finite:
@@ -59,24 +62,52 @@ class Bridge(Node):
                               generation=generation, input_topic=topic)), flush=True)
 
 
+def run_bridge(scopes):
+    stopped = False
+    previous, nodes, errors = {}, [], []
+    context = executor = None
+    def stop(*_):
+        nonlocal stopped
+        stopped = True
+    def dispose(action):
+        try:
+            if action() is False:
+                errors.append('executor shutdown incomplete')
+        except Exception as error:
+            errors.append(repr(error))
+    try:
+        for kind in (signal.SIGINT, signal.SIGTERM):
+            previous[kind] = signal.signal(kind, stop)
+        context = Context()
+        rclpy.init(context=context, signal_handler_options=SignalHandlerOptions.NO)
+        if not stopped:
+            executor = SingleThreadedExecutor(context=context)
+            for i, scope in enumerate(scopes):
+                if stopped:
+                    break
+                node = Bridge(scope, i + 1, context=context)
+                nodes.append(node)
+                executor.add_node(node)
+            while not stopped and context.ok():
+                executor.spin_once(timeout_sec=.05)
+    finally:
+        if executor is not None:
+            dispose(lambda: executor.shutdown(timeout_sec=.5))
+        for node in nodes:
+            dispose(node.destroy_node)
+        if context is not None:
+            dispose(context.try_shutdown)
+        for kind, handler in previous.items():
+            signal.signal(kind, handler)
+        print(json.dumps(dict(event='producer_bridge_exit', stopped=stopped,
+                              cleanup_errors=errors)), flush=True)
+    return 1 if errors else 0
+
+
 def main():
     if os.environ.get('M4_ISOLATED_SIMULATION') != '1' or not Path('/.dockerenv').exists():
         return 2
-    scopes = contexts()
-    rclpy.init()
-    executor = SingleThreadedExecutor()
-    nodes = [Bridge(scope, i + 1) for i, scope in enumerate(scopes)]
-    for node in nodes:
-        executor.add_node(node)
-    try:
-        executor.spin()
-    finally:
-        executor.shutdown()
-        for node in nodes:
-            node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
-    return 0
+    return run_bridge(contexts())
 
 
 if __name__ == '__main__':

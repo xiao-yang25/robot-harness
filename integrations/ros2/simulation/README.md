@@ -377,6 +377,7 @@ Context for initialization, executor and nodes. It stops spinning before disposi
 executor/nodes and closes the Context last; cleanup failures return nonzero. This
 preserves dependencies during repeated signals and partial initialization. The
 50ms spin wait is not a bound on callbacks, output or physical stopping. Local
-software and no-input Humble checks passed; complete Session qualification remains
-pending after the initial group-only run forced the old bridge and correctly
-reported failure. See [validation scope](../../../docs/TESTING.md#supported-session-process-group-lifecycle).
+software and no-input Humble checks passed, and an actual Session startup-failure
+path closed the bridge and all observed groups without force. Complete normal and
+explicit partial-start qualification remains pending. See
+[validation scope](../../../docs/TESTING.md#supported-session-process-group-lifecycle).

@@ -2692,9 +2692,19 @@ output duration. Partial-node construction is not exhaustively qualified.
 
 An initial full ROS Session with the group-only patch closed scene/Owner/collector
 groups but forced the old bridge; it correctly returned failure without a success
-marker. The subsequent bridge fix has the software coverage above. Complete normal
-and partial-start ROS Session qualification and remote CI remain pending; these
-local results do not promote the failed Session to success.
+marker. A subsequent Session with the bridge increment failed before client
+startup: B preparation exceeded the existing five-second response wait for
+`bt_navigator/get_state`. Scene, bridge and Owner/B groups and the collector all
+closed without force, direct children were reaped, the final isolated namespace
+had no live residual, and no verification was written. This exercises cleanup of
+that startup-failure path; it does not qualify normal completion or diagnose the
+underlying service-response delay. Neither failure was promoted, and no automatic retry followed either case.
+
+The exact bridge software candidate passed push/PR Core, Humble and installed-Agent
+checks and the documentation build. Humble exercised all 87 simulation checks and
+the 2 new no-input bridge checks. Complete normal and explicit partial-start Session
+qualification remains pending; the partial-start case was not run after the
+unexpected normal-path failure. Native/task verdicts remain unchanged.
 
 The implementation observes non-zombie members of only its fixed owned sessions
 and records direct-child reaping separately; the isolated container's init owns

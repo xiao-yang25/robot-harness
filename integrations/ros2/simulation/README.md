@@ -351,3 +351,36 @@ The [collector boundary](../../../docs/DESIGN.md#planned-passive-navigation-eval
 explains the trusted fixed alignment and cleanup limits. Fresh paired public
 physical qualification remains a separate step; existing recordings keep their
 original versions.
+
+
+## Session process-tree shutdown
+
+The Session supervisor creates private Linux groups for its client, scene, bridge
+and Owner; the Owner-created B context inherits the Owner group. On exit it keeps
+scene dependencies alive for Owner cleanup, then closes the optional collector,
+then the remaining groups. Group membership is checked even after a direct parent
+exits. Normal completion requires no forced cleanup, live group residual or
+observation error; only then is `verification.json` written. Original failure or
+interrupt status is retained.
+
+`owner-process.json`, optional `collector-process.json` and
+`launcher-processes.json` distinguish direct-child reaping, group observations and
+forced cleanup. The post-Owner phases share one four-second monotonic grace,
+including reserved force observation; the existing Owner window is unchanged.
+These are bounded cleanup attempts, not hard scheduling or physical-stop limits.
+This support covers the isolated fixed launch trees and their inherited groups,
+not arbitrary daemons that escape into new sessions. OS exit does not establish
+Core settlement, native cleanup or a physical task verdict.
+
+The bridge installs cooperative INT/TERM handling and uses one explicit ROS
+Context for initialization, executor and nodes. It stops spinning before disposing
+executor/nodes and closes the Context last; cleanup failures return nonzero. This
+preserves dependencies during repeated signals and partial initialization. The
+50ms spin wait is not a bound on callbacks, output or physical stopping. Local
+software and no-input Humble checks passed. A full Session closed all observed
+groups without force; a separate bridge-exit-23 startup failure preserved failure
+and closed all owned trees without a success marker. That failure case required
+forcing the Owner after its existing 19-second window, so it does not qualify
+cooperative startup cancellation. The earlier service-response timeout remains
+unresolved. These are lifecycle results only. See
+[validation scope](../../../docs/TESTING.md#supported-session-process-group-lifecycle).

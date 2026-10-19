@@ -21,6 +21,14 @@ class TruthTest(unittest.TestCase):
         self.context = dict(run_id='current-run', container_name='current-container', model='turtlebot3_waffle')
         self.collector = truth.Collector(self.output, self.context)
 
+    def session_cleanup(self):
+        source = Path(truth.__file__).with_name('navigation_session.sh').read_text()
+        cleanup = (Path(truth.__file__).with_name('navigation_cleanup.sh').read_text()
+                   + '\n' + source[source.index('cleanup() {'):source.index('trap cleanup EXIT')])
+        cleanup = cleanup.replace('/simulation/navigation_groups.py',
+                                  str(Path(truth.__file__).with_name('navigation_groups.py')))
+        return cleanup.replace('/output/', str(self.output) + '/')
+
     def fake_query(self, body):
         command = self.output/'gz'
         command.write_text('#!'+sys.executable+'\n'+body+'\n')
@@ -132,10 +140,7 @@ class TruthTest(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform=='linux', 'Session process groups use Linux setsid')
     def test_partial_startup_before_group_formation_keeps_cleanup_budget(self):
-        source = Path(truth.__file__).with_name('navigation_session.sh').read_text()
-        cleanup = (Path(truth.__file__).with_name('navigation_cleanup.sh').read_text()
-                   + '\n' + source[source.index('cleanup() {'):source.index('trap cleanup EXIT')])
-        cleanup = cleanup.replace("Path('/output/collector-process.json')", f'Path({str(self.output/"collector-process.json")!r})')
+        cleanup = self.session_cleanup()
         # Deterministically expose the window before setsid establishes its group.
         # Background children inherit ignored SIGINT before Python installs handlers.
         child = self.output/'delayed-session.py'
@@ -156,10 +161,7 @@ class TruthTest(unittest.TestCase):
     def test_real_session_cleanup_reaps_collector_before_scene(self):
         # Exercise the actual supervisor cleanup function with real processes.
         # Only its fixed artifact path is redirected to this isolated fixture.
-        source = Path(truth.__file__).with_name('navigation_session.sh').read_text()
-        cleanup = (Path(truth.__file__).with_name('navigation_cleanup.sh').read_text()
-                   + '\n' + source[source.index('cleanup() {'):source.index('trap cleanup EXIT')])
-        cleanup = cleanup.replace("Path('/output/collector-process.json')", f'Path({str(self.output/"collector-process.json")!r})')
+        cleanup = self.session_cleanup()
         sentinel = self.output/'scene-stopped'
         query_pid = self.output/'query.pid'
         (self.output/'collection-context.json').write_text(json.dumps(self.context))

@@ -2663,3 +2663,66 @@ in-motion stop, outer-launcher graceful shutdown, hardware or reliability claim.
 See [same-run recording notes](assets/demo/README.md#real-model-shared-coordination)
 and [Agent validation](https://github.com/xiao-yang25/robot-agent/blob/master/docs/TESTING.md#real-model-shared-coordination)
 for the exact versions and reproduction boundary.
+
+
+### Supported Session process-group lifecycle
+
+[Group checks](../integrations/ros2/simulation/test_navigation_groups.py) use real
+Linux processes to keep descendants alive after scene and Owner leaders exit,
+then require their groups to close without touching an unrelated group. They
+also exercise pre-setsid startup, a nonresponsive tree, normal and failed Session
+cleanup, repeated TERM, INT followed by TERM, and a forced collector with all
+other groups absent. The last case must fail without a success marker. Existing
+collector/Owner/scene dependency-order tests continue through the production
+cleanup function and helper.
+
+Final local Linux discovery passed87 tests with the declared dependencies,
+including all9new group checks and4controlled bridge checks; macOS/Python3.12
+passed87 with16platform/tool skips. Two additional actual Humble bridge checks
+passed without input commands or robot movement. Linux used an offline2CPU/2GiB
+container, exited zero without OOM and was removed. The existing Humble push/PR
+workflow discovers the software cases and runs the actual bridge checks after
+sourcing the built fixture; no new workflow is needed.
+
+The bridge uses one explicit ROS Context, handles INT/TERM with a stop latch, and
+keeps that Context alive through executor and node disposal. Checks cover inherited
+ignored signals, repeated signals during cleanup, initialization failure and
+best-effort disposal after an error. A50ms spin wait does not bound callback or
+output duration. Partial-node construction is not exhaustively qualified.
+
+An initial full ROS Session with the group-only patch closed scene/Owner/collector
+groups but forced the old bridge; it correctly returned failure without a success
+marker. A subsequent Session with the bridge increment failed before client
+startup: B preparation exceeded the existing five-second response wait for
+`bt_navigator/get_state`. Scene, bridge and Owner/B groups and the collector all
+closed without force, direct children were reaped, the final isolated namespace
+had no live residual, and no verification was written. This exercises cleanup of
+that startup-failure path; it does not qualify normal completion or diagnose the
+underlying service-response delay. Neither failure was promoted, and no automatic retry followed either case.
+
+The bridge software candidate passed push/PR Core, Humble and installed-Agent
+checks and the documentation build. Humble exercised all 87 simulation checks and
+the 2 new no-input bridge checks. A fresh full Session subsequently completed the
+public A-to-B example with supervisor exit 0 and its post-cleanup success marker;
+Owner, client, scene, bridge and collector closed without force. All eight B
+workers were exercised and the final isolated namespace had no live residual.
+
+A separate partial-start check replaced only the bridge with exit 23. The
+supervisor retained failure 1 without a success marker and all owned trees closed.
+The Owner exceeded its existing 19-second window and required KILL (exit 137);
+later unforced group reconciliation does not erase that earlier force. This
+qualifies bounded failure cleanup, not cooperative cancellation during startup.
+Both cases used the same offline 2CPU/4GiB/512PID environment and one lifecycle
+evaluation each, followed by focused independent closure review. Earlier failures
+remain failures; the intermittent service-response timeout's cause is unresolved.
+These cases do not establish startup reliability, native cleanup, physical stopping
+or a new navigation/task verdict.
+
+The implementation observes non-zombie members of only its fixed owned sessions
+and records direct-child reaping separately; the isolated container's init owns
+reaping adopted descendants. Unknown membership and signal errors prevent normal
+success. Collector and remaining groups share one absolute cleanup deadline,
+Owner finishes with scene dependencies alive, and verification follows successful
+cleanup. Force is retained as failure-path evidence, not normal completion.
+These checks do not establish native settlement, physical stopping, escaped-daemon
+ownership, hardware safety or worst-case timing.

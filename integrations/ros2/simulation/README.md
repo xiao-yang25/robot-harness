@@ -322,6 +322,50 @@ Owner installation. This is a fixed test map, not a physical obstacle or arbitra
 map interface. The scene records its selection and the Owner's actual map sample;
 launcher success continues to mean process completion only.
 
+### Optional inspection camera scene
+
+Append `--inspection-case normal` or `--inspection-case recheck` to `session`
+with a current Linux Owner installation and the **visual** image built above.
+Only the default scoped profile and normal map are supported. Invalid selections
+are rejected before output or Docker resources are created; the ordinary Session
+remains unchanged when the option is omitted.
+
+```sh
+python3 integrations/ros2/simulation/simulate.py session \
+  --python-prefix /path/to/linux-install --image robot-harness-simulation:humble-visual \
+  --inspection-case recheck --output simulation-results/inspection-scene-01
+```
+
+This selects two static, visual-only panels: A/B green in `normal`, A red/B green
+in `recheck`. The robot gains `/inspection/image_raw` and
+`/inspection/camera_info` (RGB 640×480, 5 Hz, horizontal FOV 2.2 rad), with the
+`base_link` → `inspection_optical` static transform published by the existing
+bridge. `inspection-scene.json` records the selection. These are controlled
+fixtures, not general perception or a robot camera calibration interface.
+
+Both A and B native goal-checker/controller XY tolerances become 0.15 m. The
+Owner reads both actual parameter services within one shared four-second startup
+budget, before constructing Core or exposing its public endpoint. A missing or
+wrong value fails startup. This changes arrival configuration, not the external
+physical evaluator's threshold or any execution authority.
+
+The existing supervisor owns Xvfb, keeps it alive through native/scene cleanup,
+then closes its private group within a separate two-second local phase.
+`display-process.json` records force, reaping and remaining processes. Forced or
+incomplete closure cannot write `verification.json`; original Owner and other
+group windows and the outer host limit remain unchanged. None is a hard-stop
+bound. The headless image fails explicitly if Xvfb is absent.
+
+The command above retains the standard A→B navigation client. Use the existing
+`--client-script` / `--client-prefix` options for a separately installed Agent; inspection
+interpretation and normal/recheck task branching belong to that caller. This
+scene prerequisite has software and inert Humble parameter/TF/display checks;
+complete Agent tutorials, moving inspection qualification and recordings are
+separate delivery steps. Selecting a camera does not start RViz or a recorder.
+With `--record-evaluation`, the passive collector records the selected world and
+requires the original world geometry plus the two visual-only panels; its A/B
+samples remain observations, not an inspection-task verdict.
+
 ### Optional passive evaluation collection
 
 For the normal fixed A→B example with the default scoped profile, append

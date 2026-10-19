@@ -41,6 +41,12 @@ def prepare_context(output, share):
     world = share/'worlds/world_only.model'
     if ET.parse(world).find('world') is None:
         raise ValueError('missing installed world')
+    extra = {}
+    inspection = os.environ.get('M6_INSPECTION_CASE')
+    if inspection:
+        from inspection_scene import collection_world
+        world, fixture = collection_world(output, share, inspection)
+        extra['inspection_fixture'] = fixture
     return dict(schema='nav2-passive-truth-v1', run_id=os.environ['M4_FRESH_NAV2_RUN'],
                 container_name=socket.gethostname(), model='turtlebot3_waffle',
                 clock='container-clock-monotonic', scene='normal', map_id=scene['map_id'],
@@ -48,7 +54,7 @@ def prepare_context(output, share):
                     basis='Nav2 1.1.20 installed world/map pair with explicit matching initial poses',
                     world=str(world), map_file=str(source), resolution=config['resolution'],
                     origin=config['origin'], map_to_world_xy_yaw=[0., 0., 0.],
-                    spawn=spawn, initial_pose=initial['initial_pose']))
+                    spawn=spawn, initial_pose=initial['initial_pose']), **extra)
 
 
 class Collector:

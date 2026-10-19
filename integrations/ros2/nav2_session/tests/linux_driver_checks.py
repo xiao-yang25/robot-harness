@@ -22,6 +22,30 @@ from robot_harness_nav2 import _scoped as scoped
 
 
 class DriverChecks(unittest.TestCase):
+    def test_inspection_verification_precedes_core_gate_and_endpoint(self):
+        from robot_harness_nav2 import _inspection
+        for succeeds in (True, False):
+            with self.subTest(succeeds=succeeds):
+                owner = driver.NavigationOwner.__new__(driver.NavigationOwner)
+                owner.map_id = 'turtlebot3-world-v1'
+                owner.inspection_case = 'normal'
+                owner.motion_started = False
+                owner.active = owner.execution = owner.endpoint = None
+                owner.odometry = [dict(speed=0.,angular_speed=0.)]
+                owner.valid_observation = lambda: True
+                calls = []
+                def verify(value):
+                    self.assertIs(value,owner);calls.append('verified')
+                    if not succeeds:raise ValueError('configuration differs')
+                def gate(*args, **kwargs):
+                    calls.append('gate');raise RuntimeError('gate reached after verification')
+                with patch.object(scoped.ScopedDriver,'prepare_b_initial'), \
+                     patch.object(_inspection,'verify_controllers',side_effect=verify), \
+                     patch.object(driver._core,'Gate',side_effect=gate):
+                    with self.assertRaises(RuntimeError if succeeds else ValueError):owner.prepare_b_initial()
+                self.assertEqual(calls, ['verified','gate'] if succeeds else ['verified'])
+                self.assertIsNone(owner.endpoint)
+
     def test_b_startup_endpoint_precedes_lifecycle_queries_within_context_budget(self):
         owner = scoped.ScopedDriver.__new__(scoped.ScopedDriver)
         owner.motion_started = False

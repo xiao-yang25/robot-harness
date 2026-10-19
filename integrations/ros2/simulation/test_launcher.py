@@ -16,7 +16,7 @@ import simulate
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
                  output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal', record_evaluation=False,
-                 terminal_query_seconds=None, through_cli=False):
+                 terminal_query_seconds=None, through_cli=False, inspection_case=None):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -67,6 +67,8 @@ class LauncherTest(unittest.TestCase):
                 if through_cli:
                     argv = ['simulate.py', 'session', '--image', 'image', '--output', str(output),
                             '--python-prefix', str(prefix)]
+                    if inspection_case is not None:
+                        argv.extend(['--inspection-case', inspection_case])
                     if terminal_query_seconds is not None:
                         argv.extend(['--terminal-query-seconds', str(terminal_query_seconds)])
                     with patch.object(simulate.sys, 'argv', argv):
@@ -77,7 +79,7 @@ class LauncherTest(unittest.TestCase):
                         client_script=str(client) if custom_client else None,
                         client_prefix=str(client_prefix) if custom_client else None,
                         caller_wait_seconds=45 if custom_client else None,
-                        terminal_query_seconds=terminal_query_seconds))
+                        terminal_query_seconds=terminal_query_seconds, inspection_case=inspection_case))
             status = json.loads((output / 'run.json').read_text())
             self.assertIn(['docker', 'rm', '--force', container], calls)
             self.assertEqual(outside.read_text(), 'untouched')
@@ -88,6 +90,12 @@ class LauncherTest(unittest.TestCase):
                 self.assertIn('M6_NATIVE_ISOLATED=1', command)
                 self.assertIn('M6_NAVIGATION_PROFILE='+profile, command)
                 self.assertIn('M6_NAVIGATION_SCENE='+scene, command)
+                if inspection_case is None:
+                    self.assertNotIn('inspection_case', status)
+                    self.assertFalse(any(p.startswith('M6_INSPECTION_CASE=') for p in command))
+                else:
+                    self.assertEqual(status['inspection_case'], inspection_case)
+                    self.assertIn('M6_INSPECTION_CASE='+inspection_case, command)
                 if terminal_query_seconds is None:
                     self.assertNotIn('terminal_query_seconds', status)
                     self.assertFalse(any(part.startswith('M6_TERMINAL_QUERY_SECONDS=') for part in command))
@@ -112,6 +120,24 @@ class LauncherTest(unittest.TestCase):
                     self.assertNotIn('M6_CLIENT_PREFIX=/client-prefix', command)
                     self.assertFalse(any(part.startswith('M6_CALLER_WAIT_SECONDS=') for part in command))
             return code, status
+
+    def test_inspection_selection_uses_original_session_supervisor(self):
+        for case in ('normal', 'recheck'):
+            with self.subTest(case=case):
+                self.assertEqual(self.exercise(session=True, inspection_case=case, through_cli=True)[0], 0)
+
+    def test_unsupported_inspection_combination_creates_no_resources(self):
+        cases = [(False, simulate.PROFILES[0], 'normal'),
+                 (True, simulate.PROFILES[1], 'normal'),
+                 (True, simulate.PROFILES[3], 'occupied-a')]
+        for session, profile, scene in cases:
+            with self.subTest(session=session, profile=profile), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory)/'new'
+                with patch.object(simulate.subprocess, 'run') as docker, self.assertRaises(ValueError):
+                    simulate.run_case(argparse.Namespace(output=str(output), session=session,
+                        profile=profile, scene=scene, inspection_case='normal'))
+                docker.assert_not_called()
+                self.assertFalse(output.exists())
 
     def test_terminal_query_cli_forwards_value_and_records_budget(self):
         for value in (0.125, 8.0, 10.0):

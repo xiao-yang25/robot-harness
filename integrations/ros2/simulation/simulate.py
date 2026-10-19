@@ -78,6 +78,11 @@ def run_case(args):
     if scene not in SCENES or (scene != 'normal' and
             (not getattr(args, 'session', False) or getattr(args, 'profile', PROFILES[0]) != PROFILES[3])):
         raise ValueError('occupied-a requires a session with the explicit failure recovery profile')
+    inspection = getattr(args, 'inspection_case', None)
+    if inspection is not None and (inspection not in ('normal', 'recheck')
+            or not getattr(args, 'session', False) or scene != 'normal'
+            or getattr(args, 'profile', PROFILES[0]) != PROFILES[0]):
+        raise ValueError('inspection requires a default-profile Session on the normal map')
     output = Path(args.output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
     # Keep the authoritative cleanup ID outside the container-writable mount.
@@ -123,6 +128,9 @@ def run_case(args):
                 raise ValueError('unknown navigation profile')
             status['profile'] = profile
             status['scene'] = scene
+            if inspection is not None:
+                status['inspection_case'] = inspection
+                command.extend(['-e', 'M6_INSPECTION_CASE='+inspection])
             command.extend(['-e', 'M6_NAVIGATION_PROFILE='+profile, '-e', 'M6_NAVIGATION_SCENE='+scene])
             if terminal_query is not None:
                 status['terminal_query_seconds'] = terminal_query
@@ -244,6 +252,8 @@ def main():
     session.add_argument('--profile', choices=PROFILES, default=PROFILES[0],
                          help='explicit native motion profile; existing v1 remains default')
     session.add_argument('--scene', choices=SCENES, default='normal', help='occupied-a is a static map test, not a physical obstacle')
+    session.add_argument('--inspection-case', choices=('normal', 'recheck'),
+                         help='optional RGB status panels/camera; requires a visual image')
     session.add_argument('--record-evaluation', action='store_true',
                          help='passively record physical evidence in the normal default-profile scene')
     session.add_argument('--python-prefix', required=True, help='Linux install prefix with optional Python bridge')

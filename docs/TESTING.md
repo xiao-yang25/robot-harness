@@ -2726,3 +2726,34 @@ Owner finishes with scene dependencies alive, and verification follows successfu
 cleanup. Force is retained as failure-path evidence, not normal completion.
 These checks do not establish native settlement, physical stopping, escaped-daemon
 ownership, hardware safety or worst-case timing.
+
+
+### Optional inspection scene software checks
+
+The [Session scene option](../integrations/ros2/simulation/README.md#optional-inspection-camera-scene)
+is explicitly selected; default navigation and occupied-A behavior are retained.
+Simulation test discovery includes both panel cases, RGB/scoped-drive geometry,
+native parameter preparation, invalid combinations before resource creation,
+and rejection of nonvisual/nested panel effects or a changed base world.
+
+The Humble `nav2-build` job additionally runs:
+
+```sh
+python3 integrations/ros2/simulation/linux_inspection_checks.py
+```
+
+It requires the installed current Python bridge and fixture interfaces, PyYAML,
+TF2 and Xvfb. Seven inert checks exercise actual GetParameters for both controller
+contexts, rejection of wrong/missing values within the shared four-second budget,
+received optical TF/axis geometry, real display lifetime ordering and partial
+startup cleanup, and forced display cleanup without a success marker. The
+pre-Core ordering test remains in `linux_driver_checks.py`. No robot command,
+Gazebo, model or motion qualification runs in this job.
+
+Local software validation used macOS simulation discovery (93 checks, 16 Linux
+skips) and offline Ubuntu 22.04/Humble (93 simulation checks, driver25,
+shutdown2, bridge2 and the seven inspection checks). The TF test compares unit
+rotation and camera axes because q and -q represent the same transform. These
+results do not qualify actual camera rendering, navigation arrival, an Agent's
+inspection-task result or a new recording. The public Agent's dependency pin and
+turnkey inspection tutorial are separate increments.

@@ -2700,11 +2700,23 @@ had no live residual, and no verification was written. This exercises cleanup of
 that startup-failure path; it does not qualify normal completion or diagnose the
 underlying service-response delay. Neither failure was promoted, and no automatic retry followed either case.
 
-The exact bridge software candidate passed push/PR Core, Humble and installed-Agent
+The bridge software candidate passed push/PR Core, Humble and installed-Agent
 checks and the documentation build. Humble exercised all 87 simulation checks and
-the 2 new no-input bridge checks. Complete normal and explicit partial-start Session
-qualification remains pending; the partial-start case was not run after the
-unexpected normal-path failure. Native/task verdicts remain unchanged.
+the 2 new no-input bridge checks. A fresh full Session subsequently completed the
+public A-to-B example with supervisor exit 0 and its post-cleanup success marker;
+Owner, client, scene, bridge and collector closed without force. All eight B
+workers were exercised and the final isolated namespace had no live residual.
+
+A separate partial-start check replaced only the bridge with exit 23. The
+supervisor retained failure 1 without a success marker and all owned trees closed.
+The Owner exceeded its existing 19-second window and required KILL (exit 137);
+later unforced group reconciliation does not erase that earlier force. This
+qualifies bounded failure cleanup, not cooperative cancellation during startup.
+Both cases used the same offline 2CPU/4GiB/512PID environment and one lifecycle
+evaluation each, followed by focused independent closure review. Earlier failures
+remain failures; the intermittent service-response timeout's cause is unresolved.
+These cases do not establish startup reliability, native cleanup, physical stopping
+or a new navigation/task verdict.
 
 The implementation observes non-zombie members of only its fixed owned sessions
 and records direct-child reaping separately; the isolated container's init owns

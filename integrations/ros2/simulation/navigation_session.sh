@@ -69,7 +69,7 @@ model.write('/output/scoped-waffle.model', encoding='unicode')
 PY
 # The launcher owns the scene and separate example process. The installed owner
 # creates only its native B context and its private local request endpoint.
-owner_pid='' client_pid='' launch_pid='' bridge_pid='' collector_pid=''
+owner_pid='' client_pid='' launch_pid='' bridge_pid='' collector_pid='' display_pid=''
 session_completed=0
 cleanup() {
   local status=$?
@@ -134,6 +134,7 @@ for fact in result['groups']:
 result['clean'] = result['clean'] and all(f['reaped'] for f in result['groups'])
 path.write_text(json.dumps(result, indent=2) + '\n')
 GROUP_EXIT
+  stop_navigation_display "${display_pid:-}" /output/display-process.json /simulation/navigation_groups.py || failed=1
   if (( failed && status == 0 )); then status=1; fi
   if (( status == 0 && ${session_completed:-0} )); then
     # Local process closure only, never physical/Core success.
@@ -152,9 +153,26 @@ scene=${M6_NAVIGATION_SCENE:-normal}
 python3 /simulation/navigation_scene.py "$scene"
 map_file=$(python3 -c 'import json; print(json.load(open("/output/navigation-scene.json"))["map_file"])')
 collection_options=()
+world_file=/opt/ros/humble/share/nav2_bringup/worlds/world_only.model
+if [[ -n ${M6_INSPECTION_CASE:-} ]]; then
+  command -v Xvfb >/dev/null || { echo 'Inspection camera requires the visual image' >&2; exit 2; }
+  python3 /simulation/inspection_scene.py "$M6_INSPECTION_CASE"
+  world_file=/output/inspection.world
+  collection_options=(world:="$world_file")
+  export DISPLAY=:96 LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2
+  setsid Xvfb :96 -screen 0 1600x900x24 -nolisten tcp > /output/display.log 2>&1 &
+  display_pid=$!
+  until=$((SECONDS+4))
+  while [[ ! -S /tmp/.X11-unix/X96 ]]; do
+    navigation_processes_alive display "$display_pid" || exit 1
+    (( SECONDS < until )) || { echo 'Inspection display readiness timed out' >&2; exit 1; }
+    sleep .05
+  done
+  navigation_processes_alive display "$display_pid" || exit 1
+fi
 if [[ ${M6_COLLECT_EVALUATION:-0} == 1 ]]; then
   # These are the installed default values, made explicit for coordinate evidence.
-  collection_options=(world:=/opt/ros/humble/share/nav2_bringup/worlds/world_only.model
+  collection_options=(world:="$world_file"
     x_pose:=-2.0 y_pose:=-0.5 z_pose:=0.01 roll:=0.0 pitch:=0.0 yaw:=0.0 robot_name:=turtlebot3_waffle)
   python3 /simulation/navigation_truth.py --prepare > /output/collection-prepare.log 2>&1 || true
 fi
@@ -187,7 +205,12 @@ if [[ ${M6_COLLECT_EVALUATION:-0} == 1 ]]; then
   setsid python3 /simulation/navigation_truth.py > /output/collector.log 2>&1 &
   collector_pid=$!
 fi
+display_options=()
+[[ -z $display_pid ]] || display_options=(display "$display_pid")
 owner_options=(--scene "$scene")
+if [[ -n ${M6_INSPECTION_CASE:-} ]]; then
+  owner_options+=(--inspection-case "$M6_INSPECTION_CASE")
+fi
 if [[ -n ${M6_NAVIGATION_PROFILE:-} ]]; then
   owner_options+=(--profile "$M6_NAVIGATION_PROFILE")
 fi
@@ -201,7 +224,7 @@ setsid python3 -m robot_harness_nav2 "${owner_options[@]}" > /output/caller.log 
 owner_pid=$!
 # Readiness only exposes the owner endpoint; it cannot create Core authority.
 wait_navigation_endpoint /output/navigation-endpoint.json 160 \
-  owner "$owner_pid" scene "$launch_pid" bridge "$bridge_pid"
+  owner "$owner_pid" scene "$launch_pid" bridge "$bridge_pid" "${display_options[@]}"
 endpoint=$(python3 -c 'import json; print(json.load(open("/output/navigation-endpoint.json"))["endpoint"])')
 PYTHONPATH="${M6_CLIENT_PREFIX:+${M6_CLIENT_PREFIX}:}${PYTHONPATH:-}" \
   setsid python3 /navigation-example.py "$endpoint" > /output/request-client.log 2>&1 &
@@ -213,5 +236,5 @@ with open('/output/caller.jsonl', 'a') as stream:
     stream.write(json.dumps(dict(event='request_client_exit', returncode=0, steady=time.monotonic()))+'\n')
 PYCLIENT
 wait "$owner_pid"
-navigation_processes_alive scene "$launch_pid" bridge "$bridge_pid"
+navigation_processes_alive scene "$launch_pid" bridge "$bridge_pid" "${display_options[@]}"
 session_completed=1

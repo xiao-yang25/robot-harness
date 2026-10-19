@@ -28,6 +28,7 @@ class NavigationOwner(ScopedDriver):
 
     def __init__(self):
         self.requests = self.endpoint = self.terminal_window = None
+        self.inspection_case = None
         self.stop_requested = self.completed = False
         self.stage_index = 0
         self.gate = self.execution = None
@@ -50,6 +51,14 @@ class NavigationOwner(ScopedDriver):
             self.record_scene_map, QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                                             durability=DurabilityPolicy.TRANSIENT_LOCAL)))
 
+    def configure_inspection(self, case):
+        from ._inspection import validate_selection
+        validate_selection(case, self.profile,
+                           'normal' if self.map_id == SCENE_MAP_IDS['normal'] else 'occupied-a')
+        if self.requests is not None or self.motion_started:
+            raise RuntimeError('inspection configuration must precede public startup')
+        self.inspection_case = case
+
     def record_scene_map(self, message):
         if self.scene_map is not None:
             return
@@ -67,6 +76,9 @@ class NavigationOwner(ScopedDriver):
                 or self.odometry[-1]['speed'] > .01 or abs(self.odometry[-1]['angular_speed']) > .02
                 or not self.valid_observation()):
             raise RuntimeError('initial binding not idle and observed')
+        if getattr(self, 'inspection_case', None) is not None:
+            from ._inspection import verify_controllers
+            verify_controllers(self)
         self.gate = _core.Gate('scoped-nav2', 'exclusive-waffle-drive', 'navigation.visit',
                               self.profile, 1, time.monotonic_ns(),
                               settlement_scope='native-outlet-quiet-and-next-context')

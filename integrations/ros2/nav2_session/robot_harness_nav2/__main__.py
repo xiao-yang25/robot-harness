@@ -72,11 +72,15 @@ def main():
     parser.add_argument('--terminal-query-seconds', type=terminal_query_seconds,
                         help='opt-in default-profile terminal query window; disabled by default')
     parser.add_argument('--scene', choices=SCENE_MAP_IDS, default='normal')
+    from ._inspection import CASES, validate_selection
+    parser.add_argument('--inspection-case', choices=CASES,
+                        help='optional controlled camera/panels; default profile/normal map only')
     args = parser.parse_args()
     if args.terminal_query_seconds is not None and args.profile != PROFILE_ID:
         parser.error('terminal queries currently require the default navigation profile')
     try:
         scene_map_id(args.scene, args.profile)
+        validate_selection(args.inspection_case, args.profile, args.scene)
     except ValueError as error:
         parser.error(str(error))
     require_isolation()  # Fail before importing ROS or starting any resource.
@@ -113,6 +117,8 @@ def run_owner(args, NavigationOwner, rclpy, emit, diagnose, shutdown):
             owner.terminal_window = TerminalWindow(args.terminal_query_seconds)
         if args.scene != 'normal':
             owner.configure_scene(args.scene)
+        if getattr(args, 'inspection_case', None) is not None:
+            owner.configure_inspection(args.inspection_case)
         owner.ready()
         if args.scene != 'normal':
             owner.wait(lambda: owner.scene_map is not None, 5, require_fresh=True)

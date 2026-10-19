@@ -65,7 +65,7 @@ class Bridge(Node):
 def run_bridge(scopes):
     stopped = False
     previous, nodes, errors = {}, [], []
-    context = executor = None
+    context = executor = camera = None
     def stop(*_):
         nonlocal stopped
         stopped = True
@@ -88,6 +88,9 @@ def run_bridge(scopes):
                 node = Bridge(scope, i + 1, context=context)
                 nodes.append(node)
                 executor.add_node(node)
+            if not stopped and os.environ.get('M6_INSPECTION_CASE'):
+                from inspection_scene import camera_transform
+                camera = camera_transform(nodes[0])
             while not stopped and context.ok():
                 executor.spin_once(timeout_sec=.05)
     finally:

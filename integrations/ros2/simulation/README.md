@@ -16,8 +16,14 @@ show moving cancellation and handoff; their notes identify the exact recorded sc
 
 ## First run
 
-Use Python 3.9+ and Docker on Linux or macOS. This package selects `linux/amd64`;
-Apple Silicon requires Docker Desktop's amd64 emulation. Reserve at least 4 GB
+Use Python 3.9+ and Docker on Linux or macOS. The default is `linux/amd64`;
+Apple Silicon uses Docker Desktop's amd64 emulation for that selection.
+Build, run, Session and viewer also accept explicit `--platform linux/arm64`.
+Select the same platform when building and running; the launcher rejects a local
+image whose architecture differs before creating a container. Python extensions
+must be installed separately for that Linux architecture. Platform selection
+alone does not establish native motion or cancellation qualification.
+Reserve at least 4 GB
 for the container and allow extra memory and disk for the image build. The first
 build downloads ROS/Gazebo dependencies and compiles the project with two jobs.
 Run these commands from the repository root:
@@ -26,6 +32,15 @@ Run these commands from the repository root:
 python3 integrations/ros2/simulation/simulate.py build
 python3 integrations/ros2/simulation/simulate.py run normal --output simulation-results/normal-01
 ```
+
+The supplied Dockerfile currently requires amd64: its Gazebo Classic and
+TurtleBot3 binary dependencies are unavailable from the standard Jammy ARM64
+repositories. See the [Gazebo installation notes](https://get.gazebosim.org/tutorials?tut=install_ubuntu).
+The ARM64 selector is for a separately prepared compatible image; it does not
+provide an ARM64 build recipe or establish that such an image is qualified.
+Use a distinct image name and new results for any candidate environment, and
+pass the same platform and image to `viewer.py`. Each environment needs its own
+build, software and actual scenario checks.
 
 Each run must use a **new output directory**. The normal case navigates A from
 (-2, -0.5) to (0.7, -0.5), observes native closure and fresh quiet, prepares and

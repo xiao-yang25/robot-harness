@@ -16,7 +16,7 @@ import simulate
 class LauncherTest(unittest.TestCase):
     def exercise(self, *, running=False, cleanup_error=False, verification=True, exit_code=0,
                  output_links=False, blocked_record=False, session=False, custom_client=False, profile=simulate.PROFILES[0], scene='normal', record_evaluation=False,
-                 terminal_query_seconds=None, through_cli=False, inspection_case=None):
+                 terminal_query_seconds=None, through_cli=False, inspection_case=None, platform='linux/amd64'):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
             container = 'owned-container-id'
@@ -36,7 +36,7 @@ class LauncherTest(unittest.TestCase):
             def docker(command, **_kwargs):
                 calls.append(command)
                 if command[1:3] == ['image', 'inspect']:
-                    return subprocess.CompletedProcess(command, 0, 'image-id')
+                    return subprocess.CompletedProcess(command, 0, 'image-id '+platform)
                 if command[1] == 'create':
                     Path(command[command.index('--cidfile') + 1]).write_text(container)
                     # A workload can write its output; it must not select which
@@ -66,7 +66,7 @@ class LauncherTest(unittest.TestCase):
                     patch.object(simulate.subprocess, 'Popen', return_value=attached):
                 if through_cli:
                     argv = ['simulate.py', 'session', '--image', 'image', '--output', str(output),
-                            '--python-prefix', str(prefix)]
+                            '--python-prefix', str(prefix), '--platform', platform]
                     if inspection_case is not None:
                         argv.extend(['--inspection-case', inspection_case])
                     if terminal_query_seconds is not None:
@@ -79,8 +79,11 @@ class LauncherTest(unittest.TestCase):
                         client_script=str(client) if custom_client else None,
                         client_prefix=str(client_prefix) if custom_client else None,
                         caller_wait_seconds=45 if custom_client else None,
-                        terminal_query_seconds=terminal_query_seconds, inspection_case=inspection_case))
+                        terminal_query_seconds=terminal_query_seconds, inspection_case=inspection_case, platform=platform))
             status = json.loads((output / 'run.json').read_text())
+            self.assertEqual(status['platform'], platform)
+            command = next(call for call in calls if call[1] == 'create')
+            self.assertEqual(command[command.index('--platform')+1], platform)
             self.assertIn(['docker', 'rm', '--force', container], calls)
             self.assertEqual(outside.read_text(), 'untouched')
             if session:
@@ -317,7 +320,7 @@ class LauncherTest(unittest.TestCase):
     def test_create_timeout_is_not_confirmed_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'new'
-            inspected = subprocess.CompletedProcess([], 0, 'image-id')
+            inspected = subprocess.CompletedProcess([], 0, 'image-id linux/amd64')
             with patch.object(simulate.subprocess, 'run', side_effect=[
                     inspected, subprocess.TimeoutExpired(['docker', 'create'], 60)]):
                 code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case='normal'))
@@ -325,6 +328,32 @@ class LauncherTest(unittest.TestCase):
             self.assertNotEqual(code, 0)
             self.assertFalse(status['container_removed'])
             self.assertTrue(status['container_name'].startswith('robot-harness-sim-'))
+
+    def test_arm64_session_preserves_ownership_and_selected_platform(self):
+        code, status = self.exercise(session=True, through_cli=True, platform='linux/arm64')
+        self.assertEqual(code, 0)
+        self.assertTrue(status['container_removed'])
+
+    def test_image_platform_mismatch_refused_before_container_creation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/'new'
+            inspected = subprocess.CompletedProcess([], 0, 'image-id linux/amd64')
+            with patch.object(simulate.subprocess, 'run', return_value=inspected) as docker:
+                code = simulate.run_case(argparse.Namespace(output=str(output), image='image', case='normal', platform='linux/arm64'))
+            self.assertEqual(code, 1)
+            self.assertEqual(docker.call_count, 1)
+            self.assertIn('platform differs', json.loads((output/'run.json').read_text())['error'])
+
+    def test_build_platform_selection_and_default(self):
+        for platform in simulate.PLATFORMS:
+            argv = ['simulate.py', 'build']
+            if platform != 'linux/amd64':
+                argv.extend(['--platform', platform])
+            with self.subTest(platform=platform), patch.object(simulate.sys, 'argv', argv), \
+                    patch.object(simulate.subprocess, 'call', return_value=0) as build:
+                self.assertEqual(simulate.main(), 0)
+            command = build.call_args.args[0]
+            self.assertEqual(command[command.index('--platform')+1], platform)
 
 
 if __name__ == '__main__':

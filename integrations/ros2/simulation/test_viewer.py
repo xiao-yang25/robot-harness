@@ -15,6 +15,15 @@ import viewer
 
 
 class ViewerTests(unittest.TestCase):
+    def test_selected_platform_reaches_original_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for platform in viewer.PLATFORMS:
+                with self.subTest(platform=platform), patch.object(viewer.subprocess, 'Popen') as launch:
+                    session = viewer.Session(directory, 'test-image', platform)
+                    session.start('normal')
+                    command = launch.call_args.args[0]
+                    self.assertEqual(command[command.index('--platform')+1], platform)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

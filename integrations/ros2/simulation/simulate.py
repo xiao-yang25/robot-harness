@@ -17,6 +17,7 @@ from configure_mirror import validate_mirror_url
 ROOT = Path(__file__).resolve().parents[3]
 IMAGE = 'robot-harness-simulation:humble'
 VISUAL_IMAGE = 'robot-harness-simulation:humble-visual'
+PLATFORMS = ('linux/amd64', 'linux/arm64')
 PROFILES = ('scoped-two-context-nav2-shim-v1', 'scoped-two-context-nav2-owner-permit-v1',
             'scoped-two-context-nav2-revision-v1', 'scoped-two-context-nav2-failure-recovery-v1')
 SCENES = ('normal', 'occupied-a')
@@ -63,6 +64,9 @@ def write_host_record(path, text):
 
 
 def run_case(args):
+    platform = getattr(args, 'platform', PLATFORMS[0])
+    if platform not in PLATFORMS:
+        raise ValueError('unsupported simulation platform')
     terminal_query = getattr(args, 'terminal_query_seconds', None)
     if terminal_query is not None:
         if not math.isfinite(terminal_query) or not 0 < terminal_query <= 10:
@@ -100,20 +104,22 @@ def run_case(args):
     previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     status = {'case': args.case, 'run_id': run_id, 'image': args.image,
               'container_name': container_name,
-              'platform': 'linux/amd64', 'visual': bool(getattr(args, 'visual', False)),
+              'platform': platform, 'visual': bool(getattr(args, 'visual', False)),
               'result': 'incomplete'}
     exit_code = 1
     attached = None
     print(f'Logs and result: {output}', flush=True)
     try:
-        image = subprocess.run(['docker', 'image', 'inspect', args.image,
-                                '--format', '{{.Id}}'], check=True,
-                               text=True, capture_output=True, timeout=30).stdout.strip()
-        status['image_id'] = image
+        image, image_platform = subprocess.run(['docker', 'image', 'inspect', args.image,
+                                '--format', '{{.Id}} {{.Os}}/{{.Architecture}}'], check=True,
+                               text=True, capture_output=True, timeout=30).stdout.split()
+        status.update(image_id=image, image_platform=image_platform)
+        if image_platform != platform:
+            raise ValueError('selected image platform differs from --platform')
         # Use the inspected immutable local identity throughout this run.
         command = ['docker', 'create', '--cidfile', str(cidfile),
                    '--name', container_name,
-                   '--init', '--network', 'none', '--platform', 'linux/amd64',
+                   '--init', '--network', 'none', '--platform', platform,
                    '--cpus=2', '--memory=4g', '--pids-limit=512', '--shm-size=256m',
                    '--cap-drop=ALL', '--security-opt=no-new-privileges',
                    '--user', f'{os.getuid()}:{os.getgid()}',
@@ -264,6 +270,9 @@ def main():
     session.add_argument('--caller-wait-seconds', type=float, help='explicit owner idle wait in (0, 60], not an operation deadline')
     session.add_argument('--terminal-query-seconds', type=float,
                          help='opt-in terminal query window in (0, 10], default scoped profile only; not a stop deadline')
+    for command in (build, run, session):
+        command.add_argument('--platform', choices=PLATFORMS, default=PLATFORMS[0],
+                             help='explicit Linux image/installation architecture; default linux/amd64')
     args = parser.parse_args()
     args.session = args.command == 'session'
     if args.session:
@@ -271,7 +280,7 @@ def main():
         args.visual = False
     args.image = args.image or (VISUAL_IMAGE if args.visual else IMAGE)
     if args.command == 'build':
-        command = ['docker', 'build', '--platform', 'linux/amd64',
+        command = ['docker', 'build', '--platform', args.platform,
                    '--progress=plain', '--target', 'visual' if args.visual else 'simulation',
                    '-t', args.image, '-f',
                    str(ROOT / 'integrations/ros2/simulation/Dockerfile')]

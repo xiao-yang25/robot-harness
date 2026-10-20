@@ -15,7 +15,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-from simulate import ROOT, VISUAL_IMAGE
+from simulate import ROOT, VISUAL_IMAGE, PLATFORMS
 
 HERE = Path(__file__).resolve().parent
 CASES = ('normal', 'cancel-moving', 'replace-moving')
@@ -57,9 +57,12 @@ def read_events(path):
 
 
 class Session:
-    def __init__(self, directory, image):
+    def __init__(self, directory, image, platform=PLATFORMS[0]):
+        if platform not in PLATFORMS:
+            raise ValueError('unsupported simulation platform')
         self.directory = Path(directory).resolve()
         self.image = image
+        self.platform = platform
         self.lock = threading.RLock()
         self.process = None
         self.output = None
@@ -86,7 +89,7 @@ class Session:
             # The existing launcher alone creates/owns/removes the container.
             # Keep its host console outside the container's writable directory.
             command = [sys.executable, str(HERE / 'simulate.py'), 'run', case,
-                       '--visual', '--image', self.image, '--output', str(output)]
+                       '--visual', '--image', self.image, '--platform', self.platform, '--output', str(output)]
             with (session / 'launcher.log').open('wb') as log:
                 process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
             self.process, self.output, self.case = process, output, case
@@ -216,13 +219,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--image', default=VISUAL_IMAGE)
+    parser.add_argument('--platform', choices=PLATFORMS, default=PLATFORMS[0])
     parser.add_argument('--output', default='simulation-results/viewer')
     parser.add_argument('--open', action='store_true')
     args = parser.parse_args()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     server.authority = f'127.0.0.1:{server.server_port}'
     server.token = secrets.token_urlsafe(32)
-    server.session = Session(args.output, args.image)
+    server.session = Session(args.output, args.image, args.platform)
     def interrupt(*_):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupt)

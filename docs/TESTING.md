@@ -4,6 +4,21 @@ Use macOS for fast local Core development and Ubuntu for Linux build and
 correctness coverage. Robot integration and deployment measurements require
 their relevant target environments.
 
+## Explicit simulation architecture
+
+The packaged simulation build, run, Session and viewer accept explicit
+`--platform linux/amd64` (the existing default) or `--platform linux/arm64`.
+Image identity and actual Linux architecture are read together; a mismatch is
+rejected before container creation. Installs must match Linux Python ABI and
+CPU architecture. Launcher controls cover default/ARM64 command propagation,
+image mismatch without creation, and original owned cleanup. Existing Ubuntu
+simulation discovery includes these tests. Build success, software checks and
+native moving/cancellation qualification remain separate; do not transfer an
+amd64 scenario result to ARM64 or infer a physical stop guarantee.
+The supplied Gazebo Classic Dockerfile still requires amd64 binary dependencies;
+ARM64 platform selection alone does not make its build available. A compatible
+native image and its runtime qualification remain separate prerequisites.
+
 ## Current validation baseline
 
 The closeout runtime baseline is `1a80291`, merged through

@@ -358,11 +358,17 @@ in `recheck`. The robot gains `/inspection/image_raw` and
 bridge. `inspection-scene.json` records the selection. These are controlled
 fixtures, not general perception or a robot camera calibration interface.
 
-Both A and B native goal-checker/controller XY tolerances become 0.15 m. The
-Owner reads both actual parameter services within one shared four-second startup
+For this explicit inspection selection, both A and B native goal-checker/controller
+XY tolerances become 0.15 m and the stateful SimpleGoalChecker yaw tolerance
+becomes 3 degrees. Ordinary navigation retains its existing configuration.
+The Owner checks the sole selected goal checker, its type/stateful setting and
+both position/heading values through the actual parameter services within one shared four-second startup
 budget, before constructing Core or exposing its public endpoint. A missing or
 wrong value fails startup. This changes arrival configuration, not the external
-physical evaluator's threshold or any execution authority.
+physical evaluator's threshold or any execution authority. A matching configuration
+is not proof of readable imagery, actual arrival accuracy or localization quality.
+The new heading configuration still needs moving qualification with its matched Agent;
+historical scene results retain their original versions.
 
 The existing supervisor owns Xvfb, keeps it alive through native/scene cleanup,
 then closes its private group within a separate two-second local phase.

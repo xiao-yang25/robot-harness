@@ -16,7 +16,7 @@ from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener
 
 import inspection_scene
-from robot_harness_nav2._inspection import verify_controllers, PARAMETERS
+from robot_harness_nav2._inspection import verify_controllers, PARAMETERS, YAW_TOLERANCE
 
 
 class InspectionChecks(unittest.TestCase):
@@ -45,10 +45,12 @@ class InspectionChecks(unittest.TestCase):
         self.nodes.append(result); self.executor.add_node(result)
         return result
 
-    def controller(self, namespace, tolerance):
+    def controller(self, namespace, tolerance, *, yaw=YAW_TOLERANCE):
         result = self.node('controller_server', namespace=namespace)
-        for name in PARAMETERS:
-            result.declare_parameter(name, tolerance)
+        values = (['general_goal_checker'], 'nav2_controller::SimpleGoalChecker',
+                  True, yaw, tolerance, tolerance)
+        for name, value in zip(PARAMETERS, values):
+            result.declare_parameter(name, value)
         return result
 
     def close(self):
@@ -63,7 +65,8 @@ class InspectionChecks(unittest.TestCase):
         self.assertEqual(emit.call_args.args, ('inspection_configuration_ready',))
         rows = emit.call_args.kwargs['controllers']
         self.assertEqual([r['stage'] for r in rows], ['A','B'])
-        self.assertTrue(all(list(r['values'].values()) == [.15,.15] for r in rows))
+        self.assertTrue(all(r['values']['general_goal_checker.yaw_goal_tolerance'] == YAW_TOLERANCE
+                            and r['values']['FollowPath.xy_goal_tolerance'] == .15 for r in rows))
         self.assertTrue(emit.call_args.kwargs['checked_before_public_admission'])
         self.assertFalse(tuple(self.owner.clients))
 
@@ -72,7 +75,16 @@ class InspectionChecks(unittest.TestCase):
         with patch('robot_harness_nav2._observations.emit') as emit, self.assertRaisesRegex(ValueError,'differs'):
             verify_controllers(self.owner)
         emit.assert_not_called()
-        self.assertEqual(b.get_parameter(PARAMETERS[0]).value, .25)
+        self.assertEqual(b.get_parameter('general_goal_checker.xy_goal_tolerance').value, .25)
+        self.assertFalse(tuple(self.owner.clients))
+
+    def test_wrong_actual_heading_rejects_even_when_xy_matches(self):
+        self.controller('', .15)
+        b = self.controller('/inspection_check_b', .15, yaw=.25)
+        with patch('robot_harness_nav2._observations.emit') as emit, self.assertRaisesRegex(ValueError, 'yaw'):
+            verify_controllers(self.owner)
+        emit.assert_not_called()
+        self.assertEqual(b.get_parameter('general_goal_checker.yaw_goal_tolerance').value, .25)
         self.assertFalse(tuple(self.owner.clients))
 
     def test_missing_actual_b_service_expires_without_retry_or_ready_fact(self):

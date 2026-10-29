@@ -2758,7 +2758,7 @@ python3 integrations/ros2/simulation/linux_inspection_checks.py
 ```
 
 It requires the installed current Python bridge and fixture interfaces, PyYAML,
-TF2 and Xvfb. Seven inert checks exercise actual GetParameters for both controller
+TF2 and Xvfb. Eight inert checks exercise actual GetParameters for both controller
 contexts, rejection of wrong/missing values within the shared four-second budget,
 received optical TF/axis geometry, real display lifetime ordering and partial
 startup cleanup, and forced display cleanup without a success marker. The
@@ -2772,3 +2772,24 @@ rotation and camera axes because q and -q represent the same transform. These
 results do not qualify actual camera rendering, navigation arrival, an Agent's
 inspection-task result or a new recording. The public Agent's dependency pin and
 turnkey inspection tutorial are separate increments.
+
+
+### Inspection heading configuration candidate
+
+The optional inspection fixture now generates a three-degree stateful
+SimpleGoalChecker heading tolerance for both navigation contexts. Startup reads
+back the sole checker selection, plugin type, stateful flag, heading and both XY
+values before public admission, within the existing shared four-second deadline.
+This is reference-scene configuration, not proof of arrival accuracy or readable
+images. Ordinary navigation and Agent sampling/quality predicates are unchanged.
+
+Simulation discovery includes typed-value/selection rejection, wrong B values,
+shared deadline exhaustion, pre-admission checks and client cleanup. A malformed
+B baseline must leave both controller files and the robot model unchanged.
+The existing Humble job's inert service checks additionally reject wrong heading
+with correct XY; no new CI workflow is needed. Local ARM64 Ubuntu 22.04/Humble validation passed all 107 simulation tests and
+eight inert ROS service/TF/display checks. It used the current Python source with
+the retained unchanged Core installation, not a fresh install. macOS discovery
+passed with 16 Linux-only skips among 107 tests. Moving qualification of this new
+product combination remains pending.
+Historical checks above retain their original versions and counts.

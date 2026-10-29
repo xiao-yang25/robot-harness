@@ -21,7 +21,9 @@ class InspectionSceneTests(unittest.TestCase):
         (share/'worlds/world_only.model').write_text('<sdf><world name="default"><model name="walls"><static>true</static></model></world></sdf>')
         (output/'scoped-waffle.model').write_text('<sdf><model name="robot"><link name="base_link"><sensor type="depth"/><sensor type="ray"/></link><plugin filename="libscoped_diff_drive.so"/></model></sdf>')
         parameters = {'controller_server': {'ros__parameters': {
-            'general_goal_checker': {'xy_goal_tolerance': .25, 'stateful': True},
+            'goal_checker_plugins': ['general_goal_checker'],
+            'general_goal_checker': {'plugin': 'nav2_controller::SimpleGoalChecker',
+                                     'yaw_goal_tolerance': .25, 'xy_goal_tolerance': .25, 'stateful': True},
             'FollowPath': {'xy_goal_tolerance': .25, 'plugin': 'nav2_rotation_shim_controller::RotationShimController'}}}}
         for name in ('native-params.yaml','b-params.yaml'):
             (output/name).write_text(yaml.safe_dump(parameters))
@@ -51,7 +53,8 @@ class InspectionSceneTests(unittest.TestCase):
                 self.assertIsNotNone(model.find(".//plugin[@filename='libscoped_diff_drive.so']"))
                 for name in ('native-params.yaml','b-params.yaml'):
                     value = yaml.safe_load((output/name).read_text())['controller_server']['ros__parameters']
-                    self.assertEqual(value['general_goal_checker'], dict(xy_goal_tolerance=.15, stateful=True))
+                    self.assertEqual(value['general_goal_checker'], dict(xy_goal_tolerance=.15, stateful=True, yaw_goal_tolerance=math.radians(3),
+                        plugin='nav2_controller::SimpleGoalChecker'))
                     self.assertEqual(value['FollowPath']['xy_goal_tolerance'], .15)
                 self.assertEqual((share/'worlds/world_only.model').read_text(), original)
                 selected, _ = scene.collection_world(output, share, case)
@@ -64,6 +67,20 @@ class InspectionSceneTests(unittest.TestCase):
             (output/'b-params.yaml').write_text('controller_server: {}')
             with self.assertRaises(KeyError): scene.prepare('normal',output,share)
             self.assertEqual((output/'scoped-waffle.model').read_text(), old)
+
+    def test_wrong_b_heading_baseline_leaves_both_files_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            share, output = self.fixture(Path(directory))
+            path = output/'b-params.yaml'
+            data = yaml.safe_load(path.read_text())
+            data['controller_server']['ros__parameters']['general_goal_checker']['yaw_goal_tolerance'] = .1
+            path.write_text(yaml.safe_dump(data))
+            before = {name: (output/name).read_text() for name in
+                      ('native-params.yaml', 'b-params.yaml', 'scoped-waffle.model')}
+            with self.assertRaises(ValueError):
+                scene.prepare('normal', output, share)
+            self.assertEqual(before, {name: (output/name).read_text() for name in before})
+            self.assertFalse((output/'inspection.world').exists())
 
     def test_collection_rejects_collision_or_changed_base_world(self):
         for change in ('collision','include','model','base','wrong-case'):
@@ -80,10 +97,11 @@ class InspectionSceneTests(unittest.TestCase):
         validate_selection('normal', PROFILE_ID, 'normal')
         for args in (('normal', 'other', 'normal'),('recheck',PROFILE_ID,'occupied-a'),('unknown',PROFILE_ID,'normal')):
             with self.subTest(args=args), self.assertRaises(ValueError): validate_selection(*args)
-        self.assertEqual(list(validate_values([N(type=3,double_value=.15)]*2).values()), [.15,.15])
-        for values in ([N(type=3,double_value=.25)]*2,[N(type=2,double_value=.15)]*2,
-                       [N(type=3,double_value=math.nan)]*2,[]):
+        from test_inspection_readback import valid
+        self.assertEqual(validate_values(valid())['general_goal_checker.yaw_goal_tolerance'], math.radians(3))
+        for values in ([N(type=3,double_value=.15)]*2, []):
             with self.subTest(values=values),self.assertRaises(ValueError):validate_values(values)
+
 
 
 if __name__ == '__main__': unittest.main()

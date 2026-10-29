@@ -7,7 +7,7 @@ import yaml
 
 
 def prepare(case, output, share):
-    from robot_harness_nav2._inspection import CASES, TOLERANCE
+    from robot_harness_nav2._inspection import CASES, TOLERANCE, YAW_TOLERANCE
     if case not in CASES:
         raise ValueError('unsupported inspection case')
     output, share = Path(output), Path(share)
@@ -45,6 +45,12 @@ def prepare(case, output, share):
     for name in ('native-params.yaml', 'b-params.yaml'):
         data = yaml.safe_load((output/name).read_text())
         controller = data['controller_server']['ros__parameters']
+        checker = controller['general_goal_checker']
+        if (controller['goal_checker_plugins'] != ['general_goal_checker']
+                or checker['plugin'] != 'nav2_controller::SimpleGoalChecker'
+                or checker['stateful'] is not True or checker['yaw_goal_tolerance'] != .25):
+            raise ValueError('unexpected baseline inspection goal checker')
+        checker['yaw_goal_tolerance'] = YAW_TOLERANCE
         for plugin in ('general_goal_checker', 'FollowPath'):
             if controller[plugin]['xy_goal_tolerance'] != .25:
                 raise ValueError('unexpected baseline controller tolerance')
@@ -56,7 +62,7 @@ def prepare(case, output, share):
         (output/name).write_text(yaml.safe_dump(data))
     (output/'inspection-scene.json').write_text(json.dumps(dict(case=case,
         world=str(output/'inspection.world'), camera_profile='located-bright-panel-v2',
-        camera_hfov=2.2, camera_hz=5, goal_tolerance=TOLERANCE,
+        camera_hfov=2.2, camera_hz=5, goal_tolerance=TOLERANCE, goal_yaw_tolerance=YAW_TOLERANCE,
         panels_visual_only=True), indent=2)+'\n')
 
 
